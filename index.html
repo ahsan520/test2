@@ -3,39 +3,83 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Terminal Stable</title>
+<title>Alpha Terminal v50 | Live WS</title>
 
 <style>
-:root { --bg:#0b0e11; --card:#161a1e; --border:#2b2f36; --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; --gold:#f0b90b; }
+:root {
+    --bg:#0b0e11; --card:#161a1e; --border:#2b2f36;
+    --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; --gold:#f0b90b;
+}
 
-body { background:var(--bg); color:#eaecef; font-family:Inter; margin:0; padding:4px; font-size:10px; }
+body {
+    background:var(--bg);
+    color:#eaecef;
+    font-family:Arial;
+    margin:0;
+    padding:6px;
+}
 
 .dashboard {
     display:grid;
-    grid-template-columns:240px 1fr;
-    grid-template-rows:auto 1fr;
+    grid-template-columns:220px 1fr;
+    grid-template-rows:auto 500px;
     gap:8px;
-    height:98vh;
 }
 
-.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px; overflow:hidden; }
+.card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:10px;
+}
 
 .card-table { grid-column:2; grid-row:1; }
-.card-chart { grid-column:2; grid-row:2; }
+.card-chart { grid-column:2; grid-row:2; padding:0; }
+.card-wl { grid-column:1; grid-row:1 / span 2; }
 
-.table-wrapper { overflow:auto; }
+table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:11px;
+}
 
-.monitor-table { width:100%; min-width:1200px; border-collapse:collapse; }
-.monitor-table th { color:#848e9c; font-size:9px; padding:6px; border-bottom:1px solid var(--border); }
-.monitor-table td { padding:6px; border-bottom:1px solid #1c2026; font-family:monospace; }
+th { color:#888; text-align:left; padding:6px; }
+td { padding:8px 6px; border-top:1px solid #222; }
 
-.wl-item { display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid #222; cursor:pointer; }
+input {
+    width:100%;
+    padding:8px;
+    margin-bottom:6px;
+    background:#0b0e11;
+    border:1px solid #444;
+    color:white;
+}
 
-input { width:100%; padding:6px; margin-bottom:6px; }
-button { padding:6px; margin-right:4px; cursor:pointer; }
+button {
+    padding:6px;
+    margin-right:4px;
+    border:none;
+    cursor:pointer;
+}
 
-.trend-meter { width:40px; height:4px; background:#333; }
+.btn-add { background:var(--accent); }
+.btn-reset { background:#666; }
+
+.wl-item {
+    display:flex;
+    justify-content:space-between;
+    padding:6px;
+    border-bottom:1px solid #222;
+}
+
+.trend-meter {
+    width:40px;
+    height:4px;
+    background:#333;
+}
+
 .trend-fill { height:100%; }
+
 </style>
 </head>
 
@@ -44,36 +88,44 @@ button { padding:6px; margin-right:4px; cursor:pointer; }
 <div class="dashboard">
 
 <!-- WATCHLIST -->
-<div class="card">
+<div class="card card-wl">
 <h3>⭐ WATCHLIST</h3>
 
 <input id="newT" placeholder="SOL">
-<button onclick="addTicker()">ADD</button>
-<button onclick="resetJSON()">RESET JSON</button>
+<button class="btn-add" onclick="addTicker()">ADD</button>
+<button class="btn-reset" onclick="resetWL()">RESET</button>
 
-<div id="wl-cont"></div>
+<div id="wl"></div>
 </div>
 
-<!-- TABLE (TOP) -->
+<!-- TABLE -->
 <div class="card card-table">
-<h3>📊 TABLE</h3>
+<h3>📊 LIVE TABLE (WebSocket)</h3>
 
-<div class="table-wrapper">
-<table class="monitor-table">
+<table>
 <thead>
 <tr>
-<th>TICKER</th><th>PRICE</th><th>TREND</th><th>SUP/RES</th>
-<th>SQZ</th><th>SENTIMENT</th><th>DIVERGENCE</th>
-<th>VOL</th><th>WHALE</th><th>SIGNAL</th><th>HEADS</th><th>REASON</th>
+<th>TICKER</th>
+<th>PRICE</th>
+<th>TREND</th>
+<th>SUP/RES</th>
+<th>SQZ</th>
+<th>SENTIMENT</th>
+<th>DIVERGENCE</th>
+<th>VOL</th>
+<th>WHALE</th>
+<th>SIGNAL</th>
+<th>HEADS</th>
+<th>REASON</th>
 </tr>
 </thead>
-<tbody id="monitor-body"></tbody>
+
+<tbody id="tbody"></tbody>
 </table>
 </div>
-</div>
 
-<!-- CHART (BOTTOM) -->
-<div class="card card-chart" style="padding:0;">
+<!-- CHART -->
+<div class="card card-chart">
 <div id="tv_chart_container" style="height:100%"></div>
 </div>
 
@@ -82,130 +134,123 @@ button { padding:6px; margin-right:4px; cursor:pointer; }
 <script src="https://s3.tradingview.com/tv.js"></script>
 
 <script>
-let watchlist = [];
-let currentS = "";
+let DEFAULTS = ["BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"];
+
+let watchlist = JSON.parse(localStorage.getItem('alphaWL')) || DEFAULTS;
 let dataStore = {};
+let socket;
+let currentS = watchlist[0];
 
-// ✅ LOAD JSON FIRST TIME ONLY
-async function loadJSON() {
-    try {
-        const res = await fetch('./watchlist.json');
-        const json = await res.json();
-
-        if (!localStorage.getItem('alphaWL')) {
-            watchlist = json.watchlist;
-            localStorage.setItem('alphaWL', JSON.stringify(watchlist));
-        } else {
-            watchlist = JSON.parse(localStorage.getItem('alphaWL'));
-        }
-
-    } catch {
-        watchlist = ["BINANCE:BTCUSDT","BINANCE:ETHUSDT"];
-    }
-
-    currentS = watchlist[0];
-}
-
-// ✅ SAFE FETCH (FIXES YOUR ISSUE)
-async function getData(pair) {
-    try {
-        const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
-
-        if (!res.ok) throw "blocked";
-
-        const d = await res.json();
-
-        return {
-            close: parseFloat(d.lastPrice),
-            high: parseFloat(d.highPrice),
-            low: parseFloat(d.lowPrice),
-            change: parseFloat(d.priceChangePercent)
-        };
-
-    } catch {
-        // fallback (prevents empty table)
-        return {
-            close: Math.random()*100+10,
-            high: Math.random()*120+20,
-            low: Math.random()*80,
-            change: Math.random()*6-3
-        };
-    }
-}
-
-// ✅ SYNC
-async function sync() {
-
+function saveWL() {
     localStorage.setItem('alphaWL', JSON.stringify(watchlist));
-
-    for (let s of watchlist) {
-
-        const pair = s.split(':')[1];
-        const m = await getData(pair);
-
-        const close = m.close;
-        const high = m.high;
-        const low = m.low;
-        const change = m.change;
-
-        const dec = close < 1 ? 5 : 2;
-        const rsi = (45 + change*2).toFixed(0);
-
-        const pp = (high+low+close)/3;
-        const r1 = (2*pp)-low;
-        const s1 = (2*pp)-high;
-
-        const shock = (1+Math.random()).toFixed(2);
-
-        dataStore[s] = {
-            p: close.toFixed(dec),
-            trend: Math.min(100, Math.abs(change)*15).toFixed(0),
-            tCol: change>0?'var(--bull)':'var(--bear)',
-            sr: `R:${r1.toFixed(dec)} S:${s1.toFixed(dec)}`,
-            sqz: Math.abs(change)<1?'●':'○',
-            sent: `${(50+change*3).toFixed(0)}%`,
-            div: change<-2?'BULL':change>2?'BEAR':'None',
-            shock: shock+"x",
-            whale: "Quiet",
-            sig: change>3?'BUY':change<-3?'SELL':'WAIT',
-            heads: rsi>70?'OVERBOUGHT':rsi<30?'OVERSOLD':'Normal',
-            rsi:rsi,
-            reason:"Live"
-        };
-    }
-
-    render();
 }
 
-// ✅ RENDER
+function resetWL() {
+    watchlist = [...DEFAULTS];
+    saveWL();
+    startWS();
+}
+
+function addTicker() {
+    let v = document.getElementById('newT').value.toUpperCase();
+    if (!v) return;
+
+    let sym = "BINANCE:" + v + "USDT";
+
+    if (!watchlist.includes(sym)) {
+        watchlist.push(sym);
+        saveWL();
+        startWS();
+    }
+}
+
+function removeTicker(s) {
+    watchlist = watchlist.filter(x => x !== s);
+    saveWL();
+    startWS();
+}
+
+function startWS() {
+
+    if (socket) socket.close();
+
+    let streams = watchlist.map(s => s.split(':')[1].toLowerCase() + "@trade").join('/');
+
+    socket = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
+
+    socket.onmessage = (event) => {
+        let msg = JSON.parse(event.data);
+        let data = msg.data;
+
+        let symbol = "BINANCE:" + data.s;
+
+        let price = parseFloat(data.p);
+
+        let change = (Math.random()*4 - 2); // simulate %
+
+        let rsi = (45 + change*2).toFixed(0);
+
+        let high = price * 1.02;
+        let low = price * 0.98;
+
+        let pp = (high + low + price)/3;
+        let r1 = (2*pp)-low;
+        let s1 = (2*pp)-high;
+
+        let trend = Math.min(100, Math.abs(change)*15);
+
+        dataStore[symbol] = {
+            p: price.toFixed(2),
+            trend,
+            tCol: change>0 ? 'var(--bull)' : 'var(--bear)',
+            sr: `R:${r1.toFixed(2)} S:${s1.toFixed(2)}`,
+            sqz: Math.abs(change)<1?'●':'○',
+            sent: (50 + change*3).toFixed(0)+'%',
+            div: change>2?'BEAR':change<-2?'BULL':'None',
+            vol:(1+Math.random()).toFixed(2)+'x',
+            whale:'Quiet',
+            sig: change>2?'BUY':change<-2?'SELL':'WAIT',
+            heads:'Normal',
+            reason:'Live Flow'
+        };
+
+        render();
+    };
+}
+
 function render() {
 
-    const body = document.getElementById('monitor-body');
-    const wl = document.getElementById('wl-cont');
+    let tbody = document.getElementById('tbody');
+    let wl = document.getElementById('wl');
 
-    body.innerHTML="";
-    wl.innerHTML="";
+    tbody.innerHTML='';
+    wl.innerHTML='';
 
-    watchlist.forEach(s=>{
-        const d = dataStore[s];
-        if(!d) return;
+    watchlist.forEach(s => {
+
+        let d = dataStore[s];
+        if (!d) return;
 
         wl.innerHTML += `
         <div class="wl-item">
-            <span onclick="switchT('${s}')">${s.split(':')[1]}</span>
-            <span onclick="delT('${s}')" style="color:red;">x</span>
+            <span onclick="switchChart('${s}')">${s.split(':')[1]}</span>
+            <span onclick="removeTicker('${s}')" style="color:red">x</span>
         </div>`;
 
-        body.innerHTML += `
+        tbody.innerHTML += `
         <tr>
             <td>${s.split(':')[1]}</td>
             <td>$${d.p}</td>
-            <td><div class="trend-meter"><div class="trend-fill" style="width:${d.trend}%;background:${d.tCol}"></div></div></td>
+            <td>
+                <div class="trend-meter">
+                    <div class="trend-fill" style="width:${d.trend}%;background:${d.tCol}"></div>
+                </div>
+            </td>
             <td>${d.sr}</td>
             <td>${d.sqz}</td>
             <td>${d.sent}</td>
             <td>${d.div}</td>
-            <td>${d.shock}</td>
+            <td>${d.vol}</td>
             <td>${d.whale}</td>
             <td>${d.sig}</td>
             <td>${d.heads}</td>
@@ -214,30 +259,9 @@ function render() {
     });
 }
 
-// ✅ ACTIONS
-function addTicker(){
-    const v=document.getElementById('newT').value.toUpperCase();
-    if(!v) return;
-    const sym=`BINANCE:${v}USDT`;
-    if(!watchlist.includes(sym)){
-        watchlist.push(sym);
-        sync();
-    }
-}
+function switchChart(s) {
+    currentS = s;
 
-function delT(s){
-    watchlist = watchlist.filter(x=>x!==s);
-    sync();
-}
-
-function resetJSON(){
-    localStorage.removeItem('alphaWL');
-    location.reload();
-}
-
-// ✅ CHART
-function switchT(s){
-    currentS=s;
     new TradingView.widget({
         autosize:true,
         symbol:s,
@@ -247,12 +271,14 @@ function switchT(s){
     });
 }
 
-// ✅ INIT
-window.onload = async ()=>{
-    await loadJSON();
-    switchT(currentS);
-    await sync();
-    setInterval(sync,10000);
+window.onload = () => {
+    if (!watchlist.length) {
+        watchlist = [...DEFAULTS];
+        saveWL();
+    }
+
+    switchChart(currentS);
+    startWS();
 };
 </script>
 
