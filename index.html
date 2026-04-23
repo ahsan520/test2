@@ -3,83 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Terminal v51 | Stable WS</title>
+<title>Alpha Terminal | Predator Pro</title>
 
 <style>
 :root {
-    --bg:#0b0e11; --card:#161a1e; --border:#2b2f36;
-    --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; --gold:#f0b90b;
+  --bg:#0b0e11; --card:#161a1e; --border:#2b2f36;
+  --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; --gold:#f0b90b;
 }
 
-body {
-    background:var(--bg);
-    color:#eaecef;
-    font-family:Arial;
-    margin:0;
-    padding:6px;
-}
+body { background:var(--bg); color:#eaecef; font-family:Inter; margin:0; font-size:11px; }
 
-.dashboard {
-    display:grid;
-    grid-template-columns:220px 1fr;
-    grid-template-rows:auto 500px;
-    gap:8px;
-}
+.dashboard { display:grid; grid-template-columns:240px 1fr; grid-template-rows:auto 1fr; gap:8px; padding:6px; height:98vh; }
 
-.card {
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:10px;
-}
+.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px; overflow:hidden; }
 
-.card-table { grid-column:2; grid-row:1; }
-.card-chart { grid-column:2; grid-row:2; padding:0; }
-.card-wl { grid-column:1; grid-row:1 / span 2; }
+.table-wrapper { overflow-x:auto; }
 
-table {
-    width:100%;
-    border-collapse:collapse;
-    font-size:11px;
-}
+.monitor-table { width:100%; min-width:1100px; border-collapse:collapse; }
 
-th { color:#888; text-align:left; padding:6px; }
-td { padding:8px 6px; border-top:1px solid #222; }
+.monitor-table th { color:#888; font-size:10px; padding:6px; }
+.monitor-table td { padding:8px; border-bottom:1px solid #1c2026; font-family:monospace; }
 
-input {
-    width:100%;
-    padding:8px;
-    margin-bottom:6px;
-    background:#0b0e11;
-    border:1px solid #444;
-    color:white;
-}
-
-button {
-    padding:6px;
-    margin-right:4px;
-    border:none;
-    cursor:pointer;
-}
-
-.btn-add { background:var(--accent); }
-.btn-reset { background:#666; }
-
-.wl-item {
-    display:flex;
-    justify-content:space-between;
-    padding:6px;
-    border-bottom:1px solid #222;
-    cursor:pointer;
-}
-
-.trend-meter {
-    width:40px;
-    height:4px;
-    background:#333;
-}
-
+.trend-meter { width:40px; height:4px; background:#333; border-radius:2px; }
 .trend-fill { height:100%; }
+
+.wl-item { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #222; cursor:pointer; }
+
+button { padding:8px; border:none; border-radius:4px; cursor:pointer; margin-top:5px; }
+
 </style>
 </head>
 
@@ -88,45 +39,40 @@ button {
 <div class="dashboard">
 
 <!-- WATCHLIST -->
-<div class="card card-wl">
+<div class="card">
 <h3>⭐ WATCHLIST</h3>
 
-<input id="newT" placeholder="SOL">
-<button class="btn-add" onclick="addTicker()">ADD</button>
-<button class="btn-reset" onclick="resetWL()">RESET</button>
+<input id="newT" placeholder="Symbol (e.g. SOL)" style="width:100%;padding:8px;background:#0b0e11;border:1px solid #444;color:white">
+
+<button style="background:var(--accent);width:100%" onclick="addTicker()">ADD</button>
+
+<button style="background:#555;width:100%" onclick="resetWL()">RESET</button>
+
+<button style="background:#ff3b30;width:100%" onclick="clearCache()">CLEAR CACHE</button>
 
 <div id="wl"></div>
 </div>
 
 <!-- TABLE -->
-<div class="card card-table">
-<h3>📊 LIVE TABLE (WebSocket)</h3>
+<div class="card">
+<h3>📊 LIVE TABLE</h3>
 
-<table>
+<div class="table-wrapper">
+<table class="monitor-table">
 <thead>
 <tr>
-<th>TICKER</th>
-<th>PRICE</th>
-<th>TREND</th>
-<th>SUP/RES</th>
-<th>SQZ</th>
-<th>SENTIMENT</th>
-<th>DIVERGENCE</th>
-<th>VOL</th>
-<th>WHALE</th>
-<th>SIGNAL</th>
-<th>HEADS</th>
-<th>REASON</th>
+<th>TICKER</th><th>PRICE</th><th>TREND</th><th>SUP/RES</th>
+<th>SQZ</th><th>SENT</th><th>DIV</th>
+<th>VOL</th><th>WHALE</th><th>SIGNAL</th><th>HEADS</th><th>REASON</th>
 </tr>
 </thead>
-
-<tbody id="tbody"></tbody>
+<tbody id="body"></tbody>
 </table>
 </div>
 
 <!-- CHART -->
-<div class="card card-chart">
-<div id="tv_chart_container" style="height:100%"></div>
+<div id="tv_chart_container" style="height:420px;margin-top:10px;"></div>
+
 </div>
 
 </div>
@@ -134,172 +80,185 @@ button {
 <script src="https://s3.tradingview.com/tv.js"></script>
 
 <script>
-let DEFAULTS = ["BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"];
 
-let watchlist = JSON.parse(localStorage.getItem('alphaWL')) || DEFAULTS;
-let dataStore = {};
-let socket;
+let watchlist = JSON.parse(localStorage.getItem('alphaWL')) || [
+"BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"
+];
+
 let currentS = watchlist[0];
+let dataStore = {};
 
-function saveWL() {
-    localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+function clearCache(){
+if(!confirm("Clear cache?")) return;
+localStorage.removeItem('alphaWL');
+location.reload();
 }
 
-function resetWL() {
-    watchlist = [...DEFAULTS];
-    saveWL();
-    startWS();
-    render();
+function resetWL(){
+watchlist=["BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"];
+sync();
 }
 
-function addTicker() {
-    let v = document.getElementById('newT').value.toUpperCase();
-    if (!v) return;
-
-    let sym = "BINANCE:" + v + "USDT";
-
-    if (!watchlist.includes(sym)) {
-        watchlist.push(sym);
-        saveWL();
-        startWS();
-        render();
-    }
+function addTicker(){
+let v=document.getElementById("newT").value.toUpperCase();
+if(v) watchlist.push(`BINANCE:${v}USDT`);
+sync();
 }
 
-function removeTicker(s) {
-    watchlist = watchlist.filter(x => x !== s);
-    saveWL();
-    startWS();
-    render();
+function delT(s){
+watchlist=watchlist.filter(x=>x!==s);
+sync();
 }
 
-function startWS() {
-
-    if (socket) socket.close();
-
-    if (!watchlist.length) return;
-
-    let streams = watchlist.map(s => s.split(':')[1].toLowerCase() + "@ticker").join('/');
-
-    socket = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
-
-    socket.onopen = () => console.log("WS CONNECTED");
-
-    socket.onmessage = (event) => {
-
-        let msg = JSON.parse(event.data);
-        let d = msg.data;
-
-        let symbol = "BINANCE:" + d.s;
-
-        let price = parseFloat(d.c);
-        let change = parseFloat(d.P);
-
-        let high = parseFloat(d.h);
-        let low = parseFloat(d.l);
-
-        let pp = (high + low + price)/3;
-        let r1 = (2*pp)-low;
-        let s1 = (2*pp)-high;
-
-        let trend = Math.min(100, Math.abs(change)*5);
-
-        dataStore[symbol] = {
-            p: price.toFixed(2),
-            trend,
-            tCol: change>0 ? 'var(--bull)' : 'var(--bear)',
-            sr: `R:${r1.toFixed(2)} S:${s1.toFixed(2)}`,
-            sqz: Math.abs(change)<1?'●':'○',
-            sent: (50 + change).toFixed(0)+'%',
-            div: change>3?'BEAR':change<-3?'BULL':'None',
-            vol: parseFloat(d.v).toFixed(0),
-            whale:'Live',
-            sig: change>2?'BUY':change<-2?'SELL':'WAIT',
-            heads: change>5?'⚠️ HOT':change<-5?'⚠️ DROP':'Normal',
-            reason:'Real-time stream'
-        };
-
-        render();
-    };
-
-    socket.onerror = (e) => console.log("WS ERROR", e);
-    socket.onclose = () => console.log("WS CLOSED");
+function switchT(s){
+currentS=s;
+new TradingView.widget({
+autosize:true,
+symbol:s,
+interval:"30",
+theme:"dark",
+container_id:"tv_chart_container"
+});
+render();
 }
 
-function render() {
+async function sync(){
+localStorage.setItem('alphaWL',JSON.stringify(watchlist));
 
-    let tbody = document.getElementById('tbody');
-    let wl = document.getElementById('wl');
+let volumes=[];
 
-    tbody.innerHTML='';
-    wl.innerHTML='';
+for(let s of watchlist){
+let pair=s.split(':')[1];
 
-    watchlist.forEach(s => {
+try{
+let res=await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
+let d=await res.json();
 
-        // WATCHLIST always visible
-        wl.innerHTML += `
-        <div class="wl-item">
-            <span onclick="switchChart('${s}')">${s.split(':')[1]}</span>
-            <span onclick="removeTicker('${s}')" style="color:red">x</span>
-        </div>`;
+let close=parseFloat(d.lastPrice);
+let high=parseFloat(d.highPrice);
+let low=parseFloat(d.lowPrice);
+let change=parseFloat(d.priceChangePercent);
+let volume=parseFloat(d.quoteVolume);
 
-        let d = dataStore[s];
+volumes.push(volume);
 
-        // LOADING state
-        if (!d) {
-            tbody.innerHTML += `
-            <tr>
-                <td>${s.split(':')[1]}</td>
-                <td colspan="11" style="color:#888">Loading live data...</td>
-            </tr>`;
-            return;
-        }
+dataStore[s]={close,high,low,change,volume};
 
-        tbody.innerHTML += `
-        <tr>
-            <td>${s.split(':')[1]}</td>
-            <td>$${d.p}</td>
-            <td>
-                <div class="trend-meter">
-                    <div class="trend-fill" style="width:${d.trend}%;background:${d.tCol}"></div>
-                </div>
-            </td>
-            <td>${d.sr}</td>
-            <td>${d.sqz}</td>
-            <td>${d.sent}</td>
-            <td>${d.div}</td>
-            <td>${d.vol}</td>
-            <td>${d.whale}</td>
-            <td>${d.sig}</td>
-            <td>${d.heads}</td>
-            <td>${d.reason}</td>
-        </tr>`;
-    });
+}catch(e){console.log(e);}
 }
 
-function switchChart(s) {
-    currentS = s;
+let maxVol=Math.max(...volumes);
+let avgVol=volumes.reduce((a,b)=>a+b,0)/volumes.length;
 
-    new TradingView.widget({
-        autosize:true,
-        symbol:s,
-        interval:"30",
-        theme:"dark",
-        container_id:"tv_chart_container"
-    });
+for(let s in dataStore){
+let d=dataStore[s];
+
+let rsi=(45+(d.change*2));
+
+let trend=Math.min(100,Math.abs(d.change)*15);
+let trendColor=d.change>0?"var(--bull)":"var(--bear)";
+
+let pp=(d.high+d.low+d.close)/3;
+let r1=(2*pp)-d.low;
+let s1=(2*pp)-d.high;
+
+let volNorm=Math.min(100,(d.volume/maxVol)*100);
+let volLabel=volNorm>70?"HIGH":volNorm>40?"MED":"LOW";
+
+let whale="Quiet";
+if(d.volume>avgVol*1.8 && Math.abs(d.change)>1.5){
+whale=d.change>0?"🐋 Accumulation":"🐋 Distribution";
 }
 
-window.onload = () => {
+let signal="WAIT";
+if(rsi<30 && d.change>0) signal="BUY";
+else if(rsi>70 && d.change<0) signal="SELL";
+else if(d.change>2.5) signal="STRONG BUY";
+else if(d.change<-2.5) signal="STRONG SELL";
 
-    if (!watchlist.length) {
-        watchlist = [...DEFAULTS];
-        saveWL();
-    }
+let heads="Neutral";
+if(rsi>75) heads="⚠️ Overbought";
+else if(rsi<25) heads="🚀 Oversold";
+else if(d.volume>avgVol*2) heads="🔥 Volume Spike";
+else if(Math.abs(d.change)<0.5) heads="🧊 Range";
 
-    render();          // show immediately
-    switchChart(currentS);
-    startWS();         // then live data
+let reasons=[];
+if(rsi>70) reasons.push("RSI High");
+if(rsi<30) reasons.push("RSI Low");
+if(d.volume>avgVol*1.5) reasons.push("Vol Surge");
+if(Math.abs(d.change)<1) reasons.push("Low Vol");
+if(d.change>2) reasons.push("Momentum Up");
+if(d.change<-2) reasons.push("Momentum Down");
+
+dataStore[s].render={
+price:d.close.toFixed(2),
+trend,trendColor,
+sr:`R:${r1.toFixed(2)} S:${s1.toFixed(2)}`,
+volNorm,volLabel,
+whale,signal,heads,
+reason:reasons.join(" + ")||"Neutral"
 };
+
+}
+
+render();
+}
+
+function render(){
+
+let wl=document.getElementById("wl");
+let body=document.getElementById("body");
+
+wl.innerHTML="";
+body.innerHTML="";
+
+watchlist.forEach(s=>{
+let d=dataStore[s];
+if(!d) return;
+
+wl.innerHTML+=`
+<div class="wl-item" onclick="switchT('${s}')">
+${s.split(':')[1]}
+<span onclick="event.stopPropagation();delT('${s}')" style="color:red">x</span>
+</div>
+`;
+
+let r=d.render;
+
+body.innerHTML+=`
+<tr>
+<td>${s.split(':')[1]}</td>
+<td>$${r.price}</td>
+<td><div class="trend-meter"><div class="trend-fill" style="width:${r.trend}%;background:${r.trendColor}"></div></div></td>
+<td>${r.sr}</td>
+<td>${Math.abs(d.change)<1?"●":"○"}</td>
+<td>${(50+d.change*3).toFixed(0)}%</td>
+<td>${d.change>2?"BULL":d.change<-2?"BEAR":"None"}</td>
+
+<td>
+<div style="width:60px;background:#222;border-radius:3px;">
+<div style="width:${r.volNorm}%;background:var(--gold);height:6px;border-radius:3px;"></div>
+</div>
+<span style="font-size:9px">${r.volLabel}</span>
+</td>
+
+<td>${r.whale}</td>
+<td>${r.signal}</td>
+<td>${r.heads}</td>
+<td style="font-size:9px;color:#aaa">${r.reason}</td>
+
+</tr>
+`;
+});
+
+}
+
+window.onload=()=>{
+switchT(currentS);
+sync();
+setInterval(sync,15000);
+};
+
 </script>
 
 </body>
