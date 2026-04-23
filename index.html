@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Terminal v43 | Stable</title>
+<title>Alpha Terminal v44 | Stable</title>
 
 <style>
 :root {
@@ -24,7 +24,7 @@ body {
    grid-template-rows:auto 500px;
  }
  .card-wl { grid-row:1 / 3; }
- .card-table { grid-column:2 / 4; grid-row:1; }
+ .card-table { grid-column:2 / 4; grid-row:1; max-height:400px; overflow:auto; }
  .card-chart { grid-column:2 / 4; grid-row:2; }
 }
 
@@ -47,7 +47,7 @@ body {
 .trend-meter { width:40px; height:4px; background:#333; }
 .trend-fill { height:100%; }
 
-.wl-item { display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid #222; }
+.wl-item { display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid #222; cursor:pointer; }
 
 input { width:100%; padding:6px; background:#111; color:white; }
 
@@ -97,154 +97,179 @@ input { width:100%; padding:6px; background:#111; color:white; }
 
 <script>
 
-let defaultWL = [];
 let watchlist = [];
 let dataStore = {};
 let currentS = "";
 
-// 🔥 LOAD JSON ONLY FIRST TIME
+// 🔥 INIT WATCHLIST (FIXED)
 async function initWatchlist(){
- let saved = localStorage.getItem('alphaWL');
 
- if(saved){
-   watchlist = JSON.parse(saved);
- } else {
-   try{
-     const res = await fetch('watchlist.json');
-     const json = await res.json();
-     watchlist = json.watchlist;
-     localStorage.setItem('alphaWL', JSON.stringify(watchlist));
-   }catch(e){
-     watchlist = ["BINANCE:BTCUSDT"];
-   }
- }
+    const fallback = [
+        "BINANCE:BTCUSDT",
+        "BINANCE:ETHUSDT",
+        "BINANCE:XRPUSDT",
+        "BINANCE:SOLUSDT"
+    ];
 
- currentS = watchlist[0];
+    let saved = localStorage.getItem('alphaWL');
+
+    if(saved){
+        watchlist = JSON.parse(saved);
+        console.log("Loaded from localStorage");
+        return;
+    }
+
+    try{
+        const res = await fetch('watchlist.json');
+
+        if(!res.ok) throw new Error();
+
+        const json = await res.json();
+
+        if(json.watchlist && json.watchlist.length){
+            watchlist = json.watchlist;
+            localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+            console.log("Loaded from JSON");
+            return;
+        }
+
+        throw new Error();
+
+    }catch(e){
+        console.warn("Using fallback watchlist");
+        watchlist = fallback;
+        localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+    }
 }
 
-// 🔥 FETCH DATA
+// 🔥 FETCH DATA (WITH PROXY + FALLBACK)
 async function sync(){
 
- for(let s of watchlist){
+    for(let s of watchlist){
 
-   const pair = s.split(':')[1];
+        const pair = s.split(':')[1];
 
-   // fallback ALWAYS
-   dataStore[s] = {
-     p:"--", trend:0, tCol:"#555",
-     sr:"-", sqz:"-", sent:"-",
-     div:"-", shock:"-", whale:"-",
-     sig:"WAIT", heads:"-", reason:"Loading..."
-   };
+        // always initialize (prevents empty table)
+        dataStore[s] = {
+            p:"--", trend:0, tCol:"#555",
+            sr:"-", sqz:"-", sent:"-",
+            div:"-", shock:"-", whale:"-",
+            sig:"WAIT", heads:"-", reason:"Loading..."
+        };
 
-   try{
-     const res = await fetch(`https://api.allorigins.win/raw?url=https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
-     const d = await res.json();
+        try{
+            const res = await fetch(`https://api.allorigins.win/raw?url=https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
+            const d = await res.json();
 
-     const close = parseFloat(d.lastPrice);
-     const change = parseFloat(d.priceChangePercent);
-     const high = parseFloat(d.highPrice);
-     const low = parseFloat(d.lowPrice);
+            const close = parseFloat(d.lastPrice);
+            const change = parseFloat(d.priceChangePercent);
+            const high = parseFloat(d.highPrice);
+            const low = parseFloat(d.lowPrice);
 
-     const rsi = (45 + change * 2).toFixed(0);
-     const pp = (high + low + close) / 3;
+            const rsi = (45 + change * 2).toFixed(0);
+            const pp = (high + low + close) / 3;
 
-     dataStore[s] = {
-       p:close.toFixed(2),
-       trend:Math.abs(change)*15,
-       tCol:change>0?'var(--bull)':'var(--bear)',
-       sr:`R:${(2*pp-low).toFixed(2)} S:${(2*pp-high).toFixed(2)}`,
-       sqz:Math.abs(change)<1?"●":"○",
-       sent:`${(50+change*3).toFixed(0)}%`,
-       div:change<-2?"BULL":(change>2?"BEAR":"None"),
-       shock:(1+Math.random()).toFixed(2)+"x",
-       whale:"Quiet",
-       sig:change>3?"BUY":(change<-3?"SELL":"WAIT"),
-       heads:rsi>70?"OVERBOUGHT":(rsi<30?"OVERSOLD":"Normal"),
-       reason:"Live Data"
-     };
+            dataStore[s] = {
+                p:close.toFixed(2),
+                trend:Math.abs(change)*15,
+                tCol:change>0?'var(--bull)':'var(--bear)',
+                sr:`R:${(2*pp-low).toFixed(2)} S:${(2*pp-high).toFixed(2)}`,
+                sqz:Math.abs(change)<1?"●":"○",
+                sent:`${(50+change*3).toFixed(0)}%`,
+                div:change<-2?"BULL":(change>2?"BEAR":"None"),
+                shock:(1+Math.random()).toFixed(2)+"x",
+                whale:"Quiet",
+                sig:change>3?"BUY":(change<-3?"SELL":"WAIT"),
+                heads:rsi>70?"OVERBOUGHT":(rsi<30?"OVERSOLD":"Normal"),
+                reason:"Live"
+            };
 
-   }catch(e){
-     dataStore[s].reason = "API Blocked";
-   }
- }
+        }catch(e){
+            dataStore[s].reason = "API Blocked";
+        }
+    }
 
- render();
+    render();
 }
 
 // 🔥 RENDER
 function render(){
- const body = document.getElementById('monitor-body');
- const wl = document.getElementById('wl-cont');
 
- body.innerHTML="";
- wl.innerHTML="";
+    const body = document.getElementById('monitor-body');
+    const wl = document.getElementById('wl-cont');
 
- watchlist.forEach(s=>{
-   const d = dataStore[s];
+    body.innerHTML = "";
+    wl.innerHTML = "";
 
-   wl.innerHTML += `
-   <div class="wl-item">
-     <span onclick="switchT('${s}')">${s.split(':')[1]}</span>
-     <span onclick="delT('${s}')" style="color:red">x</span>
-   </div>`;
+    watchlist.forEach(s=>{
+        const d = dataStore[s];
 
-   body.innerHTML += `
-   <tr>
-     <td>${s.split(':')[1]}</td>
-     <td>${d.p}</td>
-     <td><div class="trend-meter"><div class="trend-fill" style="width:${d.trend}%;background:${d.tCol}"></div></div></td>
-     <td>${d.sr}</td>
-     <td>${d.sqz}</td>
-     <td>${d.sent}</td>
-     <td>${d.div}</td>
-     <td>${d.shock}</td>
-     <td>${d.whale}</td>
-     <td>${d.sig}</td>
-     <td>${d.heads}</td>
-     <td class="reasoning">${d.reason}</td>
-   </tr>`;
- });
+        wl.innerHTML += `
+        <div class="wl-item">
+            <span onclick="switchT('${s}')">${s.split(':')[1]}</span>
+            <span onclick="delT('${s}')" style="color:red">x</span>
+        </div>`;
+
+        body.innerHTML += `
+        <tr onclick="switchT('${s}')">
+            <td>${s.split(':')[1]}</td>
+            <td>${d.p}</td>
+            <td><div class="trend-meter"><div class="trend-fill" style="width:${d.trend}%;background:${d.tCol}"></div></div></td>
+            <td>${d.sr}</td>
+            <td>${d.sqz}</td>
+            <td>${d.sent}</td>
+            <td>${d.div}</td>
+            <td>${d.shock}</td>
+            <td>${d.whale}</td>
+            <td>${d.sig}</td>
+            <td>${d.heads}</td>
+            <td class="reasoning">${d.reason}</td>
+        </tr>`;
+    });
 }
 
 // ACTIONS
 function switchT(s){
- currentS=s;
- new TradingView.widget({
-   autosize:true,
-   symbol:s,
-   interval:"30",
-   theme:"dark",
-   container_id:"tv_chart_container"
- });
+    currentS = s;
+    new TradingView.widget({
+        autosize:true,
+        symbol:s,
+        interval:"30",
+        theme:"dark",
+        container_id:"tv_chart_container"
+    });
 }
 
 function addTicker(){
- const v=document.getElementById('newT').value.toUpperCase();
- if(v){
-   watchlist.push(`BINANCE:${v}USDT`);
-   localStorage.setItem('alphaWL', JSON.stringify(watchlist));
-   sync();
- }
+    const v = document.getElementById('newT').value.toUpperCase();
+    if(v){
+        watchlist.push(`BINANCE:${v}USDT`);
+        localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+        sync();
+    }
 }
 
 function delT(s){
- watchlist=watchlist.filter(x=>x!==s);
- localStorage.setItem('alphaWL', JSON.stringify(watchlist));
- sync();
+    watchlist = watchlist.filter(x=>x!==s);
+    localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+    sync();
 }
 
-function resetJSON(){
- localStorage.removeItem('alphaWL');
- location.reload();
+// 🔥 FIXED RESET
+async function resetJSON(){
+    localStorage.removeItem('alphaWL');
+    await initWatchlist();
+    switchT(watchlist[0]);
+    sync();
 }
 
 // INIT
 window.onload = async ()=>{
- await initWatchlist();
- switchT(currentS);
- sync();
- setInterval(sync,10000);
+    await initWatchlist();
+    currentS = watchlist[0];
+    switchT(currentS);
+    sync();
+    setInterval(sync,10000);
 };
 
 </script>
