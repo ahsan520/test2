@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Terminal v50 | Live WS</title>
+<title>Alpha Terminal v51 | Stable WS</title>
 
 <style>
 :root {
@@ -70,6 +70,7 @@ button {
     justify-content:space-between;
     padding:6px;
     border-bottom:1px solid #222;
+    cursor:pointer;
 }
 
 .trend-meter {
@@ -79,7 +80,6 @@ button {
 }
 
 .trend-fill { height:100%; }
-
 </style>
 </head>
 
@@ -149,6 +149,7 @@ function resetWL() {
     watchlist = [...DEFAULTS];
     saveWL();
     startWS();
+    render();
 }
 
 function addTicker() {
@@ -161,6 +162,7 @@ function addTicker() {
         watchlist.push(sym);
         saveWL();
         startWS();
+        render();
     }
 }
 
@@ -168,36 +170,39 @@ function removeTicker(s) {
     watchlist = watchlist.filter(x => x !== s);
     saveWL();
     startWS();
+    render();
 }
 
 function startWS() {
 
     if (socket) socket.close();
 
-    let streams = watchlist.map(s => s.split(':')[1].toLowerCase() + "@trade").join('/');
+    if (!watchlist.length) return;
+
+    let streams = watchlist.map(s => s.split(':')[1].toLowerCase() + "@ticker").join('/');
 
     socket = new WebSocket("wss://stream.binance.com:9443/stream?streams=" + streams);
 
+    socket.onopen = () => console.log("WS CONNECTED");
+
     socket.onmessage = (event) => {
+
         let msg = JSON.parse(event.data);
-        let data = msg.data;
+        let d = msg.data;
 
-        let symbol = "BINANCE:" + data.s;
+        let symbol = "BINANCE:" + d.s;
 
-        let price = parseFloat(data.p);
+        let price = parseFloat(d.c);
+        let change = parseFloat(d.P);
 
-        let change = (Math.random()*4 - 2); // simulate %
-
-        let rsi = (45 + change*2).toFixed(0);
-
-        let high = price * 1.02;
-        let low = price * 0.98;
+        let high = parseFloat(d.h);
+        let low = parseFloat(d.l);
 
         let pp = (high + low + price)/3;
         let r1 = (2*pp)-low;
         let s1 = (2*pp)-high;
 
-        let trend = Math.min(100, Math.abs(change)*15);
+        let trend = Math.min(100, Math.abs(change)*5);
 
         dataStore[symbol] = {
             p: price.toFixed(2),
@@ -205,17 +210,20 @@ function startWS() {
             tCol: change>0 ? 'var(--bull)' : 'var(--bear)',
             sr: `R:${r1.toFixed(2)} S:${s1.toFixed(2)}`,
             sqz: Math.abs(change)<1?'●':'○',
-            sent: (50 + change*3).toFixed(0)+'%',
-            div: change>2?'BEAR':change<-2?'BULL':'None',
-            vol:(1+Math.random()).toFixed(2)+'x',
-            whale:'Quiet',
+            sent: (50 + change).toFixed(0)+'%',
+            div: change>3?'BEAR':change<-3?'BULL':'None',
+            vol: parseFloat(d.v).toFixed(0),
+            whale:'Live',
             sig: change>2?'BUY':change<-2?'SELL':'WAIT',
-            heads:'Normal',
-            reason:'Live Flow'
+            heads: change>5?'⚠️ HOT':change<-5?'⚠️ DROP':'Normal',
+            reason:'Real-time stream'
         };
 
         render();
     };
+
+    socket.onerror = (e) => console.log("WS ERROR", e);
+    socket.onclose = () => console.log("WS CLOSED");
 }
 
 function render() {
@@ -228,14 +236,24 @@ function render() {
 
     watchlist.forEach(s => {
 
-        let d = dataStore[s];
-        if (!d) return;
-
+        // WATCHLIST always visible
         wl.innerHTML += `
         <div class="wl-item">
             <span onclick="switchChart('${s}')">${s.split(':')[1]}</span>
             <span onclick="removeTicker('${s}')" style="color:red">x</span>
         </div>`;
+
+        let d = dataStore[s];
+
+        // LOADING state
+        if (!d) {
+            tbody.innerHTML += `
+            <tr>
+                <td>${s.split(':')[1]}</td>
+                <td colspan="11" style="color:#888">Loading live data...</td>
+            </tr>`;
+            return;
+        }
 
         tbody.innerHTML += `
         <tr>
@@ -272,13 +290,15 @@ function switchChart(s) {
 }
 
 window.onload = () => {
+
     if (!watchlist.length) {
         watchlist = [...DEFAULTS];
         saveWL();
     }
 
+    render();          // show immediately
     switchChart(currentS);
-    startWS();
+    startWS();         // then live data
 };
 </script>
 
