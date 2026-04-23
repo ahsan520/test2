@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpha Terminal v42 | Fixed</title>
+
+<style>
+:root { --bg:#0b0e11; --card:#161a1e; --border:#2b2f36; --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; }
+body { background:var(--bg); color:#eaecef; font-family:Inter; margin:0; padding:4px; font-size:10px; }
+
+.dashboard { display:grid; grid-template-columns:1fr; gap:8px; }
+@media(min-width:1024px){
+.dashboard{grid-template-columns:240px 1fr 300px; grid-template-rows:600px 400px;}
+}
+
+.card{background:var(--card); padding:10px; border:1px solid var(--border);}
+.wl-item{display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #222; cursor:pointer;}
+.btn{background:var(--accent); border:none; padding:8px; margin-top:5px; color:white; cursor:pointer;}
+input{width:100%; padding:8px; margin-bottom:5px;}
+
+.monitor-table{width:100%; border-collapse:collapse;}
+.monitor-table td{padding:6px; border-bottom:1px solid #222;}
+</style>
+</head>
+
+<body>
+
+<div class="dashboard">
+
+<div class="card">
+<h3>⭐ WATCHLIST</h3>
+<input id="newT" placeholder="Symbol (e.g. SOL)">
+<button class="btn" onclick="addTicker()">ADD</button>
+<button class="btn" onclick="reloadFromJSON()">RESET JSON</button>
+<div id="wl-cont"></div>
+</div>
+
+<div class="card">
+<div id="tv_chart_container" style="height:400px;"></div>
+</div>
+
+<div class="card">
+<h3>📊 TABLE</h3>
+<table class="monitor-table">
+<tbody id="monitor-body"></tbody>
+</table>
+</div>
+
+</div>
+
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+let watchlist = [];
+let currentS = "";
+let dataStore = {};
+
+// ✅ LOAD WATCHLIST
+async function loadWatchlist(){
+    try{
+        const res = await fetch('watchlist.json');
+        const json = await res.json();
+
+        const saved = localStorage.getItem('alphaWL');
+
+        if(!saved){
+            watchlist = json.watchlist || [];
+            localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+            console.log("Loaded from JSON");
+        }else{
+            watchlist = JSON.parse(saved);
+            console.log("Loaded from localStorage");
+        }
+
+        currentS = watchlist[0];
+
+    }catch(e){
+        console.error("Load error", e);
+        watchlist = ["BINANCE:BTCUSDT","BINANCE:ETHUSDT"];
+        currentS = watchlist[0];
+    }
+}
+
+// ✅ RESET
+async function reloadFromJSON(){
+    localStorage.removeItem('alphaWL');
+    await loadWatchlist();
+    sync();
+}
+
+// ✅ FETCH + FIXED ASYNC
+async function sync(){
+    localStorage.setItem('alphaWL', JSON.stringify(watchlist));
+
+    const promises = watchlist.map(async (s)=>{
+        const pair = s.split(':')[1];
+
+        try{
+            const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
+            const d = await res.json();
+
+            const close = parseFloat(d.lastPrice);
+            const change = parseFloat(d.priceChangePercent);
+
+            dataStore[s] = {
+                p: close.toFixed(2),
+                trend: Math.abs(change)*10,
+                tCol: change>0?'green':'red'
+            };
+
+        }catch(e){
+            console.error("API fail", s);
+        }
+    });
+
+    await Promise.all(promises); // 🔥 FIX
+
+    render();
+}
+
+// ✅ RENDER (ALWAYS SHOW WL)
+function render(){
+    const wl = document.getElementById('wl-cont');
+    const body = document.getElementById('monitor-body');
+
+    wl.innerHTML = "";
+    body.innerHTML = "";
+
+    watchlist.forEach(s=>{
+        const d = dataStore[s];
+
+        // 👇 ALWAYS SHOW WATCHLIST
+        wl.innerHTML += `
+        <div class="wl-item">
+            <span onclick="switchT('${s}')">${s.split(':')[1]}</span>
+            <span onclick="delT('${s}')">❌</span>
+        </div>`;
+
+        if(!d) return;
+
+        body.innerHTML += `
+        <tr>
+            <td>${s}</td>
+            <td>${d.p}</td>
+            <td style="color:${d.tCol}">${d.trend.toFixed(0)}%</td>
+        </tr>`;
+    });
+}
+
+// ✅ ACTIONS
+function switchT(s){
+    currentS = s;
+    new TradingView.widget({
+        symbol:s,
+        interval:"30",
+        theme:"dark",
+        container_id:"tv_chart_container"
+    });
+}
+
+function addTicker(){
+    const v = document.getElementById('newT').value.toUpperCase();
+    if(v){
+        watchlist.push(`BINANCE:${v}USDT`);
+        sync();
+    }
+}
+
+function delT(s){
+    watchlist = watchlist.filter(x=>x!==s);
+    sync();
+}
+
+// ✅ INIT
+window.onload = async ()=>{
+    await loadWatchlist();
+    render();            // 🔥 show WL immediately
+    switchT(currentS);
+    await sync();        // 🔥 then load data
+    setInterval(sync,10000);
+};
+</script>
+
+</body>
+</html>
