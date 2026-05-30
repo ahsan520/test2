@@ -2,264 +2,201 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alpha Terminal | Predator Pro</title>
-
-<style>
-:root {
-  --bg:#0b0e11; --card:#161a1e; --border:#2b2f36;
-  --bull:#00ffad; --bear:#ff3b30; --accent:#58a6ff; --gold:#f0b90b;
-}
-
-body { background:var(--bg); color:#eaecef; font-family:Inter; margin:0; font-size:11px; }
-
-.dashboard { display:grid; grid-template-columns:240px 1fr; grid-template-rows:auto 1fr; gap:8px; padding:6px; height:98vh; }
-
-.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px; overflow:hidden; }
-
-.table-wrapper { overflow-x:auto; }
-
-.monitor-table { width:100%; min-width:1100px; border-collapse:collapse; }
-
-.monitor-table th { color:#888; font-size:10px; padding:6px; }
-.monitor-table td { padding:8px; border-bottom:1px solid #1c2026; font-family:monospace; }
-
-.trend-meter { width:40px; height:4px; background:#333; border-radius:2px; }
-.trend-fill { height:100%; }
-
-.wl-item { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #222; cursor:pointer; }
-
-button { padding:8px; border:none; border-radius:4px; cursor:pointer; margin-top:5px; }
-
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Alpha Terminal v49.2</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
 </head>
-
 <body>
 
-<div class="dashboard">
-
-<!-- WATCHLIST -->
-<div class="card">
-<h3>⭐ WATCHLIST</h3>
-
-<input id="newT" placeholder="Symbol (e.g. SOL)" style="width:100%;padding:8px;background:#0b0e11;border:1px solid #444;color:white">
-
-<button style="background:var(--accent);width:100%" onclick="addTicker()">ADD</button>
-
-<button style="background:#555;width:100%" onclick="resetWL()">RESET</button>
-
-<button style="background:#ff3b30;width:100%" onclick="clearCache()">CLEAR CACHE</button>
-
-<div id="wl"></div>
+<!-- NEWS TICKER -->
+<div class="ticker-bar">
+  <div class="ticker-inner" id="ticker-inner">Loading news...</div>
 </div>
 
-<!-- TABLE -->
-<div class="card">
-<h3>📊 LIVE TABLE</h3>
-
-<div class="table-wrapper">
-<table class="monitor-table">
-<thead>
-<tr>
-<th>TICKER</th><th>PRICE</th><th>TREND</th><th>SUP/RES</th>
-<th>SQZ</th><th>SENT</th><th>DIV</th>
-<th>VOL</th><th>WHALE</th><th>SIGNAL</th><th>HEADS</th><th>REASON</th>
-</tr>
-</thead>
-<tbody id="body"></tbody>
-</table>
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-brand">◈ ALPHA TERMINAL <span>v49.2</span></div>
+  <div class="hdr-right">
+    <div class="hstat"><span class="hstat-l">BTC DOM</span><span class="hstat-v" id="h-btcdom">—</span></div>
+    <div class="hstat"><span class="hstat-l">MCAP</span><span class="hstat-v" id="h-mcap">—</span></div>
+    <div class="hstat"><span class="hstat-l">24H VOL</span><span class="hstat-v" id="h-vol">—</span></div>
+    <div id="fg-pill" style="background:rgba(100,100,100,.2);color:#888;">F&G —</div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">
+      <span class="sdot" id="sdot"></span><span id="sstatus">INIT</span>
+    </div>
+  </div>
 </div>
 
-<!-- CHART -->
-<div id="tv_chart_container" style="height:420px;margin-top:10px;"></div>
-
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on"  onclick="switchTab('matrix',this)">◆ SIGNAL MATRIX</button>
+  <button class="tab"     onclick="switchTab('journal',this)">◆ TRADE JOURNAL</button>
+  <button class="tab"     onclick="switchTab('alerts',this)">🔔 ALERTS</button>
 </div>
 
+<!-- ══ MATRIX TAB ══ -->
+<div id="tab-matrix" class="tc on">
+  <div class="grid2">
+    <!-- Watchlist -->
+    <div class="wl-wrap">
+      <div class="ph">
+        <span class="pt">◆ WATCHLIST</span>
+        <span id="wl-count" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">0</span>
+      </div>
+      <div class="wl-ctrl">
+        <div class="wl-row">
+          <input type="text" id="newT" placeholder="BTC, ETH, XEG.TO…">
+          <button class="btn-add" onclick="addTicker()">+ ADD</button>
+        </div>
+        <select class="wl-sel" id="assetType">
+          <option value="crypto">Crypto (Binance)</option>
+          <option value="stock">Stock / ETF</option>
+        </select>
+      </div>
+      <div class="wl-list" id="wl-cont"></div>
+      <div class="wl-btns">
+        <button class="bsm" onclick="exportWL()">↓ SAVE</button>
+        <button class="bsm" onclick="document.getElementById('wlFile').click()">↑ LOAD</button>
+        <input type="file" id="wlFile" style="display:none" onchange="importWL(this)">
+        <button class="bsm" onclick="wipeData()" style="grid-column:1/3;color:#3a3a3a;">⚡ RESET CACHE</button>
+      </div>
+    </div>
+    <!-- TradingView Chart -->
+    <div class="chart-wrap">
+      <div id="tv_chart" style="height:100%;"></div>
+    </div>
+  </div>
+
+  <!-- News Feed -->
+  <div class="bnews">
+    <div class="bnews-hdr" onclick="toggleNews()">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="pt">◆ LIVE NEWS FEED</span>
+        <span id="news-badge" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">—</span>
+        <span id="bull-n" style="font-family:var(--mono);font-size:8px;color:var(--bull);">▲ 0</span>
+        <span id="bear-n" style="font-family:var(--mono);font-size:8px;color:var(--bear);">▼ 0</span>
+      </div>
+      <span id="news-chevron" style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">▲ COLLAPSE</span>
+    </div>
+    <div class="bnews-body" id="bnews-body"></div>
+  </div>
 </div>
 
+<!-- ══ JOURNAL TAB ══ -->
+<div id="tab-journal" class="tc">
+  <div class="j-layout">
+    <div class="j-form">
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text-bright);letter-spacing:2px;">◆ LOG TRADE</div>
+      <div><label>SYMBOL</label><input type="text" id="j-sym" placeholder="BTC, ETH, XEG.TO…"></div>
+      <div class="frow">
+        <div><label>DIRECTION</label><select id="j-dir"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></div>
+        <div><label>STATUS</label><select id="j-status"><option value="OPEN">OPEN</option><option value="CLOSED">CLOSED</option></select></div>
+      </div>
+      <div class="frow">
+        <div><label>ENTRY PRICE</label><input type="number" id="j-entry" placeholder="0.00" step="any"></div>
+        <div><label>EXIT PRICE</label><input type="number" id="j-exit" placeholder="0.00" step="any"></div>
+      </div>
+      <div class="frow">
+        <div><label>SIZE (units)</label><input type="number" id="j-size" placeholder="0" step="any"></div>
+        <div><label>STOP LOSS</label><input type="number" id="j-stop" placeholder="0.00" step="any"></div>
+      </div>
+      <div><label>SIGNAL / REASON</label><input type="text" id="j-signal" placeholder="e.g. OBI spike + CVD bull + RSI 15m OS"></div>
+      <div><label>NOTES</label><textarea id="j-notes" placeholder="Execution notes, emotions, market context…"></textarea></div>
+      <button class="btn-log" onclick="addTrade()">+ LOG TRADE</button>
+      <div class="pos-calc">
+        <div class="pc-title">POSITION SIZE CALCULATOR</div>
+        <label>ACCOUNT SIZE ($)</label><input type="number" id="ps-acc" placeholder="10000" style="margin-bottom:6px;">
+        <label>RISK PER TRADE (%)</label><input type="number" id="ps-risk" placeholder="1" step="0.1" style="margin-bottom:6px;">
+        <label>ENTRY PRICE</label><input type="number" id="ps-entry" placeholder="0.00" step="any" style="margin-bottom:6px;">
+        <label>STOP LOSS PRICE</label><input type="number" id="ps-stop" placeholder="0.00" step="any" style="margin-bottom:6px;">
+        <button class="bsm" onclick="calcPos()" style="width:100%;padding:8px;">CALCULATE</button>
+        <div class="pc-grid" id="pc-result" style="display:none;">
+          <div class="pc-val"><span class="pc-vl">RISK $</span><span class="pc-vn" id="pc-r">—</span></div>
+          <div class="pc-val"><span class="pc-vl">UNITS</span><span class="pc-vn" id="pc-u">—</span></div>
+          <div class="pc-val"><span class="pc-vl">POSITION $</span><span class="pc-vn" id="pc-p">—</span></div>
+          <div class="pc-val"><span class="pc-vl">STOP DIST %</span><span class="pc-vn" id="pc-d">—</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="j-right">
+      <div class="j-stats">
+        <div class="jst"><div class="jst-v" id="js-total" style="color:var(--accent)">0</div><div class="jst-l">TRADES</div></div>
+        <div class="jst"><div class="jst-v" id="js-wr" style="color:var(--bull)">0%</div><div class="jst-l">WIN RATE</div></div>
+        <div class="jst"><div class="jst-v" id="js-pnl" style="color:var(--bull)">$0</div><div class="jst-l">TOTAL P&L</div></div>
+        <div class="jst"><div class="jst-v" id="js-rr" style="color:var(--gold)">—</div><div class="jst-l">AVG R:R</div></div>
+      </div>
+      <div class="j-tbl-wrap">
+        <table class="jtbl">
+          <thead><tr><th>DATE</th><th>SYMBOL</th><th>DIR</th><th>ENTRY</th><th>EXIT</th><th>SIZE</th><th>P&L $</th><th>P&L %</th><th>SIGNAL</th><th>STATUS</th><th></th></tr></thead>
+          <tbody id="j-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ALERTS TAB ══ -->
+<div id="tab-alerts" class="tc" style="height:calc(100vh - 80px);overflow:hidden;display:none;flex-direction:column;">
+  <!-- Populated by renderAlertCfgPage() in alerts.js -->
+</div>
+
+<!-- ══ SIGNAL MATRIX TABLE (always visible below tabs) ══ -->
+<div class="tbl-wrap">
+  <div class="tbl-ph">
+    <span class="pt">◆ PREDATOR APEX — Signal Matrix v49.2</span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <button class="bsm" onclick="toggleAlerts()" style="padding:3px 10px;">🔔 ALERTS</button>
+    </div>
+  </div>
+  <div id="alert-strip" class="alert-strip" style="display:none;"></div>
+  <div class="tbl-scroll">
+    <table class="mx">
+      <thead><tr>
+        <th onclick="sortBy('name')">TICKER ↕</th>
+        <th onclick="sortBy('p')">PRICE ↕</th>
+        <th onclick="sortBy('chg')">24H % ↕</th>
+        <th>SPARK</th>
+        <th onclick="sortBy('r1h')">MTF RSI</th>
+        <th onclick="sortBy('obi')">OB IMBAL ↕</th>
+        <th onclick="sortBy('cvdv')">CVD ↕</th>
+        <th onclick="sortBy('shock')">VOL SHOCK ↕</th>
+        <th onclick="sortBy('nf')">FLOW ↕</th>
+        <th onclick="sortBy('lp')">L/S ↕</th>
+        <th onclick="sortBy('fr')">FUNDING ↕</th>
+        <th onclick="sortBy('liqdist')">LIQ CLUSTER ↕</th>
+        <th onclick="sortBy('emaTrend')" title="Price vs 200-period EMA">EMA TREND ↕</th>
+        <th title="Funding Rate zone">FUNDING ZONE ↕</th>
+        <th title="Open Interest vs price divergence">OI DIV</th>
+        <th onclick="sortBy('dipScore')" title="Buy-dip / sell composite score">DIP SCORE ↕</th>
+        <th onclick="sortBy('bias4hScore')" title="4H timeframe bias">4H BIAS ↕</th>
+        <th onclick="sortBy('biasDayScore')" title="Daily bias">DAILY BIAS ↕</th>
+        <th onclick="sortBy('score')">SIGNAL ↕</th>
+        <th title="Support level estimate">SUP</th>
+        <th title="Resistance level estimate">RES</th>
+        <th>LINK</th>
+        <th>REASONING</th>
+      </tr></thead>
+      <tbody id="mx-body"></tbody>
+    </table>
+  </div>
+  <!-- Last Updated Bar -->
+  <div class="last-upd-bar">
+    <span>LAST UPDATE:</span>
+    <span id="last-upd-bar-time">—</span>
+    <span style="margin-left:auto;color:#2a3040;">Alpha Terminal v49.2 · 15s refresh</span>
+  </div>
+</div>
+
+<!-- Scripts — load order matters: config → api → signals → render → alerts → journal → app -->
 <script src="https://s3.tradingview.com/tv.js"></script>
-
-<script>
-
-let watchlist = JSON.parse(localStorage.getItem('alphaWL')) || [
-"BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"
-];
-
-let currentS = watchlist[0];
-let dataStore = {};
-
-function clearCache(){
-if(!confirm("Clear cache?")) return;
-localStorage.removeItem('alphaWL');
-location.reload();
-}
-
-function resetWL(){
-watchlist=["BINANCE:BTCUSDT","BINANCE:ETHUSDT","BINANCE:SOLUSDT"];
-sync();
-}
-
-function addTicker(){
-let v=document.getElementById("newT").value.toUpperCase();
-if(v) watchlist.push(`BINANCE:${v}USDT`);
-sync();
-}
-
-function delT(s){
-watchlist=watchlist.filter(x=>x!==s);
-sync();
-}
-
-function switchT(s){
-currentS=s;
-new TradingView.widget({
-autosize:true,
-symbol:s,
-interval:"30",
-theme:"dark",
-container_id:"tv_chart_container"
-});
-render();
-}
-
-async function sync(){
-localStorage.setItem('alphaWL',JSON.stringify(watchlist));
-
-let volumes=[];
-
-for(let s of watchlist){
-let pair=s.split(':')[1];
-
-try{
-let res=await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
-let d=await res.json();
-
-let close=parseFloat(d.lastPrice);
-let high=parseFloat(d.highPrice);
-let low=parseFloat(d.lowPrice);
-let change=parseFloat(d.priceChangePercent);
-let volume=parseFloat(d.quoteVolume);
-
-volumes.push(volume);
-
-dataStore[s]={close,high,low,change,volume};
-
-}catch(e){console.log(e);}
-}
-
-let maxVol=Math.max(...volumes);
-let avgVol=volumes.reduce((a,b)=>a+b,0)/volumes.length;
-
-for(let s in dataStore){
-let d=dataStore[s];
-
-let rsi=(45+(d.change*2));
-
-let trend=Math.min(100,Math.abs(d.change)*15);
-let trendColor=d.change>0?"var(--bull)":"var(--bear)";
-
-let pp=(d.high+d.low+d.close)/3;
-let r1=(2*pp)-d.low;
-let s1=(2*pp)-d.high;
-
-let volNorm=Math.min(100,(d.volume/maxVol)*100);
-let volLabel=volNorm>70?"HIGH":volNorm>40?"MED":"LOW";
-
-let whale="Quiet";
-if(d.volume>avgVol*1.8 && Math.abs(d.change)>1.5){
-whale=d.change>0?"🐋 Accumulation":"🐋 Distribution";
-}
-
-let signal="WAIT";
-if(rsi<30 && d.change>0) signal="BUY";
-else if(rsi>70 && d.change<0) signal="SELL";
-else if(d.change>2.5) signal="STRONG BUY";
-else if(d.change<-2.5) signal="STRONG SELL";
-
-let heads="Neutral";
-if(rsi>75) heads="⚠️ Overbought";
-else if(rsi<25) heads="🚀 Oversold";
-else if(d.volume>avgVol*2) heads="🔥 Volume Spike";
-else if(Math.abs(d.change)<0.5) heads="🧊 Range";
-
-let reasons=[];
-if(rsi>70) reasons.push("RSI High");
-if(rsi<30) reasons.push("RSI Low");
-if(d.volume>avgVol*1.5) reasons.push("Vol Surge");
-if(Math.abs(d.change)<1) reasons.push("Low Vol");
-if(d.change>2) reasons.push("Momentum Up");
-if(d.change<-2) reasons.push("Momentum Down");
-
-dataStore[s].render={
-price:d.close.toFixed(2),
-trend,trendColor,
-sr:`R:${r1.toFixed(2)} S:${s1.toFixed(2)}`,
-volNorm,volLabel,
-whale,signal,heads,
-reason:reasons.join(" + ")||"Neutral"
-};
-
-}
-
-render();
-}
-
-function render(){
-
-let wl=document.getElementById("wl");
-let body=document.getElementById("body");
-
-wl.innerHTML="";
-body.innerHTML="";
-
-watchlist.forEach(s=>{
-let d=dataStore[s];
-if(!d) return;
-
-wl.innerHTML+=`
-<div class="wl-item" onclick="switchT('${s}')">
-${s.split(':')[1]}
-<span onclick="event.stopPropagation();delT('${s}')" style="color:red">x</span>
-</div>
-`;
-
-let r=d.render;
-
-body.innerHTML+=`
-<tr>
-<td>${s.split(':')[1]}</td>
-<td>$${r.price}</td>
-<td><div class="trend-meter"><div class="trend-fill" style="width:${r.trend}%;background:${r.trendColor}"></div></div></td>
-<td>${r.sr}</td>
-<td>${Math.abs(d.change)<1?"●":"○"}</td>
-<td>${(50+d.change*3).toFixed(0)}%</td>
-<td>${d.change>2?"BULL":d.change<-2?"BEAR":"None"}</td>
-
-<td>
-<div style="width:60px;background:#222;border-radius:3px;">
-<div style="width:${r.volNorm}%;background:var(--gold);height:6px;border-radius:3px;"></div>
-</div>
-<span style="font-size:9px">${r.volLabel}</span>
-</td>
-
-<td>${r.whale}</td>
-<td>${r.signal}</td>
-<td>${r.heads}</td>
-<td style="font-size:9px;color:#aaa">${r.reason}</td>
-
-</tr>
-`;
-});
-
-}
-
-window.onload=()=>{
-switchT(currentS);
-sync();
-setInterval(sync,15000);
-};
-
-</script>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/signals.js"></script>
+<script src="js/render.js"></script>
+<script src="js/alerts.js"></script>
+<script src="js/journal.js"></script>
+<script src="js/app.js"></script>
 
 </body>
 </html>
