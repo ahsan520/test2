@@ -520,8 +520,11 @@ async function main() {
   }
 
   // ── Flush digest ──
-  for (const [ruleId, { matches }] of Object.entries(digest)) {
-    if (!matches.length) continue;
+  for (const [ruleId, { matches: rawMatches }] of Object.entries(digest)) {
+    if (!rawMatches.length) continue;
+    // Deduplicate by sym in case ticker appears twice in watchlist
+    const seen = new Set();
+    const matches = rawMatches.filter(m => { if (seen.has(m.sym)) return false; seen.add(m.sym); return true; });
     const isBuy  = ruleId === 'overnight_buy';
     const icon   = isBuy ? '🌙🟢' : '🌙🔴';
     const dir    = isBuy ? 'BUY'  : 'SELL';
