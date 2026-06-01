@@ -1,4 +1,4 @@
-name: Alpha Terminal – Alert Check
+name: Alpha Terminal — Alert Check
 
 on:
   schedule:
@@ -9,10 +9,8 @@ on:
 jobs:
   check-alerts:
     runs-on: ubuntu-latest
-    
-    # Allows the runner to commit the state back to your repository
     permissions:
-      contents: write
+      contents: write   # needed to commit state file back
 
     steps:
       - name: Checkout
@@ -23,27 +21,23 @@ jobs:
         with:
           node-version: '20'
 
-      # FIX: Changed from npm ci to npm install
       - name: Install dependencies
         run: npm install --prefix scripts
 
       - name: Run alert checker
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
           ALERT_COOLDOWN_HOURS: ${{ vars.ALERT_COOLDOWN_HOURS || '4' }}
           DIGEST_MODE:          ${{ vars.DIGEST_MODE || 'true' }}
+          # Optional — override the default watchlist with a JSON array string
+          # WATCHLIST: '["ETHY.TO","KILO.TO","BTCUSDT"]'
         run: node scripts/alert-runner.js
 
-      # FIX: Saves the state file so cooldowns actually work
-      - name: Commit and Push State Changes
+      - name: Persist alert state
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Stage the suppression file created by your runner
-          git add scripts/.alert-state.json || true
-          
-          # Only commit if the file actually changed
-          git commit -m "chore: update alert suppression state [skip ci]" || echo "No state changes."
+          git add scripts/.alert-state.json
+          git diff --cached --quiet && echo "No state changes." || git commit -m "chore: update alert state [skip ci]"
           git push
