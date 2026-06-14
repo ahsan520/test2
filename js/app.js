@@ -1,19 +1,28 @@
 // ══════════════════════════════════════════════
-// app.js — v12.9.1 — init, sync loop, nav, misc UI
-// Changes from v12.9:
-//   • Market-hours gate in syncOne(): stocks/ETFs (TSX + US) are fully skipped
-//     when closed — no network calls, cached DS data served as-is, row shows
-//     a 🔒 FROZEN badge and dimmed "as of close" price.
-//   • syncIntervalFor() now returns Infinity for closed non-crypto symbols so
-//     the adaptive tick never queues them at all.
-//   • Crypto (BINANCE:*) always fetches — 24/7 market, no gate applied.
-//   • Manual per-row refresh (↺ button) bypasses the gate so users can force
-//     a fetch if they know the market just opened.
-//   • refreshSymbol() shows "(CLOSED)" label instead of "↺" when market is shut.
+// app.js — v12.9.3 — init, sync loop, nav, misc UI
+// Changes from v12.9.1:
+//   • syncOne() Phase 1 for delisted pairs (XMR): goes directly to Kraken
+//     ticker instead of routing through batchCrypto. Root cause of XMR never
+//     appearing on leaderboard: batchCrypto's internal Kraken fallback was
+//     unreachable when Binance returned CORS/451, leaving pd=undefined →
+//     syncOne returned false → STATE.DS[XMR] never populated → leaderboard
+//     had nothing to score. Direct Kraken call in Phase 1 fixes this.
+//   • render.js: pumpLimit raised to 12%/20% so big movers (XMR +24%) are
+//     not silently ejected by the ingestion gate — scoring already penalises
+//     extended moves, we don't need a hard gate below 12%.
+//   • render.js: strong-mover fast-track (>8% chg24 + CVD up) bypasses
+//     persistence debounce so these appear immediately on first qualifying refresh.
 // ══════════════════════════════════════════════
 
 // ── DEFAULT WATCHLIST (fallback if watchlist.json cannot be fetched) ──
-const DEFAULT_WATCHLIST = ["ETHY.TO","KILO.TO","GE.TO","XRPP.TO","ETHH.TO","SVR.TO","XBM.TO","XEG.TO","T.TO","CGL.TO","GLCC.TO","ENCC.TO","TXF.TO","HTAE.TO","QMAX.TO"];
+// v12.9.4: updated to reflect reviewed watchlist — dropped ESTC.TO (thin TSX volume),
+// GE.TO, SVR.TO, T.TO, CGL.TO, ETHH.TO; added CRWD.TO, GOOG.TO, DELL.TO, TSLA.TO,
+// SPCX (SpaceX Nasdaq IPO), ENB.TO. SPCX is Nasdaq-listed (no .TO).
+const DEFAULT_WATCHLIST = [
+  "TXF.TO","HTAE.TO","ENCC.TO","GLCC.TO","ETHY.TO",
+  "KILO.TO","XBM.TO","CRWD.TO","GOOG.TO","DELL.TO",
+  "TSLA.TO","XRPP.TO","SPCX","ENB.TO","QMAX.TO"
+];
 
 // ══════════════════════════════════════════════
 // MARKET HOURS ENGINE
@@ -278,9 +287,35 @@ async function syncOne(s, { forceRefresh = false } = {}) {
       const isDelisted = BINANCE_DELISTED.has(pair);
 
       // ── Phase 1: price only ──
+      // v12.9.3: delisted pairs (e.g. XMR) go straight to Kraken for Phase 1
+      // price — batchCrypto's internal Kraken fallback was unreachable when
+      // the Binance fetch returned a CORS/451 error (common from browser),
+      // leaving pd=undefined and causing syncOne to return false, which meant
+      // XMR never entered STATE.DS and never appeared on the leaderboard.
       let pd;
-      try { pd = (await batchCrypto([s]))[s]; } catch {}
-      if (!pd && !isDelisted) pd = await binanceFallback(s);
+      if (isDelisted) {
+        // Direct Kraken ticker — fast, single call, no Binance dependency
+        try {
+          const kPair = KRAKEN_PAIR[pair];
+          if (kPair) {
+            const url = `https://api.kraken.com/0/public/Ticker?pair=${kPair}`;
+            let d = null;
+            try { const r = await fetch(url, { signal: AbortSignal.timeout(8000) }); if (r.ok) d = await r.json(); } catch {}
+            if (!d) d = await fetchProxy(url);
+            const key = Object.keys(d?.result || {})[0];
+            if (key) {
+              const t = d.result[key];
+              const last = parseFloat(t.c[0]);
+              const open = parseFloat(t.o);
+              const chg  = open > 0 ? parseFloat(((last - open) / open * 100).toFixed(2)) : 0;
+              pd = { p: last, chg };
+            }
+          }
+        } catch {}
+      } else {
+        try { pd = (await batchCrypto([s]))[s]; } catch {}
+        if (!pd) pd = await binanceFallback(s).catch(() => null);
+      }
       if (!pd) return false;
 
       if (!STATE.PH[s]) STATE.PH[s] = [];
