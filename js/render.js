@@ -183,6 +183,11 @@ function renderTable() {
       <td data-k="b4h" style="font-size:10px;font-weight:700;color:${d.bias4hC};">${d.bias4h||'—'}</td>
       <td data-k="bday" style="font-size:10px;font-weight:700;color:${d.biasDayC};">${d.biasDay||'—'}</td>
       <td data-k="sig"><span class="sig ${d.sigC}"><span class="sig-dot" style="background:${sdotC}"></span>${d.sig}</span></td>
+      <td data-k="whale" style="font-family:var(--mono);font-size:10px;font-weight:700;color:${d.whaleZoneC||'var(--text-dim)'};min-width:72px;">
+        <span title="${d.whaleZone||''}">${d.whaleZoneEmoji||''}${d.whaleScore??'—'}</span>
+        <span style="font-size:8px;font-weight:400;color:var(--text-dim);"> /100</span>
+      </td>
+      <td data-k="conf" style="font-family:var(--mono);font-size:10px;font-weight:700;color:${(d.bullConfirmCount||0)>=7?'var(--bull)':(d.bullConfirmCount||0)>=4?'#f5c518':'var(--bear)'};min-width:50px;" title="Bull confirmations: ${(d.confirmChecks||[]).filter(c=>c.pass).map(c=>c.label).join(', ')}">${d.bullConfirmCount??0}/10</td>
       <td data-k="sr" style="font-size:9px;min-width:90px;">${d.sup||d.res?`<div style="display:flex;flex-direction:column;gap:1px;line-height:1.3;"><span style="color:var(--bull);">S $${d.sup||'—'}</span><span style="color:var(--bear);">R $${d.res||'—'}</span></div>`:'<span style="color:var(--text-dim);">—</span>'}</td>
       <td><button class="rbtn" onclick="event.stopPropagation();refreshSymbol('${s}',this)">↺</button></td>
       <td class="td-reason" data-k="reason" title="${d.reason}">${d.reason}</td>
@@ -373,6 +378,26 @@ function patchSymbolRow(s) {
   T('bday', cell('bday'), fd.biasDay||'—');
   S('bdayc', cell('bday'), 'color', fd.biasDayC);
   T('reason', cell('reason'), fd.reason||'');
+
+  // Whale Score cell
+  const whaleEl = cell('whale');
+  const whaleKey = (fd.whaleScore??'') + '|' + (fd.whaleZone||'');
+  if (whaleEl && _dv[s+':whale'] !== whaleKey) {
+    _dv[s+':whale'] = whaleKey;
+    whaleEl.style.color = fd.whaleZoneC || 'var(--text-dim)';
+    whaleEl.title = fd.whaleZone || '';
+    whaleEl.innerHTML = `<span>${fd.whaleZoneEmoji||''}${fd.whaleScore??'—'}</span><span style="font-size:8px;font-weight:400;color:var(--text-dim);"> /100</span>`;
+  }
+
+  // Confirmation counter cell
+  const confEl = cell('conf');
+  const confKey = fd.bullConfirmCount ?? 0;
+  if (confEl && _dv[s+':conf'] !== confKey) {
+    _dv[s+':conf'] = confKey;
+    confEl.style.color = confKey >= 7 ? 'var(--bull)' : confKey >= 4 ? '#f5c518' : 'var(--bear)';
+    confEl.textContent = `${confKey}/10`;
+    confEl.title = `Bull confirmations: ${(fd.confirmChecks||[]).filter(c=>c.pass).map(c=>c.label).join(', ')}`;
+  }
 
   // Signal pill
   const sigEl = cell('sig');
@@ -795,6 +820,97 @@ function calcEntryLevels(d) {
   return { entry, stop, t1, t2, rr };
 }
 
+// ── SPIKE POTENTIAL SCORE ─────────────────────────────────────────────────────
+// Answers: "if this moves, how far and how violently?"
+// Distinct from conviction (which measures setup quality).
+// Used as primary sort key within the bull pool so we buy the one likely
+// to move the most, not just the one with the cleanest pattern.
+//
+// Factors (0–100 scale):
+//   Resistance room      — how far to the next wall (from res vs price)
+//   Vol shock            — current vs average volume (more shock = more fuel)
+//   Funding squeeze fuel — negative funding = shorts paying, squeeze pending
+//   CVD slope            — is buying pressure building right now
+//   OI divergence        — CONFIRM = real flow, not just noise
+//   Beta proxy           — smaller caps spike harder (XMR/ZEC vs BTC)
+//   Short interest       — high L/S short side = more covering fuel
+function calcSpikeScore(sym, d) {
+  const p      = parseFloat(d.p   || 0);
+  const res    = parseFloat(d.res || 0);
+  const sup    = parseFloat(d.sup || 0);
+  const shock  = parseFloat(d.shock || 1);
+  const frNum  = parseFloat(d.fr  || 0);
+  const lp     = parseFloat(d.lp  || 50); // L/S long %
+  const chg24  = parseFloat(d.chg || 0);
+  let score = 0;
+
+  // 1. Resistance room (0–30 pts)
+  // More room to resistance = more upside before hitting a wall
+  if (res > 0 && p > 0) {
+    const roomPct = ((res - p) / p) * 100;
+    if      (roomPct >= 10) score += 30;
+    else if (roomPct >= 6)  score += 22;
+    else if (roomPct >= 3)  score += 14;
+    else if (roomPct >= 1)  score += 6;
+    else                    score += 0;  // price is near resistance — no room
+  } else {
+    score += 10; // no res data → neutral
+  }
+
+  // 2. Vol shock / fuel (0–20 pts)
+  // High vol shock means real momentum, not just a drift
+  if      (shock >= 3.0) score += 20;
+  else if (shock >= 2.0) score += 14;
+  else if (shock >= 1.5) score += 8;
+  else if (shock >= 1.2) score += 4;
+  else                   score += 0;
+
+  // 3. Funding squeeze fuel (0–20 pts)
+  // Negative funding = shorts paying longs → squeeze likely if price holds
+  // Very negative = aggressive short positioning = violent squeeze potential
+  if      (frNum <= -0.05) score += 20; // extreme short squeeze fuel
+  else if (frNum <= -0.02) score += 15;
+  else if (frNum <= -0.01) score += 10;
+  else if (frNum <=  0.00) score += 5;
+  else if (frNum >=  0.05) score += 0;  // longs already paying = no squeeze fuel
+  else                     score += 2;
+
+  // 4. CVD slope (0–10 pts)
+  // Rising CVD = buyers are absorbing, move has backing
+  if (d.cvd?.trending === 'up') score += 10;
+
+  // 5. OI divergence quality (0–10 pts)
+  // CONFIRM = institutional flow validated the direction
+  if      (d.oiDiv === '✓ CONFIRM')    score += 10;
+  else if (d.oiDiv === '💎 DIP BUY')   score += 10;
+  else if (d.oiDiv === '⚠ OI DROP')    score += 3;  // ambiguous
+  else if (d.oiDiv === '↑ BEAR OI')    score += 0;
+
+  // 6. Short interest (L/S) squeeze fuel (0–10 pts)
+  // Low long % = more shorts to cover when price moves up
+  const shortPct = 100 - lp;
+  if      (shortPct >= 55) score += 10; // heavily shorted
+  else if (shortPct >= 50) score += 7;
+  else if (shortPct >= 45) score += 4;
+  else                     score += 0;
+
+  // 7. Already-moved penalty — avoid chasing (0 to -10 pts)
+  // A symbol up 5%+ today already had its spike; penalise
+  if      (chg24 > 10) score -= 10;
+  else if (chg24 > 5)  score -= 5;
+  else if (chg24 > 3)  score -= 2;
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// Spike label for card display
+function spikeLabelFromScore(s) {
+  if (s >= 70) return { label: '🔥 HIGH',   cls: 'spike-high' };
+  if (s >= 45) return { label: '⚡ MED',    cls: 'spike-med'  };
+  if (s >= 20) return { label: '〰 LOW',    cls: 'spike-low'  };
+  return               { label: '— NONE',   cls: 'spike-none' };
+}
+
 // ── Build cascade info string from global market data ──
 function getCascadeInfo() {
   const mp = STATE.marketPulse || {};
@@ -1164,9 +1280,41 @@ function renderLeaderboard() {
       STATE.hclPersist[sym] = p;
       const activeDir = p.active ? p.dir : 'neutral';
 
-      const base = sym.replace('BINANCE:','').replace('USDT','').replace('.TO','').toLowerCase();
-      const catalyst = freshNews.find(n => n.title.toLowerCase().includes(base))
-                    || news.find(n => n.title.toLowerCase().includes(base));
+      const baseLC = sym.replace('BINANCE:','').replace('USDT','').replace('.TO','').toLowerCase();
+
+      // ── Spike potential (v12.9.6) — how far/fast could this move ──────────
+      const spikeScore = calcSpikeScore(sym, d);
+
+      // ── News matching — find ALL relevant items (fresh first, then any) ──
+      // Primary: direct symbol name match in headline (most relevant)
+      // Secondary: sector-tag match (CRYPTO/TECH/ENERGY/METAL) for watchlist items
+      const symTag = sym.includes('BINANCE:')
+        ? 'CRYPTO'
+        : (sym.includes('XBM') || sym.includes('GLCC') || sym.includes('GLD') || sym.includes('SLV'))
+        ? 'METAL'
+        : (sym.includes('ENCC') || sym.includes('XEG') || sym.includes('ENB'))
+        ? 'ENERGY'
+        : (sym.includes('TXF') || sym.includes('HTAE') || sym.includes('CRWD') || sym.includes('GOOG') ||
+           sym.includes('DELL') || sym.includes('TSLA') || sym.includes('SPCX') || sym.includes('QMAX'))
+        ? 'TECH'
+        : 'TSX';
+
+      // All fresh direct-match news for this symbol (title includes ticker name)
+      const symNewsItems = freshNews.filter(n => n.title.toLowerCase().includes(baseLC));
+      // Sector news: fresh items matching the symbol's sector tag (for context)
+      const sectorNewsItems = freshNews.filter(n => n.tag === symTag && !n.title.toLowerCase().includes(baseLC));
+
+      // Best single catalyst (for footer chip — unchanged)
+      const catalyst = symNewsItems[0]
+                    || news.find(n => n.title.toLowerCase().includes(baseLC));
+
+      // News hint for the leaderboard card:
+      // Priority: direct fresh match > sector news > none
+      const newsHint = symNewsItems.length
+        ? { item: symNewsItems[0], type: 'direct', allItems: symNewsItems }
+        : sectorNewsItems.length
+        ? { item: sectorNewsItems[0], type: 'sector', allItems: sectorNewsItems }
+        : null;
 
       // ── Trend-continuation lane check ────────────────────────────────────
       // Run AFTER persistence/eviction so we only evaluate symbols that
@@ -1218,20 +1366,30 @@ function renderLeaderboard() {
 
       return {
         sym, d, conv,
-        breakdown,        // dip-buy 4-quadrant breakdown
-        trendBreakdown,   // trend lane 4-quadrant breakdown (null for dip/bear)
-        lane,             // 'dip' | 'trend'
+        breakdown,
+        trendBreakdown,
+        lane,
         dir: lane === 'trend' ? 'bull' : finalDir,
         isCapitulation: isCapitulation && finalDir === 'bull',
-        capScore, catalyst
+        capScore, catalyst, newsHint, spikeScore
       };
     })
     .filter(Boolean)
     .filter(r => r.dir !== 'neutral');
 
-  // ── Split into bull/bear pools, interleave B1 S1 B2 S2 B3 S3 ─────────────
-  const bullPool = allScored.filter(r => r.dir === 'bull').sort((a,b) => b.conv - a.conv).slice(0,3);
-  const bearPool = allScored.filter(r => r.dir === 'bear').sort((a,b) => a.conv - b.conv).slice(0,3);
+  // ── Split into bull/bear pools ────────────────────────────────────────────
+  // Bull pool: primary sort = spikeScore (who will move the most),
+  //            tiebreaker  = conv (setup quality).
+  // This ensures we buy the one LIKELY TO SPIKE, not just the cleanest pattern.
+  // Bear pool: sorted by conv (lowest = most bearish) as before.
+  const bullPool = allScored
+    .filter(r => r.dir === 'bull')
+    .sort((a, b) => (b.spikeScore - a.spikeScore) || (b.conv - a.conv))
+    .slice(0, 3);
+  const bearPool = allScored
+    .filter(r => r.dir === 'bear')
+    .sort((a, b) => a.conv - b.conv)
+    .slice(0, 3);
 
   let ranked;
   if (bullPool.length && bearPool.length) {
@@ -1394,7 +1552,8 @@ function renderLeaderboard() {
   const medals = ['#1','#2','#3','#4','#5','#6'];
 
   body.innerHTML = ranked.map((r, i) => {
-    const { sym, d, conv, dir, catalyst } = r;
+    const { sym, d, conv, dir, catalyst, newsHint, spikeScore } = r;
+    const spikeInfo = spikeLabelFromScore(spikeScore ?? 0);
     if (dir === 'bull') bullRank++; else bearRank++;
     const isCap    = r.isCapitulation || false;
     const rankLabel = isCap ? `💥` : dir === 'bull' ? `B${bullRank}` : `S${bearRank}`;
@@ -1494,6 +1653,40 @@ function renderLeaderboard() {
       ? catalyst.title.slice(0, 55) + (catalyst.title.length > 55 ? '…' : '')
       : (d.reason || '').slice(0, 55);
 
+    // ── News hint (v12.9.5) ──────────────────────────────────────────────────
+    // Show the most relevant news headline for this symbol directly on the card.
+    // Direct match (symbol in headline) > sector news > "none".
+    // Sentiment dot: green = bullish, red = bearish, grey = neutral.
+    function buildNewsHintHtml(hint, collapsed) {
+      if (!hint) {
+        // Always show "none" so the user knows news was checked
+        return collapsed
+          ? `<div class="hcl-news-row none"><span class="hcl-news-lbl">NEWS</span><span class="hcl-news-none">none</span></div>`
+          : `<div class="hcl-news-row none" style="padding:4px 10px 6px;"><span class="hcl-news-lbl">NEWS</span><span class="hcl-news-none">none</span></div>`;
+      }
+      const n = hint.item;
+      const sentClass = n.sent === 'bullish' ? 'bull' : n.sent === 'bearish' ? 'bear' : 'neu';
+      const sentDot   = n.sent === 'bullish' ? '●' : n.sent === 'bearish' ? '●' : '●';
+      const isSector  = hint.type === 'sector';
+      const count     = hint.allItems.length;
+      const countStr  = count > 1 ? ` +${count - 1}` : '';
+      const sectorPfx = isSector ? `<span class="hcl-news-sector">[${n.tag}]</span> ` : '';
+      const ageMin    = Math.floor((Date.now() - n.ts) / 60000);
+      const ageStr    = ageMin < 60 ? `${ageMin}m` : `${Math.floor(ageMin/60)}h`;
+      const headline  = collapsed
+        ? (n.title.slice(0, 52) + (n.title.length > 52 ? '…' : ''))
+        : (n.title.slice(0, 90) + (n.title.length > 90 ? '…' : ''));
+      const clickAttr = n.url ? `onclick="event.stopPropagation();window.open('${n.url.replace(/'/g,"\\'")}','_blank')" style="cursor:pointer"` : '';
+      return `<div class="hcl-news-row ${sentClass}" ${clickAttr}>
+        <span class="hcl-news-lbl">NEWS</span>
+        <span class="hcl-news-dot ${sentClass}">${sentDot}</span>
+        ${sectorPfx}<span class="hcl-news-title">${headline}</span>
+        <span class="hcl-news-meta">${ageStr}${countStr}</span>
+      </div>`;
+    }
+    const newsRowCollapsed = buildNewsHintHtml(newsHint, true);
+    const newsRowExpanded  = buildNewsHintHtml(newsHint, false);
+
     // Market context (from market pulse)
     const asiaStr = spyChg !== 0 ? `Asia ${spyChg >= 0 ? '+' : ''}${(spyChg * 0.5).toFixed(1)}%` : 'Asia —';
     const lonStr  = spyChg !== 0 ? `London ${spyChg >= 0 ? '+' : ''}${(spyChg * 0.4).toFixed(1)}%` : 'London —';
@@ -1510,12 +1703,14 @@ function renderLeaderboard() {
           <span class="hcl-sym-name">${base}</span>
         </div>
         <div class="hcl-ct-right">
+          <span class="hcl-spike-pill ${spikeInfo.cls}" title="Spike potential: ${spikeScore}/100 — resistance room + vol + funding + short squeeze fuel">${spikeInfo.label}</span>
           <span class="hcl-price-val" style="font-size:11px">$${d.p || '—'}</span>
           <span class="hcl-chg ${chgCls}" style="font-size:10px">${chgStr}</span>
           <span class="hcl-timer-val" style="font-size:9px;color:var(--text-dim)">⏱${timerStr}</span>
           <span class="hcl-card-chev" style="font-size:9px;color:var(--text-dim);margin-left:4px">${isExpanded ? '▲' : '▼'}</span>
         </div>
       </div>
+      ${newsRowCollapsed}
 
       <!-- Expandable detail — hidden by default, shown on tap -->
       <div class="hcl-card-detail" style="display:${isExpanded ? '' : 'none'}">
@@ -1560,8 +1755,74 @@ function renderLeaderboard() {
           <div class="hcl-score-total-bar"><div class="hcl-score-total-fill ${dir}" style="width:${Math.min(100, totalScore / 20 * 100)}%"></div></div>
           ${timeBoost ? `<span class="hcl-time-boost">Time boost ${timeBoost}</span>` : ''}
           <span class="hcl-cascade-tag ${cascRisk}">${cascLabel}</span>
+          <span class="hcl-spike-detail ${spikeInfo.cls}" title="Spike potential: resistance room + vol + funding squeeze + CVD + OI + short interest — used to rank which bull scores highest spike priority">SPIKE ${spikeScore}/100</span>
         </div>
       </div>
+
+      <!-- ═══ PDF ENHANCEMENTS PANEL ═══ -->
+      <div class="hcl-whale-panel">
+
+        <!-- Row 1: Whale Score + Smart Money + Trade Grade -->
+        <div class="hcl-wp-row" style="display:flex;gap:6px;align-items:stretch;margin-bottom:6px;">
+
+          <!-- Whale Score -->
+          <div class="hcl-wp-block" style="flex:2;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;">
+            <div style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;margin-bottom:3px;">🐋 WHALE SCORE</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:20px;font-weight:700;color:${d.whaleZoneC || 'var(--text)'};font-family:var(--mono);">${d.whaleScore ?? '—'}</span>
+              <span style="font-size:8px;color:var(--text-dim);">/100</span>
+              <span style="margin-left:auto;font-size:10px;font-weight:600;color:${d.whaleZoneC || 'var(--text-dim)'};">${d.whaleZoneEmoji || ''} ${d.whaleZone || '—'}</span>
+            </div>
+            <div style="height:4px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;">
+              <div style="height:100%;width:${d.whaleScore ?? 0}%;background:${d.whaleZoneC || '#444'};border-radius:2px;transition:width .4s;"></div>
+            </div>
+          </div>
+
+          <!-- Smart Money vs Retail -->
+          <div class="hcl-wp-block" style="flex:1.5;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;">
+            <div style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;margin-bottom:3px;">💡 FLOW</div>
+            <div style="font-size:11px;font-weight:600;color:${d.smartMoneyC || 'var(--text-dim)'};">${d.smartMoneyLabel || '—'}</div>
+            ${d.earlyEntryDetected ? `<div style="margin-top:4px;font-size:8px;color:var(--bull);font-weight:700;letter-spacing:.5px;">⚡ EARLY ENTRY</div>` : ''}
+          </div>
+
+          <!-- Trade Grade + Setup Type -->
+          <div class="hcl-wp-block" style="flex:1.5;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;text-align:center;">
+            <div style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;margin-bottom:3px;">GRADE</div>
+            <div style="font-size:22px;font-weight:700;color:${d.tradeGradeC || 'var(--text)'};font-family:var(--mono);line-height:1;">${d.tradeGrade || '—'}</div>
+            <div style="font-size:8px;color:${d.tradeGradeC || 'var(--text-dim)'};margin-top:2px;">${d.successProb ?? '—'}% win rate</div>
+          </div>
+        </div>
+
+        <!-- Row 2: Signal Stability + Setup Archetype -->
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <div style="flex:1;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:6px 9px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;">📊 STABILITY</span>
+            <div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${d.signalStability ?? 50}%;background:${d.signalStability >= 80 ? 'var(--bull)' : d.signalStability >= 55 ? '#f5c518' : 'var(--bear)'};border-radius:3px;transition:width .3s;"></div>
+            </div>
+            <span style="font-size:10px;font-weight:600;color:${d.signalStability >= 80 ? 'var(--bull)' : d.signalStability >= 55 ? '#f5c518' : 'var(--bear)'};">${d.signalStability ?? '—'}% <span style="font-size:8px;font-weight:400;">${d.stabilityLabel || ''}</span></span>
+          </div>
+          <div style="flex:1;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:6px 9px;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;">🔍 SETUP</span>
+            <span style="font-size:10px;font-weight:600;color:var(--accent);">${d.setupArchetype || '—'}</span>
+          </div>
+        </div>
+
+        <!-- Row 3: Bull Confirmation Counter -->
+        <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:5px;padding:7px 9px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span style="font-size:8px;color:var(--text-dim);font-family:var(--mono);letter-spacing:.8px;">✅ BULL CONFIRMATIONS</span>
+            <span style="font-size:12px;font-weight:700;font-family:var(--mono);color:${(d.bullConfirmCount||0) >= 7 ? 'var(--bull)' : (d.bullConfirmCount||0) >= 4 ? '#f5c518' : 'var(--bear)'};">${d.bullConfirmCount ?? 0}/10</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;">
+            ${(d.confirmChecks || []).map(c => `
+              <div style="display:flex;align-items:center;gap:4px;font-size:8px;font-family:var(--mono);">
+                <span style="color:${c.pass ? 'var(--bull)' : 'var(--bear)'};font-size:9px;">${c.pass ? '✔' : '✖'}</span>
+                <span style="color:${c.pass ? 'var(--text)' : 'var(--text-dim)'};">${c.label}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div><!-- end hcl-whale-panel -->
 
       <!-- Evidence -->
       <div class="hcl-evidence">
@@ -1573,6 +1834,9 @@ function renderLeaderboard() {
           </div>`).join('')}
         </div>
       </div>
+
+      <!-- News (expanded — full headline, clickable) -->
+      ${newsRowExpanded}
 
       <!-- Entry trigger -->
       <div class="hcl-entry">
@@ -1590,11 +1854,10 @@ function renderLeaderboard() {
         </div>` : '<div class="hcl-entry-wait">Awaiting price data…</div>'}
       </div>
 
-      <!-- Footer: R:R · correlation · catalyst -->
+      <!-- Footer: R:R · correlation -->
       <div class="hcl-footer">
         ${levels ? `<span class="hcl-rr">R:R <span>1:${levels.rr}</span> ✓</span>` : ''}
         <span class="hcl-corr">Corr: <span>${corrStr}</span> ✓</span>
-        ${catTxt ? `<span class="hcl-catalyst-mini">⚡ ${catTxt}</span>` : ''}
       </div>
 
       <!-- Market context bar -->
