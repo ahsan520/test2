@@ -1,64 +1,86 @@
-name: Alpha Terminal — Alert Check
+name: Alpha Terminal Alert Runner
 
 on:
   schedule:
-    # Runs every 15 minutes
-    - cron: '*/15 * * * *'
-  workflow_dispatch:   # allow manual trigger from GitHub UI
+    - cron: '15 * * * *'   # :15 past every hour — position tracker heartbeat
 
-# Only one run at a time — prevents concurrent runs from racing on
-# .alert-state.json and defeating suppression.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no Telegram messages)'
+        required: false
+        default: 'false'
+        type: boolean
+
 concurrency:
-  group: alert-check
-  cancel-in-progress: false   # queue, don't cancel — every run should persist state
+  group: alert-runner
+  cancel-in-progress: false
 
 jobs:
-  check-alerts:
+  run-alerts:
+    name: Check alerts & positions
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # needed to commit state file back
+    timeout-minutes: 8
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm install --prefix scripts
+        working-directory: scripts
+        run: npm install
 
-      - name: Run alert checker
+      - name: Run alert runner
+        working-directory: scripts
         env:
-          # ── REQUIRED GitHub Secrets (Settings → Secrets → Actions) ──────────
-          # TELEGRAM_BOT_TOKEN  : your bot token from @BotFather  e.g. 123456:ABC-xyz
-          # TELEGRAM_CHAT_ID    : your chat/channel ID            e.g. -1001234567890
-          #   Get chat ID: message your bot then call
-          #   https://api.telegram.org/bot<TOKEN>/getUpdates and read result[0].message.chat.id
-          # ────────────────────────────────────────────────────────────────────
-          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+          # ── Required secrets (Settings → Secrets and variables → Actions → Secrets) ──
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+
+          # ── Option B: GitHub Secrets/Variables sync ──────────────────────────────────
+          # If you use Option B in the GUI (no browser PAT), set these variables so the
+          # runner knows where positions.json lives. GITHUB_TOKEN is automatic — no setup.
+          #
+          # Settings → Secrets and variables → Actions → Variables:
+          #   GH_REPO           = yourname/alpha-terminal   (required for Option B)
+          #   GH_BRANCH         = main                      (optional, default: main)
+          #   GH_POSITIONS_PATH = scripts/positions.json    (optional, default shown)
+          #
+          GITHUB_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO:              ${{ vars.GH_REPO }}
+          GH_BRANCH:            ${{ vars.GH_BRANCH || 'main' }}
+          GH_POSITIONS_PATH:    ${{ vars.GH_POSITIONS_PATH || 'scripts/positions.json' }}
+
+          # ── Optional tuning ──────────────────────────────────────────────────────────
           ALERT_COOLDOWN_HOURS: ${{ vars.ALERT_COOLDOWN_HOURS || '4' }}
           DIGEST_MODE:          ${{ vars.DIGEST_MODE || 'true' }}
-          # Optional — override the default watchlist with a JSON array string
-          # WATCHLIST: '["TXF.TO","CRWD.TO","GOOG.TO","BTCUSDT"]'
-        run: node scripts/alert-runner.js
+          DRY_RUN:              ${{ inputs.dry_run || vars.DRY_RUN || 'false' }}
 
-      - name: Persist alert state
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add scripts/.alert-state.json
-          git diff --cached --quiet && echo "No state changes." && exit 0
-          git commit -m "chore: update alert state [skip ci]"
-          # Retry push up to 3 times with a pull --rebase in between,
-          # so concurrent runs don't silently drop state.
-          for i in 1 2 3; do
-            git push && exit 0
-            echo "Push failed (attempt $i) — rebasing and retrying…"
-            git pull --rebase
-          done
-          echo "ERROR: could not push alert state after 3 attempts" >&2
-          exit 1
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "🔍 DRY RUN — no Telegram messages will be sent"
+            node alert-runner.js --dry-run
+          else
+            node alert-runner.js
+          fi
+
+      - name: Commit alert state
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet scripts/.alert-state.json 2>/dev/null; then
+            echo "No state changes — skipping commit"
+          else
+            git add scripts/.alert-state.json
+            git commit -m "chore: update alert state [skip ci]"
+            git push
+          fi
