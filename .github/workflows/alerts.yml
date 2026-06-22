@@ -56,7 +56,10 @@ jobs:
           window.__TG_TOKEN     = '${TELEGRAM_BOT_TOKEN}';
           window.__TG_CHAT      = '${TELEGRAM_CHAT_ID}';
           ENVEOF
-          echo "env.js written — GH_PAT: $([ -n "$GH_PAT" ] && echo yes || echo MISSING) | TG: $([ -n "$TELEGRAM_BOT_TOKEN" ] && echo yes || echo MISSING)"
+          
+          # Force Git on the runner to temporarily ignore tracking modifications to this file
+          git update-index --assume-unchanged scripts/env.js 2>/dev/null || true
+          echo "env.js written and hidden from git index tracker — GH_PAT: $([ -n "$GH_PAT" ] && echo yes || echo MISSING)"
 
       # ── Ensure positions.json exists (first run safety) ──
       - name: Ensure positions.json exists
@@ -114,7 +117,7 @@ jobs:
             node alert-runner.js
           fi
 
-      # ── Commit alert state + env.js back to repo ──────────────────────────────────
+      # ── Commit alert state back to repo (Do NOT commit env.js) ──────────────────
       - name: Commit changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -122,11 +125,15 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add scripts/.alert-state.json scripts/env.js scripts/positions.json 2>/dev/null || true
+          # 1. Purge the dynamic env.js file completely so the scanner sees nothing
+          rm -f scripts/env.js
+
+          # 2. Add ONLY the state JSON files
+          git add scripts/.alert-state.json scripts/positions.json 2>/dev/null || true
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update alert state + env [skip ci]"
+            git commit -m "chore: update alert state [skip ci]"
             git push
           fi
