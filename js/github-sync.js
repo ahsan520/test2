@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════
-// github-sync.js — pushes open positions to scripts/positions.json
+// github-sync.js — pushes open positions to scripts/tracker.json
 // v1.0
 //
 // WHY: localStorage (a49_positions) only lives in this browser tab.
@@ -17,7 +17,7 @@
 //     configured interval has elapsed and content actually changed.
 //
 // This is one-directional: browser → GitHub. The server only reads
-// positions.json to decide when to alert; it never writes it back,
+// tracker.json to decide when to alert; it never writes it back,
 // so the browser's localStorage stays the single source of truth.
 // ══════════════════════════════════════════════════════════════════
 
@@ -34,7 +34,7 @@ const DEFAULT_GH_SYNC_CFG = {
   token:        '',        // GitHub PAT — fine-grained, "Contents: Read and write" on this repo
   repo:         '',        // "yourname/your-repo"
   branch:       'main',
-  path:         'scripts/positions.json',
+  path:         'scripts/tracker.json',
   intervalMins: 3,         // periodic safety-net push interval (Option A only)
 };
 
@@ -51,7 +51,7 @@ function loadGhSyncCfg() {
         token:        raw.token        || '',
         repo:         raw.repo         || '',
         branch:       raw.branch       || 'main',
-        path:         raw.path         || 'scripts/positions.json',
+        path:         raw.path         || 'scripts/tracker.json',
         intervalMins: raw.intervalMins || 3,
       };
       localStorage.setItem(GH_SYNC_KEY, JSON.stringify(migrated));
@@ -175,7 +175,22 @@ async function syncPositionsToGitHub(manual = false) {
     window._ghSyncState.lastSyncAt     = Date.now();
     window._ghSyncState.lastError      = null;
     window._ghSyncState.lastPushedJSON = json;
-    logAlertItem('info', `☁ GitHub sync OK — ${Object.keys(positions).length} position(s) → ${cfg.repo}`);
+
+    // ── Auto-promote to Option B after first successful Option A sync ──
+    // Once the PAT has proven it can write to the repo, clear it from
+    // localStorage and switch to Secrets mode so the token is no longer
+    // stored in the browser. The runner already has GH_PAT via repo Secrets,
+    // so headless monitoring continues uninterrupted.
+    if (cfg.mode === 'pat' && cfg.token) {
+      const promoted = { ...cfg, mode: 'secrets', token: '' };
+      saveGhSyncCfg(promoted);
+      logAlertItem('info', `☁ GitHub sync OK — ${Object.keys(positions).length} position(s) → ${cfg.repo}`);
+      logAlertItem('info', `🔒 Auto-switched to Option B (Secrets) — PAT cleared from browser storage.`);
+      renderAlertCfgPage(); // refresh UI to show Secrets panel
+    } else {
+      logAlertItem('info', `☁ GitHub sync OK — ${Object.keys(positions).length} position(s) → ${cfg.repo}`);
+    }
+
     _refreshGhSyncStatusDOM();
     return { ok: true };
 
@@ -279,7 +294,7 @@ function renderGithubSyncCard() {
   const secretsPanel = `
     <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:12px;line-height:1.9;">
       <b style="color:var(--text);">No PAT stored in the browser.</b>
-      The GitHub Actions workflow manages <code style="color:var(--accent);">positions.json</code>
+      The GitHub Actions workflow manages <code style="color:var(--accent);">tracker.json</code>
       directly using its built-in <code style="color:var(--accent);">GITHUB_TOKEN</code>.<br><br>
       Add these in your repo → <b>Settings → Secrets and variables → Actions</b>:<br><br>
       <b style="color:#8957e5;">Secrets</b> (encrypted):<br>
@@ -288,7 +303,7 @@ function renderGithubSyncCard() {
       <b style="color:#8957e5;">Variables</b> (plain text, optional):<br>
       &nbsp;&nbsp;<code style="color:var(--accent);">GH_REPO</code> — owner/repo (e.g. <code>ahsan520/alpha-terminal</code>)<br>
       &nbsp;&nbsp;<code style="color:var(--accent);">GH_BRANCH</code> — branch (default: <code>main</code>)<br>
-      &nbsp;&nbsp;<code style="color:var(--accent);">GH_POSITIONS_PATH</code> — file path (default: <code>scripts/positions.json</code>)<br>
+      &nbsp;&nbsp;<code style="color:var(--accent);">GH_TRACKER_PATH</code> — file path (default: <code>scripts/tracker.json</code>)<br>
       &nbsp;&nbsp;<code style="color:var(--accent);">ALERT_COOLDOWN_HOURS</code> — cooldown hrs (default: <code>4</code>)<br><br>
       <span style="color:var(--bull);">✓ Recommended for headless-first setups</span> — workflow
       reads and monitors positions via repo file; no token in browser.
@@ -359,7 +374,7 @@ function saveGithubSyncCfgFromUI() {
     cfg.token        = document.getElementById('gh-sync-token')?.value.trim()    || '';
     cfg.repo         = document.getElementById('gh-sync-repo')?.value.trim()     || '';
     cfg.branch       = document.getElementById('gh-sync-branch')?.value.trim()   || 'main';
-    cfg.path         = document.getElementById('gh-sync-path')?.value.trim()     || 'scripts/positions.json';
+    cfg.path         = document.getElementById('gh-sync-path')?.value.trim()     || 'scripts/tracker.json';
     cfg.intervalMins = parseInt(document.getElementById('gh-sync-interval')?.value) || 3;
   }
   // Option B: no fields to read from UI — config comes from repo secrets/variables

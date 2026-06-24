@@ -12,6 +12,17 @@ const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const DRY_RUN    = process.argv.includes('--dry-run');
 const STATE_FILE = path.join(__dirname, '.alert-state.json');
 
+// ── Run mode ──────────────────────────────────────────────────────────────
+// 'full'      — watchlist signal scan + leaderboard scanner + position
+//               tracker. Heavier (klines/depth/funding per symbol). Meant
+//               for the hourly schedule, matching the 4h/daily timeframes
+//               the scoring logic actually operates on.
+// 'positions' — position tracker ONLY (stop/T1/T2 checks on open GUI
+//               positions). One ticker call per open position — cheap
+//               enough to run every 5-10 min for timely stop alerts
+//               without re-running the full multi-symbol indicator scan.
+const MODE = (process.argv.find(a => a.startsWith('--mode=')) || '--mode=full').split('=')[1];
+
 // ── Config from environment ──
 const TG_TOKEN        = process.env.TELEGRAM_BOT_TOKEN  || '';
 const TG_CHAT         = process.env.TELEGRAM_CHAT_ID    || '';
@@ -50,22 +61,20 @@ const WATCHLIST = process.env.WATCHLIST
       }
     })();
 
-// ── Position loading — Option A or Option B ─────────────────────────────────
+// ── Position loading — two sources merged ───────────────────────────────────
 //
-// Option A (Browser PAT): GUI pushes positions.json to the repo via localStorage
-//   PAT. The runner reads the local file (checked out by actions/checkout).
-//   Nothing extra needed — loadPositions() reads the file directly.
+// positions.json — written by leaderboard-decider.js (headless signal entries)
+// tracker.json   — written by the browser GUI via github-sync.js (manual trades)
 //
-// Option B (GitHub Secrets): No PAT in the browser. The runner fetches
-//   positions.json from the GitHub Contents API using GITHUB_TOKEN + GH_REPO.
-//   Set GH_REPO (and optionally GH_BRANCH / GH_POSITIONS_PATH) as repo Variables.
+// Both are monitored for stop/T1/T2 exits. They're separate files so the
+// leaderboard runner never overwrites manually-managed GUI positions.
 //
-const POSITIONS_JSON_PATH = path.join(__dirname, 'positions.json');
+const POSITIONS_JSON_PATH = path.join(process.cwd(), 'positions.json');
+const TRACKER_JSON_PATH   = path.join(process.cwd(), 'tracker.json');
 
-async function loadPositionsFromGitHub() {
+async function loadFromGitHub(fpath) {
   const repo   = process.env.GH_REPO;
   const branch = process.env.GH_BRANCH || 'main';
-  const fpath  = process.env.GH_POSITIONS_PATH || 'scripts/positions.json';
   const token  = process.env.GITHUB_TOKEN;
   if (!repo || !token) return null;
 
@@ -79,21 +88,21 @@ async function loadPositionsFromGitHub() {
       },
     });
     if (!res.ok) {
-      if (res.status === 404) return {}; // no positions file yet = no open positions
+      if (res.status === 404) return {}; // file doesn't exist yet = empty
       throw new Error(`GitHub API ${res.status}`);
     }
-    const j    = await res.json();
-    const raw  = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8'));
+    const j   = await res.json();
+    const raw = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8'));
     return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
   } catch (e) {
-    console.warn(`[Option B] Failed to fetch positions from GitHub: ${e.message}`);
-    return null; // fall through to local file
+    console.warn(`[positions] Failed to fetch ${fpath} from GitHub: ${e.message}`);
+    return null;
   }
 }
 
-function loadPositionsLocal() {
+function loadLocal(filePath) {
   try {
-    const raw = JSON.parse(fs.readFileSync(POSITIONS_JSON_PATH, 'utf8'));
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
   } catch {
     return {};
@@ -101,23 +110,99 @@ function loadPositionsLocal() {
 }
 
 async function loadPositions() {
-  // Option B: GH_REPO set → fetch from GitHub API (headless, no browser PAT needed)
-  if (process.env.GH_REPO) {
-    const remote = await loadPositionsFromGitHub();
-    if (remote !== null) {
-      console.log(`[positions] Loaded from GitHub API (Option B) — ${Object.keys(remote).length} position(s)`);
-      return remote;
-    }
-    console.warn('[positions] GitHub API fetch failed — falling back to local file');
-  }
-  // Option A: read local checkout (default)
-  const local = loadPositionsLocal();
-  console.log(`[positions] Loaded from local file (Option A) — ${Object.keys(local).length} position(s)`);
-  return local;
+  const ghPositions = await loadFromGitHub(process.env.GH_POSITIONS_PATH || 'scripts/positions.json');
+  const ghTracker   = await loadFromGitHub(process.env.GH_TRACKER_PATH   || 'scripts/tracker.json');
+
+  // Fall back to local files if GitHub API unavailable
+  const positions = ghPositions ?? loadLocal(POSITIONS_JSON_PATH);
+  const tracker   = ghTracker   ?? loadLocal(TRACKER_JSON_PATH);
+
+  const merged = { ...tracker, ...positions }; // positions.json wins on key collision
+  const posCount = Object.keys(positions).length;
+  const trkCount = Object.keys(tracker).length;
+  console.log(`[positions] Loaded from GitHub API — ${posCount} headless position(s), ${trkCount} tracker position(s)`);
+  return merged;
 }
 
 function stripExchangePrefix(sym) {
   return sym.startsWith('BINANCE:') ? sym.slice('BINANCE:'.length) : sym;
+}
+
+// ── Sweep terminal positions from positions.json and push back to GitHub ─────
+// After stop/T1/T2 hit, the position stays in the file but the runner skips
+// it each cycle (fire-key system prevents duplicate alerts). This sweep removes
+// entries that have been in a terminal state longer than the grace period, then
+// pushes the cleaned file back via the GitHub Contents API so the GUI reflects it.
+//
+// Grace periods (same logic as GUI tracker AUTO_EVICT_MS):
+//   stopped:  15 min  — stop hit, trade closed, clean up quickly
+//   tp2_hit:  20 min  — full target, celebrate then clear
+//   tp1_hit:  60 min  — partial target, still watching for T2
+//   exiting:  30 min  — distribution confirmed, should be closing
+//
+const HEADLESS_EVICT_MS = {
+  stopped: 15 * 60 * 1000,
+  tp2_hit: 20 * 60 * 1000,
+  tp1_hit: 60 * 60 * 1000,
+  exiting: 30 * 60 * 1000,
+};
+
+async function sweepAndPushPositions(positions) {
+  const now     = Date.now();
+  const cleaned = { ...positions };
+  let   swept   = 0;
+
+  for (const [sym, pos] of Object.entries(cleaned)) {
+    const grace = HEADLESS_EVICT_MS[pos.status];
+    if (!grace) continue; // 'watching' — keep indefinitely
+
+    const changedAt = pos.statusChangedAt || pos.alertedAt || 0;
+    if (now - changedAt >= grace) {
+      delete cleaned[sym];
+      swept++;
+      console.log(`  🗑  Swept ${sym} (${pos.status}) after grace period`);
+    }
+  }
+
+  if (!swept) return; // nothing to do
+
+  // Push cleaned positions.json back to GitHub
+  const token  = process.env.GITHUB_TOKEN;
+  const repo   = process.env.GH_REPO;
+  const branch = process.env.GH_BRANCH        || 'main';
+  const fpath  = process.env.GH_POSITIONS_PATH || 'scripts/positions.json';
+
+  if (!token || !repo) {
+    console.log(`[sweep] Skipping push — GITHUB_TOKEN or GH_REPO not set`);
+    return;
+  }
+
+  const apiUrl  = `https://api.github.com/repos/${repo}/contents/${fpath}`;
+  const headers = {
+    'Authorization':        `Bearer ${token}`,
+    'Accept':               'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type':         'application/json',
+  };
+
+  try {
+    let sha = null;
+    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
+    if (getRes.ok) { sha = (await getRes.json()).sha || null; }
+
+    const content = Buffer.from(JSON.stringify(cleaned, null, 2), 'utf8').toString('base64');
+    const body    = {
+      message: `chore: sweep ${swept} terminal position(s) [skip ci]`,
+      content, branch,
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+    if (!putRes.ok) throw new Error(`PUT ${putRes.status}`);
+    console.log(`[sweep] ✓ Pushed cleaned positions.json (${swept} removed, ${Object.keys(cleaned).length} remaining)`);
+  } catch (e) {
+    console.warn(`[sweep] ⚠ Failed to push: ${e.message}`);
+  }
 }
 
 // ── Overnight checklist conditions ──
@@ -217,6 +302,46 @@ async function fetchJSON(url, headers = {}, timeoutMs = 9000) {
   } finally { clearTimeout(tid); }
 }
 
+// ── Resilient Binance fetch ───────────────────────────────────────────────
+// api.binance.com returns HTTP 451 ("unavailable for legal reasons") for
+// requests from US-based datacenter IPs — which is exactly what GitHub-hosted
+// runners are. Three-step fallback, same pattern the browser GUI already
+// uses in js/api.js (direct → proxy):
+//   1. data-api.binance.vision — Binance's own public market-data mirror,
+//      intended for this exact use case (no auth, read-only, not subject
+//      to the same regional trading restrictions as api.binance.com).
+//   2. api.binance.com direct — in case the mirror is ever the one that's
+//      down/blocked instead.
+//   3. Public CORS proxy (corsproxy.io) — last resort, free but not
+//      uptime-guaranteed, mirrors the browser's own proxy fallback.
+// NOTE: fapi.binance.com (futures — funding rate) has no public mirror
+// equivalent, so it only gets steps 2+3.
+const BINANCE_MIRROR = 'https://data-api.binance.vision';
+const BINANCE_DIRECT = 'https://api.binance.com';
+const PROXY_PREFIX   = 'https://corsproxy.io/?url=';
+
+async function fetchBinance(urlPath, { useMirror = true } = {}) {
+  const candidates = [];
+  if (useMirror) candidates.push(`${BINANCE_MIRROR}${urlPath}`);
+  candidates.push(`${BINANCE_DIRECT}${urlPath}`);
+
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      return await fetchJSON(url);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  // Last resort — public CORS proxy around the direct URL.
+  try {
+    return await fetchJSON(`${PROXY_PREFIX}${encodeURIComponent(`${BINANCE_DIRECT}${urlPath}`)}`);
+  } catch (e) {
+    lastErr = e;
+  }
+  throw lastErr || new Error('all Binance endpoints failed');
+}
+
 // RSI calculation (mirrors v8 calcRSI)
 function calcRSI(closes, p = 14) {
   if (!closes || closes.length < p + 1) return null;
@@ -239,14 +364,17 @@ function calcRSI(closes, p = 14) {
 // ════════════════════════════════════════════════════
 async function fetchCryptoTicker(pair) {
   try {
-    const d = await fetchJSON(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
+    const d = await fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`);
     return { price: parseFloat(d.lastPrice), chgPct: parseFloat(d.priceChangePercent) };
-  } catch { return null; }
+  } catch (e) {
+    console.log(`  ⚠  fetchCryptoTicker failed for ${pair}: ${e.message}`);
+    return null;
+  }
 }
 
 async function fetchCrypto4h(pair) {
   try {
-    const k = await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=4h&limit=50`);
+    const k = await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`);
     if (!Array.isArray(k) || k.length < 5) return null;
     const closes = k.map(c => parseFloat(c[4]));
     const vols   = k.map(c => parseFloat(c[5]));
@@ -259,12 +387,15 @@ async function fetchCrypto4h(pair) {
     let cvd4h = 0;
     for (let i = n-4; i < n; i++) cvd4h += closes[i] > parseFloat(k[i][1]) ? 1 : -1;
     return { aboveEma8: closes[n-1] > ema8, recentUp, volUp, rsi4h, cvd4h };
-  } catch { return null; }
+  } catch (e) {
+    console.log(`  ⚠  fetchCrypto4h failed for ${pair}: ${e.message}`);
+    return null;
+  }
 }
 
 async function fetchCryptoDaily(pair) {
   try {
-    const k = await fetchJSON(`https://api.binance.com/api/v3/klines?symbol=${pair}&interval=1d&limit=14`);
+    const k = await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`);
     if (!Array.isArray(k) || k.length < 7) return null;
     const closes = k.map(c => parseFloat(c[4]));
     const vols   = k.map(c => parseFloat(c[5]));
@@ -278,7 +409,10 @@ async function fetchCryptoDaily(pair) {
     let cvdDaily = 0;
     for (let i = n-7; i < n; i++) cvdDaily += closes[i] > parseFloat(k[i][1]) ? 1 : -1;
     return { rsiDaily, aboveEma7: closes[n-1] > ema7, volSurge, chg7d, cvdDaily };
-  } catch { return null; }
+  } catch (e) {
+    console.log(`  ⚠  fetchCryptoDaily failed for ${pair}: ${e.message}`);
+    return null;
+  }
 }
 
 // ════════════════════════════════════════════════════
@@ -361,10 +495,13 @@ async function fetchStockExtra(sym) {
 // ════════════════════════════════════════════════════
 async function fetchAll(sym) {
   if (isCrypto(sym)) {
+    // FIX: Binance's API rejects the "BINANCE:" TradingView-style prefix —
+    // strip it before hitting api.binance.com, same as fetchPositionPrice etc. do.
+    const bare = stripExchangePrefix(sym);
     const [ticker, k4h, kDay] = await Promise.all([
-      fetchCryptoTicker(sym),
-      fetchCrypto4h(sym),
-      fetchCryptoDaily(sym),
+      fetchCryptoTicker(bare),
+      fetchCrypto4h(bare),
+      fetchCryptoDaily(bare),
     ]);
     return { ticker, k4h, kDay };
   } else {
@@ -589,14 +726,14 @@ async function fetchCvdTrending(sym) {
   const bare = stripExchangePrefix(sym);
   try {
     if (isCrypto(bare)) {
-      const k = await fetchJSON(
-        `https://api.binance.com/api/v3/klines?symbol=${bare}&interval=15m&limit=6`
-      );
+      const k = await fetchBinance(`/api/v3/klines?symbol=${bare}&interval=15m&limit=6`);
       if (!Array.isArray(k) || k.length < 3) return 'up';
       const bearCount = k.filter(c => parseFloat(c[4]) < parseFloat(c[1])).length;
       return bearCount >= 4 ? 'down' : 'up';
     }
-  } catch {}
+  } catch (e) {
+    console.log(`  ⚠  fetchCvdTrending failed for ${bare}: ${e.message}`);
+  }
   return 'up'; // conservative default for stocks (no 15m data from Yahoo)
 }
 
@@ -604,25 +741,27 @@ async function fetchFundingRate(sym) {
   const bare = stripExchangePrefix(sym);
   if (!isCrypto(bare)) return 0;
   try {
-    const d = await fetchJSON(
-      `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${bare}`
-    );
+    // fapi.binance.com (futures) has no public-mirror equivalent — direct + proxy only.
+    const d = await fetchBinance(`/fapi/v1/premiumIndex?symbol=${bare}`, { useMirror: false });
     return parseFloat(d.lastFundingRate || 0) * 100; // convert to % like GUI
-  } catch { return 0; }
+  } catch (e) {
+    console.log(`  ⚠  fetchFundingRate failed for ${bare}: ${e.message}`);
+    return 0;
+  }
 }
 
 async function fetchRsi15(sym) {
   const bare = stripExchangePrefix(sym);
   try {
     if (isCrypto(bare)) {
-      const k = await fetchJSON(
-        `https://api.binance.com/api/v3/klines?symbol=${bare}&interval=15m&limit=30`
-      );
+      const k = await fetchBinance(`/api/v3/klines?symbol=${bare}&interval=15m&limit=30`);
       if (!Array.isArray(k) || k.length < 15) return 50;
       const closes = k.map(c => parseFloat(c[4]));
       return calcRSI(closes, 14) || 50;
     }
-  } catch {}
+  } catch (e) {
+    console.log(`  ⚠  fetchRsi15 failed for ${bare}: ${e.message}`);
+  }
   return 50;
 }
 
@@ -704,6 +843,8 @@ async function checkPositions(state) {
           `  P&L ${pnlPct}%  Setup: ${pos.setup || '—'}\n` +
           `  _Headless — reopen GUI to update position status_`
         );
+        pos.status          = 'stopped';
+        pos.statusChangedAt = now;
       }
       continue;
     }
@@ -731,6 +872,8 @@ async function checkPositions(state) {
           `  T2 $${t2}  Current $${price}  Entry $${entry}\n` +
           `  P&L +${pnlPct}%  → Full target reached`
         );
+        pos.status          = 'tp2_hit';
+        pos.statusChangedAt = now;
       }
     }
 
@@ -817,8 +960,19 @@ async function checkPositions(state) {
         (t2 > price ? `  T2 $${t2} not yet hit — consider partial exit or trail stop` : `  → Consider full exit`) + `\n` +
         `  _Headless — CVD decline confirmed server-side_`
       );
+      // Mark exiting so grace period timer starts
+      pos.status          = 'exiting';
+      pos.statusChangedAt = now;
     }
   }
+
+  // ── Sweep terminal positions + push cleaned positions.json back ──────────
+  // Positions that have been in stopped/tp2_hit/exiting/tp1_hit longer than
+  // their grace period are removed. This keeps positions.json lean and the
+  // GUI Tracker Alerts panel clean, without needing manual intervention.
+  // fire-key deduplication in .alert-state.json ensures no re-alerts even
+  // if a symbol re-enters the leaderboard after being swept here.
+  await sweepAndPushPositions(positions);
 }
 
 // ════════════════════════════════════════════════════
@@ -827,9 +981,29 @@ async function checkPositions(state) {
 async function main() {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`Alpha Terminal Alert Runner — ${new Date().toUTCString()}`);
-  console.log(`Pairs: ${WATCHLIST.join(', ')}`);
-  console.log(`Cooldown: ${COOLDOWN_HOURS}h | Digest: ${DIGEST_MODE} | Dry-run: ${DRY_RUN}`);
+  console.log(`Mode: ${MODE} | Cooldown: ${COOLDOWN_HOURS}h | Digest: ${DIGEST_MODE} | Dry-run: ${DRY_RUN}`);
   console.log('═'.repeat(60));
+
+  const state = loadState();
+
+  // ── 'positions' mode — fast path for the tight (5-10 min) schedule. ──
+  // Only checks open GUI positions for stop/T1/T2 — one ticker call per
+  // position, no full watchlist scan, no leaderboard scoring. Keeps the
+  // frequent schedule cheap and avoids re-running expensive klines/depth/
+  // funding pulls more often than the underlying 4h/daily signals change.
+  if (MODE === 'positions') {
+    const positionSyms = Object.keys(await loadPositions()).map(stripExchangePrefix);
+    if (positionSyms.some(s => !isCrypto(s))) {
+      console.log('\n📡  Initialising Yahoo Finance session (stock position present)...');
+      await initYahoo();
+    }
+    await checkPositions(state);
+    saveState(state);
+    console.log('\n✅  Run complete (positions mode).\n');
+    return;
+  }
+
+  console.log(`Pairs: ${WATCHLIST.join(', ')}`);
 
   // Init Yahoo Finance session if we have any non-crypto tickers — check both
   // the watchlist and any GUI-synced positions, since a position symbol may
@@ -841,7 +1015,6 @@ async function main() {
     await initYahoo();
   }
 
-  const state  = loadState();
   const digest = {};
 
   for (const sym of WATCHLIST) {
@@ -963,6 +1136,16 @@ async function main() {
     await sendTelegram(`${header}\n\n${rows}`);
   }
 
+  // ── Headless leaderboard buy scanner ──
+  // v10.2: superseded by leaderboard-decider.js (Job B, runs every 15 min
+  // against market-fetcher.js's data). Disabled here to avoid two
+  // independent scanners with separate cooldown stores both deciding
+  // whether to open the same position. Set LB_LEGACY_SCAN=true to restore
+  // this hourly path if you ever stop running the new Job A/B pipeline.
+  if ((process.env.LB_LEGACY_SCAN || 'false') === 'true') {
+    await checkLeaderboardBuys(state);
+  }
+
   // ── Monitor GUI-synced positions for stop/T1/T2 ──
   await checkPositions(state);
 
@@ -971,3 +1154,262 @@ async function main() {
 }
 
 main().catch(err => { console.error('Fatal:', err); process.exit(1); });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// HEADLESS LEADERBOARD BUY SCANNER
+// Scores all crypto symbols in watchlist.json — runs as part of the hourly
+// full-scan job (MODE=full) using Binance public APIs — no browser needed.
+// Sends Telegram buy alerts when conv >= LB_MIN_SCORE.
+// Mirrors the browser leaderboard scoring logic from render.js + signals.js.
+// ══════════════════════════════════════════════════════════════════════════════
+
+function calcEMA(closes, period) {
+  if (!closes || closes.length < period) return null;
+  const k = 2 / (period + 1);
+  let ema = closes.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < closes.length; i++) ema = closes[i] * k + ema * (1 - k);
+  return ema;
+}
+
+function calcOBI(depth) {
+  if (!depth) return 0;
+  const bid = (depth.bids || []).slice(0, 10).reduce((s, b) => s + parseFloat(b[1]), 0);
+  const ask = (depth.asks || []).slice(0, 10).reduce((s, a) => s + parseFloat(a[1]), 0);
+  const tot = bid + ask;
+  return tot > 0 ? ((bid - ask) / tot * 100) : 0;
+}
+
+function calcCvdTrend(k15m) {
+  if (!k15m || k15m.length < 6) return 'up';
+  const bearCount = k15m.slice(-6).filter(c => parseFloat(c[4]) < parseFloat(c[1])).length;
+  return bearCount >= 4 ? 'down' : 'up';
+}
+
+function calc4hBias(k4h) {
+  if (!k4h || k4h.length < 10) return '—';
+  const closes = k4h.map(c => parseFloat(c[4]));
+  const ema20  = calcEMA(closes, 20);
+  const ema50  = calcEMA(closes, Math.min(50, closes.length));
+  const price  = closes.at(-1);
+  const r4h    = calcRSI(closes);
+  if (!ema20) return '—';
+  if (price > ema20 && r4h > 55)   return 'BULL 4H';
+  if (price < ema20 && r4h < 45)   return 'BEAR 4H';
+  if (price > ema20)                return 'LEAN BULL';
+  return 'LEAN BEAR';
+}
+
+function calcDayBias(kDay) {
+  if (!kDay || kDay.length < 5) return '—';
+  const closes = kDay.map(c => parseFloat(c[4]));
+  const ema10  = calcEMA(closes, Math.min(10, closes.length));
+  const price  = closes.at(-1);
+  const r1d    = calcRSI(closes);
+  if (!ema10) return '—';
+  if (price > ema10 && r1d > 55)  return 'BULL DAY';
+  if (price < ema10 && r1d < 45)  return 'BEAR DAY';
+  if (price > ema10)              return 'LEAN BULL';
+  return 'LEAN BEAR';
+}
+
+function calcConviction(d) {
+  // Mirrors signals.js calcSpikeScore — same weights, same gates
+  let s = 0;
+  const { chg, shock, obi, cvd, r15, r4h, fr, oiDiv, bias4h, biasDay, emaTrend } = d;
+
+  // Price momentum
+  if (chg > 1.5) s += 2; else if (chg > 0.5) s += 1;
+  else if (chg < -1.5) s -= 2; else if (chg < -0.5) s -= 1;
+
+  // Vol shock
+  if (shock >= 2.0) s += 2; else if (shock >= 1.5) s += 1;
+
+  // Order book
+  if (obi > 20) s += 2; else if (obi > 5) s += 1;
+  else if (obi < -20) s -= 2; else if (obi < -5) s -= 1;
+
+  // CVD
+  if (cvd === 'up') s += 2; else s -= 1;
+
+  // RSI
+  if (r15 < 30 && r4h < 35) s += 1;  // oversold — bounce setup
+  if (r15 > 72 && r4h > 68) s -= 1;  // overbought
+
+  // EMA trend
+  if (emaTrend === 'ABOVE') s += 1; else if (emaTrend === 'BELOW') s -= 1;
+
+  // Funding
+  if (fr <= -0.03) s += 2; else if (fr <= -0.01) s += 1;
+  else if (fr >= 0.08) s -= 2; else if (fr >= 0.04) s -= 1;
+
+  // OI divergence
+  if (oiDiv === 'DIP_BUY')  s += 2;
+  else if (oiDiv === 'CONF') s += 1;
+  else if (oiDiv === 'DROP') s -= 1;
+
+  // 4H bias
+  if (bias4h === 'BULL 4H')   s += 2; else if (bias4h === 'LEAN BULL') s += 1;
+  else if (bias4h === 'BEAR 4H') s -= 2; else if (bias4h === 'LEAN BEAR') s -= 1;
+
+  // Daily bias
+  if (biasDay === 'BULL DAY') s += 1; else if (biasDay === 'BEAR DAY') s -= 1;
+
+  return Math.round(s);
+}
+
+function lbSetupLabel(d) {
+  // Mirrors render.js getSetupMode
+  if (d.oiDiv === 'DIP_BUY' && d.fr <= -0.01) return { label: 'CAP BUY',     emoji: '⭐' };
+  if (d.shock >= 2.0 && d.cvd === 'up')        return { label: 'SQUEEZE NOW', emoji: '🚀' };
+  if (d.emaTrend === 'ABOVE' && d.conv > 5)    return { label: 'BREAKOUT',    emoji: '⚡' };
+  if (d.conv < -4)                              return { label: 'SHORT SETUP', emoji: '🔻' };
+  return { label: 'WATCHING', emoji: '👁' };
+}
+
+function calcEntryLevels(price, shock) {
+  // Mirrors render.js calcEntryLevels
+  const p   = parseFloat(price) || 0;
+  if (!p) return null;
+  const atr = p * 0.015 * Math.max(1, shock * 0.5);
+  const dp  = p < 0.01 ? 6 : p < 1 ? 4 : p < 100 ? 3 : 2;
+  const entry = (p * 1.004).toFixed(dp);
+  const stop  = (p - atr * 1.5).toFixed(dp);
+  const t1    = (p + atr * 2).toFixed(dp);
+  const t2    = (p + atr * 4).toFixed(dp);
+  const rr    = (parseFloat(t1) - parseFloat(entry)) / (parseFloat(entry) - parseFloat(stop));
+  return { entry, stop, t1, t2, rr: isFinite(rr) ? rr.toFixed(1) : '—' };
+}
+
+function lbBuyCooldownKey(sym) { return `lb_buy_${sym}`; }
+function isLbOnCooldown(state, sym) {
+  return (Date.now() - (state[lbBuyCooldownKey(sym)] || 0)) < LB_COOLDOWN_MIN * 60000;
+}
+function markLbCooldown(state, sym) { state[lbBuyCooldownKey(sym)] = Date.now(); }
+
+async function scoreCryptoSymbol(pair) {
+  try {
+    const [ticker, k15r, k4r, kDr, depr, premr, oiCurr, oiPrevr] = await Promise.allSettled([
+      fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
+      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
+      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=60`),
+      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
+      fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
+      fetchBinance(`/fapi/v1/premiumIndex?symbol=${pair}`, { useMirror: false }),
+      fetchBinance(`/fapi/v1/openInterest?symbol=${pair}`, { useMirror: false }),
+      fetchBinance(`/fapi/v1/openInterest?symbol=${pair}`, { useMirror: false }), // placeholder for prev OI
+    ]);
+
+    const v = r => r.status === 'fulfilled' ? r.value : null;
+    const t = v(ticker);
+    if (!t || t.code) {
+      const reason = ticker.status === 'rejected' ? ticker.reason?.message : (t?.msg || 'invalid response');
+      console.log(`  ⚠  scoreCryptoSymbol: ticker fetch failed for ${pair}: ${reason}`);
+      return null;
+    }
+
+    const k15  = v(k15r) || [];
+    const k4   = v(k4r)  || [];
+    const kD   = v(kDr)  || [];
+    const dep  = v(depr);
+    const prem = v(premr);
+    const oiNow = v(oiCurr);
+
+    const price = parseFloat(t.lastPrice);
+    const chg   = parseFloat(t.priceChangePercent);
+
+    // Vol shock: last 15m candle vol vs avg of previous 4
+    const recentVols = k15.slice(-5).map(c => parseFloat(c[5]));
+    const avgVol  = recentVols.slice(0, 4).reduce((a, b) => a + b, 0) / 4 || 1;
+    const shock   = recentVols[4] ? recentVols[4] / avgVol : 1;
+
+    const k15c = k15.map(c => parseFloat(c[4]));
+    const k4c  = k4.map(c => parseFloat(c[4]));
+    const kDc  = kD.map(c => parseFloat(c[4]));
+
+    const r15      = calcRSI(k15c);
+    const r4h      = calcRSI(k4c);
+    const cvd      = calcCvdTrend(k15);
+    const obi      = calcOBI(dep);
+    const fr       = prem ? parseFloat(prem.lastFundingRate) * 100 : 0;
+    const bias4h   = calc4hBias(k4);
+    const biasDay  = calcDayBias(kD);
+    const ema20    = calcEMA(k4c, Math.min(20, k4c.length));
+    const emaTrend = ema20 ? (price > ema20 ? 'ABOVE' : 'BELOW') : '—';
+
+    // OI divergence
+    let oiDiv = 'NEUTRAL';
+    if (fr <= -0.01 && chg > 0)    oiDiv = 'DIP_BUY';
+    else if (fr <= 0 && chg > 0.5)  oiDiv = 'CONF';
+    else if (fr > 0.05 && chg < 0)  oiDiv = 'DROP';
+
+    const d    = { chg, shock, obi, cvd, r15, r4h, fr, oiDiv, bias4h, biasDay, emaTrend };
+    d.conv     = calcConviction(d);
+    const setup = lbSetupLabel(d);
+    const levels = calcEntryLevels(price, shock);
+
+    return { pair, price, chg, conv: d.conv, setup, levels, d };
+  } catch (e) {
+    console.log(`  ⚠  ${pair} score error: ${e.message}`);
+    return null;
+  }
+}
+
+async function checkLeaderboardBuys(state) {
+  // Filter crypto-only from watchlist
+  const cryptoPairs = WATCHLIST
+    .filter(s => isCrypto(stripExchangePrefix(s)))
+    .map(stripExchangePrefix);
+
+  if (!cryptoPairs.length) {
+    console.log('\n📡  Leaderboard scanner — no crypto in watchlist, skipping');
+    return;
+  }
+
+  console.log(`\n📡  Leaderboard scanner — scoring ${cryptoPairs.length} symbol(s) [min score: ${LB_MIN_SCORE}]...`);
+
+  // Score all symbols concurrently
+  const results = (await Promise.all(cryptoPairs.map(scoreCryptoSymbol))).filter(Boolean);
+
+  // Filter: score >= min, not SHORT/WATCHING, not on cooldown
+  const SKIP_SETUPS = new Set(['SHORT SETUP', 'WATCHING']);
+  const alerts = [];
+
+  for (const r of results.sort((a, b) => b.conv - a.conv)) {
+    if (r.conv < LB_MIN_SCORE)              { console.log(`  ⏭  ${r.pair} score:${r.conv} below min:${LB_MIN_SCORE}`); continue; }
+    if (SKIP_SETUPS.has(r.setup.label))     { console.log(`  ⏭  ${r.pair} setup:${r.setup.label} skipped`); continue; }
+    if (isLbOnCooldown(state, r.pair))      { console.log(`  🔕  ${r.pair} [${r.setup.label}] score:${r.conv} — cooldown`); continue; }
+
+    markLbCooldown(state, r.pair);
+    alerts.push(r);
+    console.log(`  🟢  ${r.pair} [${r.setup.label}] score:${r.conv} price:$${r.price}`);
+  }
+
+  if (!alerts.length) {
+    console.log('  ✓  No new leaderboard buy signals this cycle');
+    return;
+  }
+
+  // Build and send Telegram message
+  const utc   = new Date().toUTCString().replace(/.*(\d{2}:\d{2}).*/, '$1') + ' UTC';
+  const lines = alerts.map(a => {
+    const l = a.levels;
+    return [
+      `${a.setup.emoji} *${a.pair.replace('USDT', '')}* — ${a.setup.label}  [${a.conv} pts]`,
+      `  Price $${a.price}  Chg ${a.chg > 0 ? '+' : ''}${a.chg.toFixed(2)}%`,
+      `  Entry $${l?.entry || '—'}  Stop $${l?.stop || '—'}`,
+      `  T1 $${l?.t1 || '—'}  T2 $${l?.t2 || '—'}  R:R ${l?.rr || '—'}`,
+      `  4H: ${a.d.bias4h}  Day: ${a.d.biasDay}  CVD: ${a.d.cvd}  FR: ${a.d.fr.toFixed(3)}%`,
+    ].join('\n');
+  });
+
+  const msg = [
+    `🔔 *Leaderboard BUY Alert* — ${utc}`,
+    `_${alerts.length} signal(s) · headless scan · min score ${LB_MIN_SCORE}_`,
+    '',
+    lines.join('\n\n'),
+    '',
+    `_Open GUI for live leaderboard · Stop/T1/T2 monitored automatically_`,
+  ].join('\n');
+
+  await sendTelegram(msg);
+}
