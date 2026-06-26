@@ -1,57 +1,48 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // leaderboard-decider.js — Job B (runs every 15 min v10.7: 2,19,36,53)
-// v10.7
+// v10.8
 //
 // Reads market-data.json (populated by Job A every 5 min), evaluates buy
 // signals (both latest and peak-substituted) against LB_MIN_SCORE/cooldown/
 // setup gates, writes positions to positions.json, sends Telegram, resets
 // peak tracking in market-data.json.
 //
+// v10.8 changes:
+//   - Stock/ETF support: market-data.json now contains both BINANCE: crypto
+//     and TSX/NYSE stock entries (populated by market-fetcher.js v10.8).
+//   - Position sym key uses entry.exchangePrefix to build the correct
+//     TradingView-style prefix (BINANCE:BTCUSDT, TSX:ETHY.TO, NYSE:GE).
+//   - CAP BUY fast path skipped for stocks (capBuy.isCapBuy is always false
+//     for stocks — no futures/funding available from Yahoo Finance).
+//   - Telegram alert includes assetType tag so stock alerts are identifiable.
+//   - Pre-screen, bullConf gate, cooldown, and open-position check all work
+//     identically for crypto and stocks.
+//
 // v10.3 changes:
 //   - pushPositionsToGitHub(): after writing positions.json locally, also
-//     pushes it to the repo via GitHub Contents API immediately so the browser
-//     GUI can see new positions without waiting for the end-of-job git commit.
-//   - Audit rotation changed from count-based (500 entries) to time-based (1h).
-//   - positions_pushed / positions_push_failed audit events added.
+//     pushes it to the repo via GitHub Contents API immediately.
+//   - Audit rotation changed to time-based (1h).
 //
 // v10.4 changes:
-//   - Early-exit pre-screen at top of processBuySignals(): checks every symbol's
-//     conv (latest) and peakConv against LB_MIN_SCORE BEFORE loading cooldown
-//     state, alert state, or positions. If nothing clears the threshold the job
-//     logs a single 'no_candidates' audit event and stops immediately — no
-//     wasted I/O, no noise in the audit log.
+//   - Early-exit pre-screen: bail immediately if no symbol clears LB_MIN_SCORE.
 //
 // v10.5 changes:
-//   - SKIP_SETUPS no longer includes 'WATCHING'. Job B now fires on conviction
-//     score alone (conv >= LB_MIN_SCORE) rather than requiring getSetupMode()
-//     to return SQUEEZE NOW / BREAKOUT etc. at the exact 15-min polling moment.
-//     Those labels appear for seconds; conv score persists across cycles.
-//   - Added directional sanity gate (replaced in v10.6).
-//   - getSetupMode() is now used for alert labeling only, not as a gate.
+//   - SKIP_SETUPS no longer includes 'WATCHING'. Job B fires on conviction
+//     score alone (conv >= LB_MIN_SCORE).
+//   - getSetupMode() is used for alert labeling only, not as a gate.
 //
 // v10.6 changes:
-//   - Directional sanity gate replaced with bullConf gate (LB_BULL_CONF_MIN, default 5/10).
-//     market-fetcher.js now computes calcBullConf(d) every 5min and stores bullConf +
-//     bullChecks in market-data.json. Job B reads bullConf and skips any symbol below
-//     the threshold — mirrors the GUI leaderboard 10-check panel exactly.
-//     WATCHING with 2-3/10 conf = blocked. Real setup with 5+/10 = fires.
-//   - LB_BULL_CONF_MIN added as GitHub Actions variable (default 5).
-//   - no_candidates audit now logs bestBullConf so you can see how close market is.
+//   - bullConf gate (LB_BULL_CONF_MIN, default 5/10).
 //
 // v10.7 changes:
-//   - CAP BUY fast path: entry.capBuy.isCapBuy bypasses score + bullConf gates entirely.
-//     Capitulation setups (extreme RSI + neg funding + CVD turning) are time-critical
-//     and won't show bullConf >= 5 by definition (symbol is in a downtrend).
-//   - Telegram alert enriched with whale score/zone, flow label, grade, successProb,
-//     setup archetype, and bullConf count — all sourced from market-data.json.
-//   - leaderboard-scanner.js now fetches r1h (1h RSI) for CAP BUY + bullConf accuracy.
+//   - CAP BUY fast path bypasses score + bullConf gates for crypto.
+//   - Telegram enriched with whale/flow/grade/archetype/bullConf.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import fs   from 'fs';
 import path from 'path';
 import { calcConviction, getSetupMode } from './leaderboard-scanner.js';
 
-// Use process.cwd() for reliable path resolution in GitHub Actions
 const MARKET_DATA_PATH    = path.join(process.cwd(), 'market-data.json');
 const POSITIONS_PATH      = path.join(process.cwd(), 'positions.json');
 const LB_ALERT_STATE_PATH = path.join(process.cwd(), 'lb-alert-state.json');
@@ -62,15 +53,12 @@ const TG_TOKEN        = process.env.TELEGRAM_BOT_TOKEN || '';
 const TG_CHAT         = process.env.TELEGRAM_CHAT_ID   || '';
 const TG_ENABLED      = (process.env.TELEGRAM_ENABLED ?? 'true') === 'true';
 
-const LB_MIN_SCORE    = parseInt(process.env.LB_MIN_SCORE    || '9');
-const LB_BULL_CONF_MIN = parseInt(process.env.LB_BULL_CONF_MIN || '5'); // min bull confirmations out of 10
-const LB_COOLDOWN_MIN = parseInt(process.env.LB_COOLDOWN_MIN || '60');
-const LB_HOLD_LOCK    = parseInt(process.env.LB_HOLD_LOCK    || '20');
+const LB_MIN_SCORE     = parseInt(process.env.LB_MIN_SCORE     || '9');
+const LB_BULL_CONF_MIN = parseInt(process.env.LB_BULL_CONF_MIN || '5');
+const LB_COOLDOWN_MIN  = parseInt(process.env.LB_COOLDOWN_MIN  || '60');
+const LB_HOLD_LOCK     = parseInt(process.env.LB_HOLD_LOCK     || '20');
 const ALERT_STATE_TTL_HOURS = parseFloat(process.env.LB_ALERT_STATE_TTL_HOURS || '6');
 
-// WATCHING is no longer skipped — Job B fires on conviction score alone.
-// getSetupMode() is used for labeling only, not as an alert gate.
-// Only SHORT SETUP is blocked (bear direction, opposite of our buy logic).
 const SKIP_SETUPS = new Set(['SHORT SETUP']);
 
 function loadJSON(p, fallback) {
@@ -96,10 +84,8 @@ function logAudit(action, details = {}) {
   } catch {}
 
   logs.push(audit);
-  // Rotate: drop entries older than 1 hour
   const cutoff = Date.now() - 60 * 60 * 1000;
   logs = logs.filter(e => new Date(e.timestamp).getTime() >= cutoff);
-
   fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2));
 }
 
@@ -146,10 +132,16 @@ async function sendTelegram(msg) {
   } catch (e) { console.warn('TG fetch error:', e.message); }
 }
 
-// ── Push positions.json to GitHub Contents API ──────────────────────────────
-// Uses GITHUB_TOKEN (always available in Actions) + GH_REPO repo variable.
-// Writing here means the browser GUI sees the new position immediately —
-// before the end-of-job git commit even runs.
+// ── Build position sym key — TradingView-style prefix ──
+// Crypto:   BINANCE:BTCUSDT
+// TSX:      TSX:ETHY.TO
+// NYSE/US:  NYSE:GE
+function buildSymKey(pair, entry) {
+  const prefix = entry.exchangePrefix || (pair.includes('.') ? 'TSX' : 'BINANCE');
+  return `${prefix}:${pair}`;
+}
+
+// ── Push positions.json to GitHub Contents API ──
 async function pushPositionsToGitHub(positions) {
   const token  = process.env.GITHUB_TOKEN;
   const repo   = process.env.GH_REPO;
@@ -172,7 +164,6 @@ async function pushPositionsToGitHub(positions) {
   };
 
   try {
-    // GET current sha — required to update an existing file
     let sha = null;
     const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
     console.log(`[positions-push] GET ${getRes.status}`);
@@ -234,13 +225,13 @@ async function processBuySignals() {
     console.log(`[leaderboard-decider] ⚠ market-data.json is ${ageMin.toFixed(1)} min old — proceeding, but check market-fetcher.js is running.`);
   }
 
-  // ── Pre-screen: bail immediately if nothing clears LB_MIN_SCORE ──────────
-  // Checks both latest conv and peak conv for every symbol. This runs BEFORE
-  // loading cooldown state, alert state, or positions — so bear-market cycles
-  // where nothing is close to the threshold cost almost nothing.
+  // Count by asset type for logging
+  const cryptoCount = symbols.filter(([, e]) => e.assetType === 'crypto').length;
+  const stockCount  = symbols.filter(([, e]) => e.assetType === 'stock').length;
+  console.log(`[leaderboard-decider] ${symbols.length} symbols (${cryptoCount} crypto, ${stockCount} stock/ETF)`);
+
+  // ── Pre-screen: bail immediately if nothing clears LB_MIN_SCORE ──
   const anyCandidate = symbols.some(([, entry]) => {
-    // Pre-screen: conv threshold + not a pure SHORT SETUP.
-    // WATCHING is now allowed through — label gate removed from Job B.
     if (entry.conv >= LB_MIN_SCORE && !SKIP_SETUPS.has(entry.setup?.label)) return true;
     const peakD     = { ...entry.d, shock: entry.peakShock, obi: entry.peakObi };
     const peakConv  = calcConviction(peakD);
@@ -249,13 +240,12 @@ async function processBuySignals() {
   });
 
   if (!anyCandidate) {
-    const maxConv = Math.max(...symbols.map(([, e]) => e.conv ?? -Infinity));
+    const maxConv  = Math.max(...symbols.map(([, e]) => e.conv ?? -Infinity));
     const bestConf = Math.max(...symbols.map(([, e]) => e.bullConf ?? 0));
     console.log(`[leaderboard-decider] Pre-screen: no symbol reaches min score ${LB_MIN_SCORE} (best conv: ${maxConv}, best bullConf: ${bestConf}/10) — stopping early.`);
     logAudit('no_candidates', { totalSymbols: symbols.length, minScore: LB_MIN_SCORE, bestConv: maxConv, bestBullConf: bestConf });
     return;
   }
-  // ── End pre-screen ────────────────────────────────────────────────────────
 
   const cooldownState = loadJSON(path.join(process.cwd(), '.lb-scan-state.json'), {});
   const alertState    = pruneAlertState(loadAlertState());
@@ -266,31 +256,29 @@ async function processBuySignals() {
     const evald = evaluateSymbol(entry);
     if (evald.conv < LB_MIN_SCORE)          { continue; }
     if (SKIP_SETUPS.has(evald.setup.label)) { continue; }
-    // ── CAP BUY fast path — bypasses all score/conf gates ──
-    // Capitulation bounces are time-critical: extreme RSI + negative funding +
-    // CVD turning up = rare high-urgency setup. Fire immediately without waiting
-    // for bullConf to build (it won't — the symbol is in a downtrend by definition).
-    const isCapBuy = entry.capBuy?.isCapBuy ?? false;
+
+    // ── CAP BUY fast path — crypto only (stocks don't have futures data) ──
+    const isCapBuy = (entry.assetType === 'crypto') && (entry.capBuy?.isCapBuy ?? false);
     if (isCapBuy) {
       console.log(`  💥  ${pair} [CAP BUY] capScore:${entry.capBuy.capScore} — fast path, skipping score/conf gates`);
-      // fall through to candidate — don't continue
+      // fall through
     } else {
-      // ── Bull confirmation gate — mirrors the GUI leaderboard 10-check panel ──
-      // market-fetcher.js computes bullConf every 5min and stores it in market-data.json.
-      // Requires at least LB_BULL_CONF_MIN (default 5/10) confirmations to fire.
-      // WATCHING with 2-3/10 conf is correctly blocked; real setup will show 5+/10.
+      // ── Bull confirmation gate ──
       const bullConf = entry.bullConf ?? 0;
       if (bullConf < LB_BULL_CONF_MIN) {
         console.log(`  ⏭  ${pair} [${evald.setup.label}] score:${evald.conv} bullConf:${bullConf}/10 < ${LB_BULL_CONF_MIN} — skipped`);
         continue;
       }
     }
-    if (isOnCooldown(cooldownState, pair))  {
+
+    if (isOnCooldown(cooldownState, pair)) {
       console.log(`  🔕  ${pair} [${evald.setup.label}] score:${evald.conv} — cooldown`);
       continue;
     }
 
-    const sym = `BINANCE:${pair}`;
+    // ── Build the TradingView-style sym key used by positions.json ──
+    const sym = buildSymKey(pair, entry);
+
     if (positions[sym] && positions[sym].status !== 'stopped' && positions[sym].status !== 'tp2_hit') {
       console.log(`  ⏭  ${pair} — already has an open position (status: ${positions[sym].status})`);
       continue;
@@ -300,8 +288,6 @@ async function processBuySignals() {
   }
 
   if (!candidates.length) {
-    // All symbols cleared the pre-screen conv threshold but were blocked by
-    // SKIP_SETUPS, cooldown, or an existing open position.
     console.log('  ✓  No new leaderboard buy signals this cycle (blocked by cooldown / setup / open position)');
     saveMarketData(resetPeaks(market));
     saveJSON(path.join(process.cwd(), '.lb-scan-state.json'), cooldownState);
@@ -321,29 +307,33 @@ async function processBuySignals() {
 
     positions[sym] = {
       sym,
-      base:          pair.replace('USDT', ''),
-      setup:         evald.setup.label,
+      base:           pair.replace('USDT', '').replace('.TO', ''),
+      assetType:      entry.assetType || 'crypto',
+      exchangePrefix: entry.exchangePrefix || 'BINANCE',
+      setup:          evald.setup.label,
       dir,
-      alertedAt:     now,
-      holdLockUntil: now + LB_HOLD_LOCK * 60000,
-      entryPrice:    levels ? parseFloat(levels.entry) : entry.price,
-      stop:          levels ? parseFloat(levels.stop)  : 0,
-      t1:            levels ? parseFloat(levels.t1)    : 0,
-      t2:            levels ? parseFloat(levels.t2)    : 0,
-      score:         evald.conv,
-      spikeScore:    evald.shock,
-      session:       '—',
-      exitAlertedAt: null,
+      alertedAt:      now,
+      holdLockUntil:  now + LB_HOLD_LOCK * 60000,
+      entryPrice:     levels ? parseFloat(levels.entry) : entry.price,
+      stop:           levels ? parseFloat(levels.stop)  : 0,
+      t1:             levels ? parseFloat(levels.t1)    : 0,
+      t2:             levels ? parseFloat(levels.t2)    : 0,
+      score:          evald.conv,
+      spikeScore:     evald.shock,
+      session:        '—',
+      exitAlertedAt:  null,
       tier1AlertedAt: null,
-      status:        'watching',
-      source:        'headless_v10.3',
-      scoreSource:   evald.source,
+      status:         'watching',
+      source:         'headless_v10.8',
+      scoreSource:    evald.source,
     };
 
-    buyAlerts.push({ pair, levels, evald, price: entry.price, chg: entry.chg, d: entry.d });
-    console.log(`  🟢  ${pair} [${evald.setup.label}] score:${evald.conv} (${evald.source}) → position opened`);
+    buyAlerts.push({ pair, sym, levels, evald, price: entry.price, chg: entry.chg, d: entry.d, entry });
+    console.log(`  🟢  ${pair} [${evald.setup.label}] score:${evald.conv} (${evald.source}) assetType:${entry.assetType} → ${sym}`);
     logAudit('position_opened', {
       pair,
+      sym,
+      assetType:  entry.assetType,
       setup:      evald.setup.label,
       score:      evald.conv,
       source:     evald.source,
@@ -351,32 +341,31 @@ async function processBuySignals() {
     });
   }
 
-  // Write positions locally (committed by the workflow git push at job end)
   savePositions(positions);
   saveJSON(path.join(process.cwd(), '.lb-scan-state.json'), cooldownState);
   saveAlertState(alertState);
   saveMarketData(resetPeaks(market));
 
-  // Also push positions to GitHub immediately via Contents API so the browser
-  // GUI can read the new entry without waiting for the end-of-job git commit.
   await pushPositionsToGitHub(positions);
 
-  const utc = new Date().toUTCString().replace(/.*(\d{2}:\d{2}).*/, '$1') + ' UTC';
+  const utc = new Date().toUTCString().replace(/.*(\\d{2}:\\d{2}).*/, '$1') + ' UTC';
   const lines = buyAlerts.map(a => {
     const l = a.levels;
-    const peakNote = a.evald.source === 'peak' ? '  _(caught via peak — spike faded before check)_' : '';
+    const peakNote   = a.evald.source === 'peak' ? '  _(caught via peak — spike faded before check)_' : '';
+    const assetLabel = a.entry.assetType === 'stock' ? ' 📊' : '';
     return [
-      `${a.evald.setup.emoji} *${a.pair.replace('USDT', '')}* — ${a.evald.setup.label}  [${a.evald.conv} pts]${peakNote}`,
+      `${a.evald.setup.emoji} *${a.pair.replace('USDT', '').replace('.TO', '')}*${assetLabel} — ${a.evald.setup.label}  [${a.evald.conv} pts]${peakNote}`,
       a.entry.whale ? `  ${a.entry.whale.emoji} Whale ${a.entry.whale.score}/100 (${a.entry.whale.zone})  · Flow: ${a.entry.flow || '—'}  · Grade: ${a.entry.grade || '—'} (${a.entry.successProb || '—'}% win)` : '',
       a.entry.archetype ? `  Setup: ${a.entry.archetype}  · BullConf: ${a.entry.bullConf ?? '—'}/10` : '',
       `  Price $${a.price}  Chg ${a.chg > 0 ? '+' : ''}${a.chg.toFixed(2)}%`,
       `  Entry $${l?.entry || '—'}  Stop $${l?.stop || '—'}  T1 $${l?.t1 || '—'}  T2 $${l?.t2 || '—'}  R:R ${l?.rr || '—'}`,
-    ].join('\n');
+      `  _Position: ${a.sym}_`,
+    ].filter(Boolean).join('\n');
   });
 
   const msg = [
     `🔔 *Leaderboard BUY Alert* — ${utc}`,
-    `_${buyAlerts.length} signal(s) · headless v10.7 · min score ${LB_MIN_SCORE} · bullConf ≥${LB_BULL_CONF_MIN}/10_`,
+    `_${buyAlerts.length} signal(s) · headless v10.8 · min score ${LB_MIN_SCORE} · bullConf ≥${LB_BULL_CONF_MIN}/10_`,
     '', lines.join('\n\n'), '',
     `_Position(s) opened automatically — tracked for stop/T1/T2 going forward._`,
   ].join('\n');
