@@ -11,6 +11,21 @@ import { fileURLToPath } from 'url';
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const DRY_RUN    = process.argv.includes('--dry-run');
 const STATE_FILE = path.join(__dirname, '.alert-state.json');
+const AUDIT_PATH = path.join(__dirname, 'audit.json');
+
+// ── Audit logging — rolling 1-hour window (shared with market-fetcher + leaderboard-decider) ──
+function logAudit(action, details = {}) {
+  const entry = { timestamp: new Date().toISOString(), job: 'alert-runner', action, ...details };
+  let logs = [];
+  try {
+    logs = JSON.parse(fs.readFileSync(AUDIT_PATH, 'utf8'));
+    if (!Array.isArray(logs)) logs = [];
+  } catch {}
+  logs.push(entry);
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  logs = logs.filter(e => new Date(e.timestamp).getTime() >= cutoff);
+  try { fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2)); } catch {}
+}
 
 // ── Run mode ──────────────────────────────────────────────────────────────
 // 'full'      — watchlist signal scan + leaderboard scanner + position
@@ -61,16 +76,15 @@ const WATCHLIST = process.env.WATCHLIST
       }
     })();
 
-// ── Position loading — two sources merged ───────────────────────────────────
+// ── Position loading — single source: positions.json ────────────────────────
 //
-// positions.json — written by leaderboard-decider.js (headless signal entries)
-// tracker.json   — written by the browser GUI via github-sync.js (manual trades)
+// positions.json is written by:
+//   - leaderboard-decider.js (headless signal entries via GitHub Contents API)
+//   - github-sync.js in the browser (Option A/B manual GUI positions)
 //
-// Both are monitored for stop/T1/T2 exits. They're separate files so the
-// leaderboard runner never overwrites manually-managed GUI positions.
+// Both paths write to the same file so alert-runner only needs to read one.
 //
 const POSITIONS_JSON_PATH = path.join(process.cwd(), 'positions.json');
-const TRACKER_JSON_PATH   = path.join(process.cwd(), 'tracker.json');
 
 async function loadFromGitHub(fpath) {
   const repo   = process.env.GH_REPO;
@@ -88,7 +102,7 @@ async function loadFromGitHub(fpath) {
       },
     });
     if (!res.ok) {
-      if (res.status === 404) return {}; // file doesn't exist yet = empty
+      if (res.status === 404) return {};
       throw new Error(`GitHub API ${res.status}`);
     }
     const j   = await res.json();
@@ -104,24 +118,15 @@ function loadLocal(filePath) {
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 async function loadPositions() {
-  const ghPositions = await loadFromGitHub(process.env.GH_POSITIONS_PATH || 'scripts/positions.json');
-  const ghTracker   = await loadFromGitHub(process.env.GH_TRACKER_PATH   || 'scripts/tracker.json');
-
-  // Fall back to local files if GitHub API unavailable
-  const positions = ghPositions ?? loadLocal(POSITIONS_JSON_PATH);
-  const tracker   = ghTracker   ?? loadLocal(TRACKER_JSON_PATH);
-
-  const merged = { ...tracker, ...positions }; // positions.json wins on key collision
-  const posCount = Object.keys(positions).length;
-  const trkCount = Object.keys(tracker).length;
-  console.log(`[positions] Loaded from GitHub API — ${posCount} headless position(s), ${trkCount} tracker position(s)`);
-  return merged;
+  const fpath = process.env.GH_POSITIONS_PATH || 'scripts/positions.json';
+  const remote = await loadFromGitHub(fpath);
+  const positions = remote ?? loadLocal(POSITIONS_JSON_PATH);
+  console.log(`[positions] Loaded ${Object.keys(positions).length} position(s) from ${remote !== null ? 'GitHub API' : 'local file'}`);
+  return positions;
 }
 
 function stripExchangePrefix(sym) {
@@ -166,6 +171,8 @@ async function sweepAndPushPositions(positions) {
 
   if (!swept) return; // nothing to do
 
+  logAudit('positions_sweep_start', { swept, remaining: Object.keys(cleaned).length });
+
   // Push cleaned positions.json back to GitHub
   const token  = process.env.GITHUB_TOKEN;
   const repo   = process.env.GH_REPO;
@@ -174,6 +181,7 @@ async function sweepAndPushPositions(positions) {
 
   if (!token || !repo) {
     console.log(`[sweep] Skipping push — GITHUB_TOKEN or GH_REPO not set`);
+    logAudit('positions_sweep_skipped', { reason: 'no token or repo' });
     return;
   }
 
@@ -200,8 +208,10 @@ async function sweepAndPushPositions(positions) {
     const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
     if (!putRes.ok) throw new Error(`PUT ${putRes.status}`);
     console.log(`[sweep] ✓ Pushed cleaned positions.json (${swept} removed, ${Object.keys(cleaned).length} remaining)`);
+    logAudit('positions_sweep_pushed', { swept, remaining: Object.keys(cleaned).length });
   } catch (e) {
     console.warn(`[sweep] ⚠ Failed to push: ${e.message}`);
+    logAudit('positions_sweep_failed', { error: e.message });
   }
 }
 
@@ -771,10 +781,13 @@ async function checkPositions(state) {
 
   if (!entries.length) {
     console.log('\n📍  positions.json — no open positions to monitor.');
+    logAudit('positions_check', { total: 0, monitored: 0 });
     return;
   }
 
-  console.log(`\n📍  Monitoring ${entries.length} GUI-tracked position(s) [headless]...`);
+  const open = entries.filter(([,p]) => p.status === 'watching' || p.status === 'tp1_hit' || p.status === 'exiting');
+  console.log(`\n📍  Monitoring ${entries.length} position(s) [${open.length} active, ${entries.length - open.length} terminal]...`);
+  logAudit('positions_check', { total: entries.length, monitored: open.length });
 
   const EXIT_CVD_CYCLES  = LB_CVD_CYCLES;   // override via LB_CVD_CYCLES repo Variable
   const HOLD_LOCK_MINS   = LB_HOLD_LOCK;  // override via LB_HOLD_LOCK repo Variable
@@ -807,6 +820,7 @@ async function checkPositions(state) {
       if (!isPosFired(state, staleKey)) {
         markPosFired(state, staleKey);
         console.log(`  ⚠  ${sym} — stale (${Math.round(ageHours)}h open), sending one-time warning`);
+        logAudit('stale_position', { sym, ageHours: Math.round(ageHours) });
         await sendTelegram(
           `⚠ *Stale Position* — ${base}\n` +
           `  Open for ${Math.round(ageHours)}h with no close recorded.\n` +
@@ -837,6 +851,7 @@ async function checkPositions(state) {
       if (!isPosFired(state, key)) {
         markPosFired(state, key);
         console.log(`  🔴  STOP HIT — ${base} @ ${price}`);
+        logAudit('stop_hit', { sym, pair: base, price, entry, stop, pnlPct });
         await sendTelegram(
           `🔴 *STOP HIT* — ${base}\n` +
           `  Entry $${entry}  Stop $${stop}  Current $${price}\n` +
@@ -854,6 +869,7 @@ async function checkPositions(state) {
       if (!isPosFired(state, key)) {
         markPosFired(state, key);
         console.log(`  ✅  T1 HIT — ${base} @ ${price}`);
+        logAudit('t1_hit', { sym, pair: base, price, t1, entry, pnlPct });
         await sendTelegram(
           `✅ *T1 HIT* — ${base}\n` +
           `  T1 $${t1}  Current $${price}  Entry $${entry}\n` +
@@ -867,6 +883,7 @@ async function checkPositions(state) {
       if (!isPosFired(state, key)) {
         markPosFired(state, key);
         console.log(`  🏆  T2 HIT — ${base} @ ${price}`);
+        logAudit('t2_hit', { sym, pair: base, price, t2, entry, pnlPct });
         await sendTelegram(
           `🏆 *T2 HIT* — ${base}\n` +
           `  T2 $${t2}  Current $${price}  Entry $${entry}\n` +
@@ -926,6 +943,7 @@ async function checkPositions(state) {
         && tier1Cooldownok) {
       state[`${tier1Key}_ts`] = now;
       console.log(`  ⚠  TIER1 WATCH — ${base} FR=${fr.toFixed(3)}% RSI=${Math.round(r15)}`);
+      logAudit('tier1_watch', { sym, pair: base, price, pnlPct, fr: fr.toFixed(3), rsi: Math.round(r15) });
       await sendTelegram(
         `⚠ *WATCH — Overheating* — ${base}\n` +
         `  Funding ${fr.toFixed(3)}%  RSI 15m ${Math.round(r15)}\n` +
@@ -952,6 +970,7 @@ async function checkPositions(state) {
       ].filter(Boolean).join(' · ');
 
       console.log(`  🟡  EXIT SIGNAL — ${base} score:${exitScore}/6 [${signals}]`);
+      logAudit('exit_signal', { sym, pair: base, price, pnlPct, exitScore, signals });
       await sendTelegram(
         `🟡 *EXIT SIGNAL* — ${base}\n` +
         `  Exit score ${exitScore}/6\n` +

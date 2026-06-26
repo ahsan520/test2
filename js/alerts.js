@@ -362,6 +362,17 @@ function checkAlertRules(sym, d, shock, bias4h) {
 
 // ── Save ──
 function saveAlertCfg() {
+  // Track leaderboard score changes in audit before saving
+  try {
+    const prevLb  = JSON.parse(localStorage.getItem(`${_REPO_NS}_lb_alert_cfg`) || '{}');
+    const newScoreEl = document.getElementById('lb-min-score');
+    if (newScoreEl && prevLb.minScore !== undefined) {
+      const newScore = parseInt(newScoreEl.value);
+      if (prevLb.minScore !== newScore) {
+        logBrowserAudit('lb_score_changed', { from: prevLb.minScore, to: newScore });
+      }
+    }
+  } catch {}
   const cfg = STATE.alertCfg;
   cfg.email.enabled           = document.getElementById('al-email-on').checked;
   cfg.email.address           = document.getElementById('al-email-addr').value.trim();
@@ -551,19 +562,24 @@ async function flushDigest() {
 
 function switchCfgTab(tab) {
   STATE._cfgTab = tab;
-  ['telegram','rules','leaderboard','sync','positions'].forEach(t => {
+  const ALL_TABS = ['telegram','rules','leaderboard','sync','positions','tracker','audit'];
+  ALL_TABS.forEach(t => {
     const panel = document.getElementById('cfg-panel-' + t);
-    if (panel) panel.style.display = t === tab ? 'flex' : 'none';
-    panel && (panel.style.flexDirection = 'column');
+    if (panel) {
+      panel.style.display       = t === tab ? 'flex' : 'none';
+      panel.style.flexDirection = 'column';
+    }
   });
   // Update tab highlight without full re-render
   document.querySelectorAll('#cfg-tabs button').forEach((btn, i) => {
-    const tabs = ['telegram','rules','leaderboard','sync','positions'];
-    const active = tabs[i] === tab;
+    const active = ALL_TABS[i] === tab;
     btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
     btn.style.color             = active ? 'var(--accent)' : 'var(--text-dim)';
     btn.style.fontWeight        = active ? '700' : '400';
   });
+  // Load data panels on demand
+  if (tab === 'positions' && typeof refreshHeadlessPositions === 'function') refreshHeadlessPositions();
+  if (tab === 'audit'     && typeof refreshAuditLog          === 'function') refreshAuditLog();
 }
 
 function resetSuppression() {
@@ -858,9 +874,9 @@ function renderAlertCfgPage() {
         </button>
       </div>
       <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:12px;line-height:1.7;">
-        Positions opened automatically by <code>leaderboard-decider.js</code> via GitHub Actions.<br>
-        Read-only here — managed entirely by the headless runner.<br>
-        <span style="color:var(--accent);">Source: <code>scripts/positions.json</code> in repo</span>
+        Shows <code style="color:var(--accent);">scripts/positions.json</code> from your GitHub repo.<br>
+        Written by GitHub Actions every 15 min + by Option A sync when you save positions.<br>
+        <span style="color:var(--text-dim);">Repo: <code style="color:var(--accent);">${_deriveRepo() || 'not detected — set in Sync tab'}</code></span>
       </div>
       <div id="headless-positions-panel">
         <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);padding:10px 0;">Loading from repo…</div>
@@ -875,9 +891,10 @@ function renderAlertCfgPage() {
         📍 TRACKER
       </div>
       <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:14px;line-height:1.7;">
-        Your manually-managed positions. Synced to <code>scripts/tracker.json</code> in repo.<br>
-        Live P&amp;L, stop/T1/T2 levels, exit signal progress.<br>
-        <span style="color:#ffd700;">Headless runner monitors these 24/7 via GitHub Actions.</span>
+        Local browser cache — positions stored in this browser's localStorage.<br>
+        Use <b>Option A sync</b> (☁ Sync tab) to push these to <code>positions.json</code> so<br>
+        the headless runner can monitor them for stop/T1/T2/exit alerts.<br>
+        <span style="color:#ffd700;">Live P&amp;L updates while this tab is open.</span>
       </div>
       <div id="position-tracker-panel"></div>
     </div>
@@ -955,14 +972,53 @@ function renderAlertCfgPage() {
 
 // ── Derive repo slug (window.__GH_REPO or GitHub Pages URL) ─────────────────
 function _deriveRepo() {
+  // Priority: 1) window.__GH_REPO (env.js) 2) github-sync cfg 3) Pages URL auto-detect
   if (window.__GH_REPO) return window.__GH_REPO;
+  // Check github-sync saved config (Option A or B)
+  try {
+    const ghCfg = JSON.parse(localStorage.getItem(`${_REPO_NS}_gh_sync_cfg`) || '{}');
+    if (ghCfg.repo) return ghCfg.repo;
+  } catch {}
+  // Auto-derive from GitHub Pages URL
   const m = location.hostname.match(/^([^.]+)\.github\.io$/);
   if (m) {
     const owner = m[1];
     const repo  = location.pathname.split('/').filter(Boolean)[0] || '';
-    return `${owner}/${repo}`;
+    if (repo) return `${owner}/${repo}`;
   }
   return '';
+}
+
+// ── Browser-side audit logging ────────────────────────────────────────────────
+// Writes browser events to scripts/audit.json via GitHub API (Option A only).
+// Events: sync ok/fail, leaderboard score changes, manual position changes.
+async function logBrowserAudit(action, details = {}) {
+  try {
+    const repo  = _deriveRepo();
+    const ghCfg = JSON.parse(localStorage.getItem(`${_REPO_NS}_gh_sync_cfg`) || '{}');
+    const token = ghCfg.token || window.__GH_PAT || '';
+    if (!repo || !token) return; // needs Option A PAT to write
+
+    const branch = ghCfg.branch || 'main';
+    const apiUrl = `https://api.github.com/repos/${repo}/contents/scripts/audit.json`;
+    const hdrs   = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    const entry  = { timestamp: new Date().toISOString(), job: 'browser', action, ...details };
+
+    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers: hdrs });
+    let existing = [], sha = null;
+    if (getRes.ok) {
+      const j = await getRes.json(); sha = j.sha;
+      try { existing = JSON.parse(atob(j.content.replace(/\n/g, ''))); } catch {}
+    }
+    if (!Array.isArray(existing)) existing = [];
+    existing.push(entry);
+    const cutoff = Date.now() - 3600000;
+    existing = existing.filter(e => new Date(e.timestamp).getTime() >= cutoff);
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(existing, null, 2))));
+    const putBody = { message: 'chore: browser audit [skip ci]', content, branch };
+    if (sha) putBody.sha = sha;
+    await fetch(apiUrl, { method: 'PUT', headers: hdrs, body: JSON.stringify(putBody) });
+  } catch {} // silently fail — audit is best-effort
 }
 
 // ── Headless positions panel (positions.json — machine written) ──────────────
@@ -974,7 +1030,10 @@ async function refreshHeadlessPositions() {
   try {
     const repo = _deriveRepo();
     if (!repo) throw new Error('Cannot derive repo — set GH_REPO or deploy via GitHub Pages');
-    const rawUrl = `https://raw.githubusercontent.com/${repo}/main/scripts/positions.json?t=${Date.now()}`;
+    // Get branch from github-sync cfg or default to main
+    let _branch = 'main';
+    try { const c = JSON.parse(localStorage.getItem(`${_REPO_NS}_gh_sync_cfg`) || '{}'); _branch = c.branch || 'main'; } catch {}
+    const rawUrl = `https://raw.githubusercontent.com/${repo}/${_branch}/scripts/positions.json?t=${Date.now()}`;
     const res    = await fetch(rawUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const positions = await res.json();
@@ -1049,27 +1108,67 @@ async function refreshAuditLog() {
     const sorted = [...entries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     const actionColor = a => ({
-      fetch_complete:        'var(--bull)',
-      position_opened:       'var(--accent)',
-      positions_pushed:      'var(--bull)',
-      buy_cycle_complete:    'var(--text)',
-      job_start:             'var(--text-dim)',
-      job_complete:          'var(--text-dim)',
-      market_data_empty:     '#ffa500',
-      fatal_error:           'var(--bear)',
-      positions_push_failed: 'var(--bear)',
+      // market-fetcher (Job A)
+      fetch_complete:           'var(--bull)',
+      no_symbols:               '#ffa500',
+      // leaderboard-decider (Job B)
+      position_opened:          'var(--accent)',
+      positions_pushed:         'var(--bull)',
+      positions_push_failed:    'var(--bear)',
+      buy_cycle_complete:       'var(--text)',
+      market_data_empty:        '#ffa500',
+      // alert-runner (positions monitor)
+      positions_check:          'var(--text-dim)',
+      stop_hit:                 'var(--bear)',
+      t1_hit:                   'var(--bull)',
+      t2_hit:                   '#ffd700',
+      tier1_watch:              '#ffa500',
+      exit_signal:              '#ffa500',
+      stale_position:           '#ffa500',
+      positions_sweep_start:    'var(--text-dim)',
+      positions_sweep_pushed:   'var(--bull)',
+      positions_sweep_failed:   'var(--bear)',
+      positions_sweep_skipped:  'var(--text-dim)',
+      // shared
+      job_start:                'var(--text-dim)',
+      job_complete:             'var(--text-dim)',
+      fatal_error:              'var(--bear)',
+      browser_sync_ok:          'var(--bull)',
+      browser_sync_failed:      'var(--bear)',
+      lb_score_changed:         '#8957e5',
+      position_closed_manual:   'var(--text-dim)',
     }[a] || 'var(--text-dim)');
 
     const actionIcon = a => ({
-      fetch_complete:        '📡',
-      position_opened:       '🟢',
-      positions_pushed:      '☁',
-      buy_cycle_complete:    '✅',
-      job_start:             '▶',
-      job_complete:          '■',
-      market_data_empty:     '⚠',
-      fatal_error:           '🔴',
-      positions_push_failed: '⚠',
+      // market-fetcher
+      fetch_complete:           '📡',
+      no_symbols:               '⚠',
+      // leaderboard-decider
+      position_opened:          '🟢',
+      positions_pushed:         '☁',
+      positions_push_failed:    '🔴',
+      buy_cycle_complete:       '✅',
+      market_data_empty:        '⚠',
+      // alert-runner
+      positions_check:          '📍',
+      stop_hit:                 '🔴',
+      t1_hit:                   '✅',
+      t2_hit:                   '🏆',
+      tier1_watch:              '⚠',
+      exit_signal:              '🟡',
+      stale_position:           '⏰',
+      positions_sweep_start:    '🗑',
+      positions_sweep_pushed:   '🗑',
+      positions_sweep_failed:   '⚠',
+      positions_sweep_skipped:  '⏭',
+      // shared
+      job_start:                '▶',
+      job_complete:             '■',
+      fatal_error:              '🔴',
+      browser_sync_ok:          '☁',
+      browser_sync_failed:      '🔴',
+      lb_score_changed:         '⚙',
+      position_closed_manual:   '✕',
     }[a] || '·');
 
     el.innerHTML = `
@@ -1083,22 +1182,48 @@ async function refreshAuditLog() {
         const icon    = actionIcon(e.action);
 
         const details = [];
+        // job_start — show config snapshot
+        if (e.action === 'job_start') {
+          if (e.minScore    !== undefined) details.push(`minScore:${e.minScore}`);
+          if (e.ghRepo)                    details.push(`repo:${e.ghRepo}`);
+          if (e.ghToken)                   details.push(`token:${e.ghToken}`);
+          if (e.tgToken)                   details.push(`tg:${e.tgToken}`);
+          if (e.dryRun)                    details.push('DRY-RUN');
+        }
+        // general fields
         if (e.successCount  !== undefined) details.push(`${e.successCount}/${e.totalPairs} ok`);
         if (e.pair)                        details.push(e.pair);
         if (e.setup)                       details.push(e.setup);
+        if (e.from !== undefined && e.to !== undefined) details.push(`${e.from} → ${e.to}`);
+        if (e.count    !== undefined)      details.push(`${e.count} positions`);
+        if (e.error)                       details.push(e.error);
         if (e.score)                       details.push(`score:${e.score}`);
         if (e.count         !== undefined) details.push(`${e.count} pos`);
         if (e.signalsFound  !== undefined) details.push(`${e.signalsFound} signals`);
         if (e.positionsOpened > 0)         details.push(`${e.positionsOpened} opened`);
-        if (e.error)                       details.push(`err: ${e.error}`);
+        if (e.total         !== undefined) details.push(`${e.total} total`);
+        if (e.monitored     !== undefined) details.push(`${e.monitored} active`);
+        if (e.swept         !== undefined) details.push(`${e.swept} swept`);
+        if (e.remaining     !== undefined) details.push(`${e.remaining} remain`);
+        if (e.pnlPct)                      details.push(`P&L ${e.pnlPct}%`);
+        if (e.price)                       details.push(`$${e.price}`);
+        if (e.exitScore)                   details.push(`exit ${e.exitScore}/6`);
+        if (e.signals)                     details.push(e.signals);
+        if (e.ageHours)                    details.push(`${e.ageHours}h old`);
+        if (e.reason)                      details.push(e.reason);
+        if (e.error)                       details.push(`⚠ ${e.error}`);
+
+        const jobLabel = e.job === 'market-fetcher' ? 'Job A'
+                       : e.job === 'leaderboard-decider' ? 'Job B'
+                       : e.job === 'alert-runner' ? 'Monitor'
+                       : e.job || '?';
 
         return `
         <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;
                     border-bottom:1px solid rgba(255,255,255,.04);font-size:8px;">
           <span style="color:${col};flex-shrink:0;font-size:10px;">${icon}</span>
           <span style="color:var(--text-dim);flex-shrink:0;min-width:110px;">${dateStr} ${timeStr}</span>
-          <span style="color:var(--text-dim);flex-shrink:0;min-width:50px;font-size:7px;padding-top:1px;">
-            ${e.job === 'market-fetcher' ? 'Job A' : 'Job B'}</span>
+          <span style="color:var(--text-dim);flex-shrink:0;min-width:55px;font-size:7px;padding-top:1px;">${jobLabel}</span>
           <span style="color:${col};font-weight:700;flex-shrink:0;min-width:130px;">${e.action}</span>
           <span style="color:var(--text-dim);">${details.join(' · ')}</span>
         </div>`;
