@@ -1,39 +1,40 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // market-fetcher.js — Job A (runs every 5 min)
-// v10.8: added stock/ETF support via Yahoo Finance (scoreStock).
-//        Watchlist is split into BINANCE: (crypto) and everything else
-//        (stocks/ETFs). Both are scored and merged into market-data.json
-//        using the same entry shape so leaderboard-decider.js treats them
-//        identically.
+// v10.9: uses exchange-registry for session gating and symbol routing.
 //
-// WHY: leaderboard setups are gated by shock + OBI — both can spike and fade
-// within a 15-min window. Job A polls every 5 min and tracks the PEAK
-// shock/obi seen since Job B last consumed the file. Job B reads peaks then
-// resets them. This means spikes are caught even if they fade between polls.
-//
-// v10.3: Audit rotation changed to time-based (1 hour).
-// v10.6: stores full enrichment — bullConf, whale, capBuy, flow, grade, archetype, r1h
-// v10.8: stocks/ETFs now scored via Yahoo Finance and included in market-data.json
+// Changes from v10.8:
+//   - getMarketSession() from exchange-registry replaces hardcoded .TO check.
+//   - Stocks outside their regular session are frozen with marketClosed:true
+//     and session tag — Job B skips them entirely (no stale alerts).
+//   - Pre-market / after-hours stocks are scored but tagged session:'pre_market'
+//     or 'after_hours' so Job B can respect LB_ALLOW_PRE_MARKET / LB_ALLOW_AH.
+//   - Lunch-break stocks (TSE, HKEX) frozen same as closed.
+//   - Crypto always scored (24/7).
+//   - exchangePrefix derived from registry (LSE, XETRA, TSE, HKEX, NSE all work).
 // ══════════════════════════════════════════════════════════════════════════════
 
 import fs   from 'fs';
 import path from 'path';
-import { scoreSymbol, scoreStock, initYahoo, isCrypto } from './leaderboard-scanner.js';
+import { scoreSymbol, scoreStock, initYahoo } from './leaderboard-scanner.js';
+import { resolveExchange, getMarketSession, EXCHANGES } from './exchange-registry.js';
 
-// Use process.cwd() for reliable path resolution in GitHub Actions
-const WATCHLIST_PATH    = path.join(process.cwd(), '..', 'watchlist.json');
-const MARKET_DATA_PATH  = path.join(process.cwd(), 'market-data.json');
-const AUDIT_PATH        = path.join(process.cwd(), 'audit.json');
+const WATCHLIST_PATH   = path.join(process.cwd(), '..', 'watchlist.json');
+const MARKET_DATA_PATH = path.join(process.cwd(), 'market-data.json');
+const AUDIT_PATH       = path.join(process.cwd(), 'audit.json');
 
 const STALE_MINUTES = 30;
+
+// ── Resolve exchange prefix key (BINANCE, TSX, LSE …) ──
+function exchangePrefixFor(sym) {
+  const ex = resolveExchange(sym);
+  return Object.entries(EXCHANGES).find(([, v]) => v === ex)?.[0] ?? 'NYSE';
+}
 
 function loadWatchlist() {
   try {
     const raw  = JSON.parse(fs.readFileSync(WATCHLIST_PATH, 'utf8'));
     const list = Array.isArray(raw) ? raw : raw.symbols || [];
-    const crypto = list
-      .filter(s => s.startsWith('BINANCE:'))
-      .map(s => s.replace('BINANCE:', ''));
+    const crypto = list.filter(s => s.startsWith('BINANCE:')).map(s => s.replace('BINANCE:', ''));
     const stocks = list.filter(s => !s.startsWith('BINANCE:'));
     return { crypto, stocks };
   } catch {
@@ -51,51 +52,54 @@ function saveMarketData(data) {
 }
 
 function logAudit(action, details = {}) {
-  const audit = { timestamp: new Date().toISOString(), job: 'market-fetcher', action, ...details };
+  const entry = { timestamp: new Date().toISOString(), job: 'market-fetcher', action, ...details };
   let logs = [];
   try {
     logs = JSON.parse(fs.readFileSync(AUDIT_PATH, 'utf8'));
     if (!Array.isArray(logs)) logs = [];
   } catch {}
-  logs.push(audit);
+  logs.push(entry);
   const cutoff = Date.now() - 60 * 60 * 1000;
   logs = logs.filter(e => new Date(e.timestamp).getTime() >= cutoff);
   fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2));
 }
 
-// ── Build a symbols entry from a scoreSymbol / scoreStock result ──
-// Handles peak tracking: max absolute shock/obi seen since Job B last reset.
-function buildEntry(r, prev, now) {
+// ── Build/update a market-data.json entry ──
+// Maintains peak shock/obi since Job B last consumed + reset them.
+function buildEntry(r, prev, now, session) {
   const shock = r.d.shock || 1;
   const obi   = r.d.obi   || 0;
-
-  const peakShock = Math.max(shock, prev?.peakShock ?? shock);
-  const peakObi   = Math.abs(obi) > Math.abs(prev?.peakObi ?? 0) ? obi : (prev?.peakObi ?? obi);
-
   return {
-    pair:        r.pair,
-    price:       r.price,
-    chg:         r.chg,
-    conv:        r.conv,
-    setup:       r.setup,
-    assetType:   r.assetType,           // 'crypto' | 'stock'
-    exchangePrefix: r.exchangePrefix,   // 'BINANCE' | 'TSX' | 'NYSE'
-    d:           r.d,
-    // enriched fields
-    bullConf:    r.bullConf,
-    bullChecks:  r.bullChecks,
-    whale:       r.whale,
-    capBuy:      r.capBuy,
-    flow:        r.flow,
-    grade:       r.grade,
-    successProb: r.successProb,
-    archetype:   r.archetype,
-    // peak tracking
-    peakShock,
-    peakObi,
-    peakSince:   prev?.peakSince ?? now,
-    updatedAt:   now,
+    pair:           r.pair,
+    price:          r.price,
+    chg:            r.chg,
+    conv:           r.conv,
+    setup:          r.setup,
+    assetType:      r.assetType,
+    exchangePrefix: r.exchangePrefix,
+    session,                                        // 'open' | 'pre_market' | 'after_hours' | '24/7'
+    marketClosed:   false,
+    d:              r.d,
+    bullConf:       r.bullConf,
+    bullChecks:     r.bullChecks,
+    whale:          r.whale,
+    capBuy:         r.capBuy,
+    flow:           r.flow,
+    grade:          r.grade,
+    successProb:    r.successProb,
+    archetype:      r.archetype,
+    peakShock:      Math.max(shock, prev?.peakShock ?? shock),
+    peakObi:        Math.abs(obi) > Math.abs(prev?.peakObi ?? 0) ? obi : (prev?.peakObi ?? obi),
+    peakSince:      prev?.peakSince ?? now,
+    updatedAt:      now,
   };
+}
+
+// ── Freeze an entry when market is closed ──
+// Carries forward prior data but flags it so Job B ignores it.
+function freezeEntry(prev, session) {
+  if (!prev) return null;
+  return { ...prev, session, marketClosed: true };
 }
 
 async function main() {
@@ -103,80 +107,99 @@ async function main() {
   const totalSymbols = cryptoPairs.length + stockSyms.length;
 
   if (!totalSymbols) {
-    console.log('[market-fetcher] No symbols in watchlist — nothing to fetch.');
-    logAudit('no_symbols', { count: 0 });
+    console.log('[market-fetcher] No symbols in watchlist.');
+    logAudit('no_symbols');
     return;
   }
 
-  console.log(`[market-fetcher] Fetching ${cryptoPairs.length} crypto + ${stockSyms.length} stock/ETF symbol(s)...`);
+  console.log(`[market-fetcher] ${cryptoPairs.length} crypto + ${stockSyms.length} stock/ETF`);
 
   const existing = loadExisting();
-  const now = Date.now();
+  const now      = Date.now();
 
-  // Init Yahoo session once upfront if we have stock symbols
-  if (stockSyms.length) {
-    await initYahoo();
+  // ── Determine which stocks need scoring vs freezing ──
+  const stocksToScore  = [];
+  const stocksToFreeze = [];
+
+  for (const sym of stockSyms) {
+    const session = getMarketSession(sym);
+    if (session === 'closed' || session === 'lunch_break') {
+      stocksToFreeze.push({ sym, session });
+    } else {
+      stocksToScore.push({ sym, session }); // open | pre_market | after_hours
+    }
   }
 
-  // Fetch all in parallel (crypto and stocks run concurrently)
+  // Init Yahoo once if any stocks need scoring
+  if (stocksToScore.length) await initYahoo();
+
+  // ── Fetch in parallel ──
   const [cryptoResults, stockResults] = await Promise.all([
     Promise.all(cryptoPairs.map(scoreSymbol)),
-    Promise.all(stockSyms.map(scoreStock)),
+    Promise.all(stocksToScore.map(({ sym }) => scoreStock(sym))),
   ]);
 
-  const symbols = {};
-  let okCount = 0;
+  const symbols      = {};
+  let okCount        = 0;
   const fetchResults = [];
 
-  // ── Process crypto results ──
+  // ── Crypto (always 24/7) ──
   for (let i = 0; i < cryptoPairs.length; i++) {
     const pair = cryptoPairs[i];
     const r    = cryptoResults[i];
-    const key  = pair; // market-data keyed by raw pair (BTCUSDT, ETHY.TO, etc.)
-    const prev = existing.symbols?.[key];
+    const prev = existing.symbols?.[pair];
 
     if (!r) {
-      if (prev) symbols[key] = prev;
+      if (prev) symbols[pair] = prev;
       console.log(`  ⚠  ${pair} — crypto fetch failed, carrying forward`);
-      fetchResults.push({ pair, status: 'failed_carried_forward', assetType: 'crypto' });
+      fetchResults.push({ pair, status: 'failed', assetType: 'crypto' });
       continue;
     }
     okCount++;
-    symbols[key] = buildEntry(r, prev, now);
-    fetchResults.push({ pair, status: 'success', conv: r.conv, setup: r.setup.label, assetType: 'crypto' });
+    symbols[pair] = buildEntry(r, prev, now, '24/7');
+    fetchResults.push({ pair, status: 'ok', conv: r.conv, session: '24/7', assetType: 'crypto' });
   }
 
-  // ── Process stock/ETF results ──
-  for (let i = 0; i < stockSyms.length; i++) {
-    const sym  = stockSyms[i];
+  // ── Stocks: freeze closed markets ──
+  for (const { sym, session } of stocksToFreeze) {
+    const prev   = existing.symbols?.[sym];
+    const frozen = freezeEntry(prev, session);
+    if (frozen) symbols[sym] = frozen;
+    console.log(`  ⏸  ${sym} — ${session}, frozen`);
+    fetchResults.push({ pair: sym, status: 'frozen', session, assetType: 'stock' });
+  }
+
+  // ── Stocks: scored (open / pre_market / after_hours) ──
+  for (let i = 0; i < stocksToScore.length; i++) {
+    const { sym, session } = stocksToScore[i];
     const r    = stockResults[i];
-    const key  = sym;
-    const prev = existing.symbols?.[key];
+    const prev = existing.symbols?.[sym];
 
     if (!r) {
-      if (prev) symbols[key] = prev;
-      console.log(`  ⚠  ${sym} — stock fetch failed, carrying forward`);
-      fetchResults.push({ pair: sym, status: 'failed_carried_forward', assetType: 'stock' });
+      if (prev) symbols[sym] = { ...prev, session, marketClosed: false };
+      console.log(`  ⚠  ${sym} — fetch failed, carrying forward`);
+      fetchResults.push({ pair: sym, status: 'failed', session, assetType: 'stock' });
       continue;
     }
     okCount++;
-    symbols[key] = buildEntry(r, prev, now);
-    fetchResults.push({ pair: sym, status: 'success', conv: r.conv, setup: r.setup.label, assetType: 'stock' });
+    symbols[sym] = buildEntry(r, prev, now, session);
+    console.log(`  ✓  ${sym} [${session}] conv:${r.conv} setup:${r.setup.label}`);
+    fetchResults.push({ pair: sym, status: 'ok', conv: r.conv, session, setup: r.setup.label, assetType: 'stock' });
   }
 
   const out = { fetchedAt: now, staleAfterMinutes: STALE_MINUTES, symbols };
   saveMarketData(out);
 
   logAudit('fetch_complete', {
-    totalPairs:   totalSymbols,
-    successCount: okCount,
-    failureCount: totalSymbols - okCount,
-    cryptoCount:  cryptoPairs.length,
-    stockCount:   stockSyms.length,
-    results:      fetchResults,
+    totalPairs:    totalSymbols,
+    successCount:  okCount,
+    cryptoCount:   cryptoPairs.length,
+    stockScored:   stocksToScore.length,
+    stockFrozen:   stocksToFreeze.length,
+    results:       fetchResults,
   });
 
-  console.log(`[market-fetcher] Wrote market-data.json — ${okCount}/${totalSymbols} symbol(s) updated (${cryptoPairs.length} crypto, ${stockSyms.length} stocks).`);
+  console.log(`[market-fetcher] Done — ${okCount} scored, ${stocksToFreeze.length} frozen.`);
 }
 
 main().catch(err => {
