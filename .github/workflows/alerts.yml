@@ -261,6 +261,26 @@ jobs:
           # ── Relative Strength vs BTC ──
           GUARD_BTC_RS_ENABLED: ${{ vars.GUARD_BTC_RS_ENABLED || 'true' }}
           GUARD_BTC_RS_MIN: ${{ vars.GUARD_BTC_RS_MIN || '2.0' }}
+          # ── v15 Market Intelligence Engine (market-intelligence.js / market-state.json) ──
+          MI_HISTORY_LEN: ${{ vars.MI_HISTORY_LEN || '4' }}
+          # ── v15 Buy-side gate (market-guard.js: checkMarketIntelligenceGate) ──
+          BUY_BTC_RISK_MAX:             ${{ vars.BUY_BTC_RISK_MAX || '60' }}
+          BUY_DYNAMIC_BULL4H:           ${{ vars.BUY_DYNAMIC_BULL4H || 'true' }}
+          BUY_REQUIRE_BREADTH:          ${{ vars.BUY_REQUIRE_BREADTH || 'true' }}
+          BUY_MIN_BREADTH:              ${{ vars.BUY_MIN_BREADTH || '60' }}
+          BUY_REQUIRE_RELATIVE_STRENGTH: ${{ vars.BUY_REQUIRE_RELATIVE_STRENGTH || 'true' }}
+          # ── v15 Position Intelligence Engine (position-intelligence.js) ──
+          SELL_ENABLE_INTELLIGENCE:    ${{ vars.SELL_ENABLE_INTELLIGENCE || 'true' }}
+          SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
+          SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
+          SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
+          SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '15' }}
+          SELL_RECOVERY_WAIT_MIN:      ${{ vars.SELL_RECOVERY_WAIT_MIN || '10' }}
+          SELL_PARTIAL_EXIT_LEVEL1:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL1 || '50' }}
+          SELL_PARTIAL_EXIT_LEVEL2:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL2 || '70' }}
+          SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
+          SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
+          SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
           MEXC_NO_TRADE_SYMBOLS: ${{ vars.MEXC_NO_TRADE_SYMBOLS || 'BTCUSDT,ETHUSDT' }}
           TRADE_MODE:         ${{ vars.TRADE_MODE || 'paper' }}
           TRADE_USD_SIZE:     ${{ vars.TRADE_USD_SIZE || '25' }}
