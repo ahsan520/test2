@@ -11,7 +11,13 @@
 //   - the MARKET INTEL tile row in #mi-panel (breadth + top-mover momentum)
 // ══════════════════════════════════════════════════════════════════════════════
 
-const MI_DATA_REPO   = () => (window.__GH_REPO || 'ahsan520/alpha');
+// Uses the same repo-detection logic as position-tracker.js / alerts.js's
+// _deriveRepo() (window.__GH_REPO → saved sync config → auto-detect from
+// the GitHub Pages hostname/path). NOT hardcoded to a single repo, since
+// this file is shared across every Alpha Terminal instance (alpha, test2,
+// etc.) — hardcoding one repo here silently pointed every OTHER instance's
+// Market Intel panel at the wrong repo's market-state.json.
+const MI_DATA_REPO   = () => (typeof _deriveRepo === 'function' ? _deriveRepo() : (window.__GH_REPO || ''));
 const MI_DATA_BRANCH = 'main';
 const MI_DATA_PATH   = 'scripts/market-state.json';
 const MI_POLL_MS     = 60_000; // market-state.json only updates every ~5min (Job A cadence) — poll well under that
