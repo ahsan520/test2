@@ -114,17 +114,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "reason": "dynamicPositionRisk 0 below 50 threshold (recovery detected, risk softened)",
       "fallingKnifeScore": 0,
-      "thesisDrop": -6,
+      "thesisDrop": -3,
       "confidenceDecay": 13,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
-      "evaluatedAt": 1785865391063
+      "evaluatedAt": 1785866586429
     }
   },
   "BINANCE:SOLUSDT": {
@@ -212,6 +212,20 @@
       "btcRiskScore": 6,
       "breadthScore": 64,
       "marketRegime": "RISK_ON"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 5 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 5,
+      "thesisDrop": 19,
+      "confidenceDecay": 29,
+      "exitProbability": 9,
+      "dynamicPositionRisk": 5,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 10
+      },
+      "evaluatedAt": 1785866586429
     }
   },
   "BINANCE:ZECUSDT": {
@@ -225,7 +239,7 @@
     "alertedAt": 1785865392376,
     "holdLockUntil": 1785866592376,
     "entryPrice": 502.23,
-    "stop": 495.23,
+    "stop": 497.21,
     "t1": 531.07,
     "t2": 561.92,
     "score": 6,
