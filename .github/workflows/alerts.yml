@@ -281,6 +281,11 @@ jobs:
           SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
           SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
           SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
+          # Off by default on purpose — this executes real partial sells via
+          # reduceLiveOrder() in position-monitor.js. Flip to 'true' as a
+          # repo variable only after watching it fire correctly on test2 in
+          # TRADE_MODE=paper for a while.
+          SELL_AUTO_PARTIAL_EXIT:      ${{ vars.SELL_AUTO_PARTIAL_EXIT || 'false' }}
           MEXC_NO_TRADE_SYMBOLS: ${{ vars.MEXC_NO_TRADE_SYMBOLS || 'BTCUSDT,ETHUSDT' }}
           TRADE_MODE:         ${{ vars.TRADE_MODE || 'paper' }}
           TRADE_USD_SIZE:     ${{ vars.TRADE_USD_SIZE || '25' }}
