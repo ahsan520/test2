@@ -141,17 +141,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 10 below 50 threshold",
-      "fallingKnifeScore": 14,
-      "thesisDrop": 10,
-      "confidenceDecay": 33,
-      "exitProbability": 10,
-      "dynamicPositionRisk": 10,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": -11,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785872595474
+      "evaluatedAt": 1785873788539
     }
   },
   "BINANCE:IMXUSDT": {
@@ -172,7 +172,7 @@
     "spikeScore": 2.2025760474363354,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -186,7 +186,9 @@
       "usdSize": 110.61,
       "qty": 989.355992844365,
       "fillPrice": 0.1118,
-      "buyOrderId": "PAPER_1785867802125"
+      "buyOrderId": "PAPER_1785867802125",
+      "closedAt": 1785873788542,
+      "exitFillPrice": 0.1106
     },
     "entrySnapshot": {
       "at": 1785867802125,
@@ -226,7 +228,9 @@
         "sustainedMin": 0
       },
       "evaluatedAt": 1785872595474
-    }
+    },
+    "exitPrice": 0.1106,
+    "statusChangedAt": 1785873788539
   },
   "BINANCE:LINKUSDT": {
     "sym": "BINANCE:LINKUSDT",
@@ -244,9 +248,9 @@
     "t2": 8.7714,
     "score": 6,
     "spikeScore": 2.162605610215532,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1785873788539,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -260,7 +264,9 @@
       "usdSize": 110.61,
       "qty": 13.375010580539064,
       "fillPrice": 8.2699,
-      "buyOrderId": "PAPER_1785867803510"
+      "buyOrderId": "PAPER_1785867803510",
+      "closedAt": 1785873789643,
+      "exitFillPrice": 8.195
     },
     "entrySnapshot": {
       "at": 1785867803510,
@@ -288,19 +294,21 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 21 below 50 threshold",
-      "fallingKnifeScore": 6,
-      "thesisDrop": 49,
-      "confidenceDecay": 38,
-      "exitProbability": 21,
-      "dynamicPositionRisk": 21,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 75 → current 0 (drop 75 > 60)",
+      "fallingKnifeScore": 36,
+      "thesisDrop": 75,
+      "confidenceDecay": 75,
+      "exitProbability": 51,
+      "dynamicPositionRisk": 51,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785872595474
-    }
+      "evaluatedAt": 1785873788539
+    },
+    "exitPrice": 8.195,
+    "statusChangedAt": 1785873788539
   },
   "BINANCE:APTUSDT": {
     "sym": "BINANCE:APTUSDT",
@@ -363,17 +371,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 3 below 50 threshold",
-      "fallingKnifeScore": 5,
-      "thesisDrop": 11,
+      "reason": "dynamicPositionRisk 2 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 15,
       "confidenceDecay": 13,
-      "exitProbability": 3,
-      "dynamicPositionRisk": 3,
+      "exitProbability": 2,
+      "dynamicPositionRisk": 2,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785872595474
+      "evaluatedAt": 1785873788539
     }
   },
   "BINANCE:ZECUSDT": {
@@ -437,17 +445,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold",
-      "fallingKnifeScore": 5,
-      "thesisDrop": 10,
-      "confidenceDecay": 13,
-      "exitProbability": 2,
-      "dynamicPositionRisk": 2,
+      "reason": "dynamicPositionRisk 25 below 50 threshold",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 30,
+      "confidenceDecay": 25,
+      "exitProbability": 25,
+      "dynamicPositionRisk": 25,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785872595474
+      "evaluatedAt": 1785873788539
     }
   },
   "BINANCE:XRPUSDT": {
@@ -511,17 +519,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -12,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 25 below 50 threshold",
+      "fallingKnifeScore": 14,
+      "thesisDrop": 45,
+      "confidenceDecay": 43,
+      "exitProbability": 25,
+      "dynamicPositionRisk": 25,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785872595474
+      "evaluatedAt": 1785873788539
     }
   },
   "BINANCE:SUIUSDT": {
@@ -535,7 +543,7 @@
     "alertedAt": 1785872596446,
     "holdLockUntil": 1785873796446,
     "entryPrice": 0.7009,
-    "stop": 0.6911,
+    "stop": 0.693891,
     "t1": 0.719,
     "t2": 0.74,
     "score": 8,
@@ -595,7 +603,7 @@
     "alertedAt": 1785872596447,
     "holdLockUntil": 1785873796447,
     "entryPrice": 0.0708,
-    "stop": 0.0698,
+    "stop": 0.070092,
     "t1": 0.0734,
     "t2": 0.0764,
     "score": 6,
