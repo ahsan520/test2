@@ -141,17 +141,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -5,
-      "confidenceDecay": 17,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 5,
+      "thesisDrop": -6,
+      "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785877387807
+      "evaluatedAt": 1785878588943
     }
   },
   "BINANCE:APTUSDT": {
@@ -215,17 +215,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold (recovery detected, risk softened)",
+      "reason": "dynamicPositionRisk 3 below 50 threshold",
       "fallingKnifeScore": 5,
-      "thesisDrop": 14,
+      "thesisDrop": 11,
       "confidenceDecay": 13,
-      "exitProbability": 4,
-      "dynamicPositionRisk": 2,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 3,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785877387807
+      "evaluatedAt": 1785878588943
     }
   },
   "BINANCE:ZECUSDT": {
@@ -289,174 +289,18 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 13 below 50 threshold",
-      "fallingKnifeScore": 14,
+      "reason": "dynamicPositionRisk 14 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 35,
       "thesisDrop": 23,
       "confidenceDecay": 25,
-      "exitProbability": 13,
-      "dynamicPositionRisk": 13,
+      "exitProbability": 23,
+      "dynamicPositionRisk": 14,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
-      "evaluatedAt": 1785877387807
+      "evaluatedAt": 1785878588943
     }
-  },
-  "BINANCE:XRPUSDT": {
-    "sym": "BINANCE:XRPUSDT",
-    "base": "XRP",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785871393911,
-    "holdLockUntil": 1785872593911,
-    "entryPrice": 1.0812,
-    "stop": 1.0704,
-    "t1": 1.1092,
-    "t2": 1.1415,
-    "score": 6,
-    "spikeScore": 0.42234498214006877,
-    "exitAlertedAt": 1785877387807,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.21,
-    "histWinRate": 0,
-    "histSample": 51,
-    "caution": true,
-    "liveOrder": {
-      "mode": "paper",
-      "buyAt": 1785871395316,
-      "usdSize": 167.16,
-      "qty": 154.60599334073254,
-      "fillPrice": 1.0812,
-      "buyOrderId": "PAPER_1785871395316",
-      "closedAt": 1785877387810,
-      "exitFillPrice": 1.0781
-    },
-    "entrySnapshot": {
-      "at": 1785871395316,
-      "price": 1.0769,
-      "conv": 6,
-      "whaleScore": 77,
-      "bullConfCount": 7,
-      "bullChecks": {
-        "dailyBiasBull": false,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": false,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "LEAN BULL",
-      "cvdTrend": "up",
-      "thesisScore": 74,
-      "btcRiskScore": 6,
-      "breadthScore": 79,
-      "marketRegime": "RISK_ON"
-    },
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 74 → current 12 (drop 62 > 60)",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 62,
-      "confidenceDecay": 43,
-      "exitProbability": 40,
-      "dynamicPositionRisk": 40,
-      "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
-      },
-      "evaluatedAt": 1785877387807
-    },
-    "exitPrice": 1.0781,
-    "statusChangedAt": 1785877387807
-  },
-  "BINANCE:SUIUSDT": {
-    "sym": "BINANCE:SUIUSDT",
-    "base": "SUI",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785872596446,
-    "holdLockUntil": 1785873796446,
-    "entryPrice": 0.7009,
-    "stop": 0.693891,
-    "t1": 0.719,
-    "t2": 0.74,
-    "score": 8,
-    "spikeScore": 0.5497598265335941,
-    "exitAlertedAt": 1785877387807,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.38,
-    "histWinRate": 0,
-    "histSample": 39,
-    "caution": true,
-    "liveOrder": {
-      "mode": "paper",
-      "buyAt": 1785872596450,
-      "usdSize": 0.83,
-      "qty": 1.1841917534598374,
-      "fillPrice": 0.7009,
-      "buyOrderId": "PAPER_1785872596450",
-      "closedAt": 1785877388910,
-      "exitFillPrice": 0.6965
-    },
-    "entrySnapshot": {
-      "at": 1785872596450,
-      "price": 0.6981,
-      "conv": 8,
-      "whaleScore": 88,
-      "bullConfCount": 8,
-      "bullChecks": {
-        "dailyBiasBull": false,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": true,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 88,
-      "btcRiskScore": 6,
-      "breadthScore": 71,
-      "marketRegime": "RISK_ON"
-    },
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 88 → current 26 (drop 62 > 60)",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 62,
-      "confidenceDecay": 50,
-      "exitProbability": 42,
-      "dynamicPositionRisk": 42,
-      "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
-      },
-      "evaluatedAt": 1785877387807
-    },
-    "exitPrice": 0.6965,
-    "statusChangedAt": 1785877387807
   },
   "BINANCE:IMXUSDT": {
     "sym": "BINANCE:IMXUSDT",
