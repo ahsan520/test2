@@ -346,7 +346,13 @@ function calcEntryLevels(price, shock) {
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
   const dp    = p < 10 ? 4 : 2;
-  const entry = (p * 1.004).toFixed(dp);
+  // Entry = current price, no chase markup. All buys execute as MEXC MARKET
+  // orders anyway (fills near-instantly at whatever price is live) — the old
+  // +0.4% markup didn't change what got paid, it just inflated the reference
+  // entry used to anchor stop/rr math, making the effective risk-per-trade
+  // wider than STOP_LOSS_PCT implied. See mexc-trader.js executeAutoBuys()
+  // for the post-fill resync that anchors stop/t1/t2 to the REAL fill price.
+  const entry = p.toFixed(dp);
   const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1'); // fixed %, not volatility-scaled — kept in sync with leaderboard-decider.js
   const stop  = (p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp);
   const t1    = (p + atr * 2).toFixed(dp);

@@ -82,7 +82,15 @@ function calcEntryLevels(price, shock) {
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
   const dp    = p < 10 ? 4 : 2;
-  const entry = (p * 1.004).toFixed(dp);
+  // Entry = current price, no chase markup. Every buy is a MEXC MARKET
+  // order (fills near-instantly at whatever price is live) — the old
+  // +0.4% markup never changed what got paid, it just inflated the
+  // reference entry used to anchor stop/rr math, widening effective
+  // risk-per-trade beyond what STOP_LOSS_PCT implied. mexc-trader.js
+  // resyncs entryPrice/stop/t1/t2 to the REAL fill price after the order
+  // executes (see recalcLevelsFromFill in mexc-trader.js) — this pre-fill
+  // estimate is only what the buy alert / rank / caution tags see.
+  const entry = p.toFixed(dp);
   // Fixed-percentage stop — deliberately NOT volatility-scaled.
   // Previously (ATR_STOP_MULT) the stop widened automatically on
   // high-shock days, which defeats the purpose of setting a small,

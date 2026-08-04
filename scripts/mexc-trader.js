@@ -30,6 +30,31 @@ import {
   loadPaperBalance, adjustPaperBalance,
 } from './job-state.js';
 
+// ── Post-fill level resync — anchors entryPrice/stop/t1/t2 to the price
+// ACTUALLY paid, not the pre-fill reference estimate calcEntryLevels()
+// computed (leaderboard-scanner.js / leaderboard-decider.js) before the
+// order executed. Matters most for live orders: mexc-client.js's
+// mexcMarketBuy() already derives a real fill price from MEXC's own
+// cummulativeQuoteQty / executedQty (not the unreliable `price` field on
+// market-order responses — see mexc-client.js), but until now that real
+// price was only ever stored on pos.liveOrder.fillPrice — pos.entryPrice
+// (what stop-recalculation and P&L in position-monitor.js actually use)
+// stayed pinned to the pre-fill estimate for the position's whole
+// lifetime. Same formula as calcEntryLevels(), just anchored to the real
+// fill instead of the estimate, and with no chase markup to undo.
+function recalcLevelsFromFill(fillPrice, shock = 1) {
+  const p = parseFloat(fillPrice) || 0;
+  if (!p) return null;
+  const atr = p * 0.015 * Math.max(1, shock * 0.5);
+  const dp  = p < 10 ? 4 : 2;
+  const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1');
+  return {
+    stop: parseFloat((p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp)),
+    t1:   parseFloat((p + atr * 2).toFixed(dp)),
+    t2:   parseFloat((p + atr * 4).toFixed(dp)),
+  };
+}
+
 // ── Symbols that can alert/star normally but must NEVER be auto-traded ──
 // Default: empty — ALL symbols are tradeable unless explicitly listed here.
 // These still flow through leaderboard-decider's scan and Telegram messages
@@ -640,6 +665,16 @@ async function executeAutoBuys({
         fillPrice: pick.levels ? parseFloat(pick.levels.entry) : pick.price,
         buyOrderId: `PAPER_${Date.now()}`,
       };
+      // Resync entryPrice/stop/t1/t2 to the simulated fill price — a no-op
+      // in practice now that calcEntryLevels() no longer chases (paper
+      // fillPrice === the same pre-fill estimate), but keeps paper and live
+      // on one code path instead of the two silently drifting apart again
+      // if either formula changes later.
+      const paperLevels = recalcLevelsFromFill(pos.liveOrder.fillPrice, pick.evald?.shock ?? 1);
+      if (paperLevels) {
+        pos.entryPrice = pos.liveOrder.fillPrice;
+        pos.stop = paperLevels.stop; pos.t1 = paperLevels.t1; pos.t2 = paperLevels.t2;
+      }
       // v15 design doc — capture the entry snapshot Position Intelligence
       // compares against every cycle for this position's whole lifetime.
       pos.entrySnapshot = buildEntrySnapshot(pick.entry || {}, marketState);
@@ -665,10 +700,22 @@ async function executeAutoBuys({
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId,
           qtyEstimated: buy.estimated || false,
         };
+        // Resync entryPrice/stop/t1/t2 to what MEXC actually filled at —
+        // buy.fillPrice is derived from real executedQty/cummulativeQuoteQty
+        // (see mexc-client.js deriveFillPrice()), not the pre-fill estimate
+        // positions[sym] was created with in leaderboard-decider.js before
+        // this order was even placed. Without this, stop distance and
+        // reported P&L on every live trade were anchored to a price that
+        // was never actually paid.
+        const liveLevels = recalcLevelsFromFill(buy.fillPrice, pick.evald?.shock ?? 1);
+        if (liveLevels) {
+          pos.entryPrice = buy.fillPrice;
+          pos.stop = liveLevels.stop; pos.t1 = liveLevels.t1; pos.t2 = liveLevels.t2;
+        }
         // v15 design doc — capture the entry snapshot Position Intelligence
         // compares against every cycle for this position's whole lifetime.
         pos.entrySnapshot = buildEntrySnapshot(pick.entry || {}, marketState);
-        logAudit('mexc_live_buy', { sym: symbol, usdSize: perPickUsd, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId, estimated: buy.estimated });
+        logAudit('mexc_live_buy', { sym: symbol, usdSize: perPickUsd, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId, estimated: buy.estimated, entryPrice: pos.entryPrice, stop: pos.stop });
         recordTradeOpen(pos, {
           mode: 'live', orderId: buy.orderId,
           qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: perPickUsd,
