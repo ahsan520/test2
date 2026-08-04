@@ -98,14 +98,16 @@
     "spikeScore": 0.11884432005400801,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
     "rankScore": 0.18,
     "histWinRate": 0,
     "histSample": 36,
-    "caution": true
+    "caution": true,
+    "exitPrice": 0.6918,
+    "statusChangedAt": 1785825792913
   },
   "BINANCE:ETHUSDT": {
     "sym": "BINANCE:ETHUSDT",
@@ -125,14 +127,16 @@
     "spikeScore": 0.9162976006528764,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
     "rankScore": 0.35,
     "histWinRate": 0,
     "histSample": 14,
-    "caution": true
+    "caution": true,
+    "exitPrice": 1857.21,
+    "statusChangedAt": 1785825792913
   },
   "BINANCE:IMXUSDT": {
     "sym": "BINANCE:IMXUSDT",
@@ -196,16 +200,16 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 1,
+      "fallingKnifeScore": 7,
+      "thesisDrop": -15,
       "confidenceDecay": 14,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785824593938
+      "evaluatedAt": 1785825792913
     }
   },
   "BINANCE:GALAUSDT": {
@@ -269,17 +273,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 3,
-      "confidenceDecay": 13,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 29 below 50 threshold",
+      "fallingKnifeScore": 36,
+      "thesisDrop": 32,
+      "confidenceDecay": 38,
+      "exitProbability": 29,
+      "dynamicPositionRisk": 29,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785824593938
+      "evaluatedAt": 1785825792913
     }
   },
   "BINANCE:APTUSDT": {
@@ -342,19 +346,20 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 5 below 50 threshold",
-      "fallingKnifeScore": 10,
-      "thesisDrop": 10,
-      "confidenceDecay": 13,
-      "exitProbability": 5,
-      "dynamicPositionRisk": 5,
+      "action": "REDUCE_50",
+      "reason": "Confidence decay 38% > 35% with falling-knife 58",
+      "fallingKnifeScore": 58,
+      "thesisDrop": 30,
+      "confidenceDecay": 38,
+      "exitProbability": 38,
+      "dynamicPositionRisk": 38,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785824593938
-    }
+      "evaluatedAt": 1785825792913
+    },
+    "piReduceAlertedAt": 1785825792913
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -417,17 +422,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 4,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 17 below 50 threshold",
+      "fallingKnifeScore": 27,
+      "thesisDrop": 25,
+      "confidenceDecay": 11,
+      "exitProbability": 17,
+      "dynamicPositionRisk": 17,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785824593938
+      "evaluatedAt": 1785825792913
     }
   }
 }
