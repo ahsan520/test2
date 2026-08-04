@@ -17,6 +17,7 @@
     <div class="hstat"><span class="hstat-l">MCAP</span><span class="hstat-v" id="h-mcap">—</span></div>
     <div class="hstat"><span class="hstat-l">24H VOL</span><span class="hstat-v" id="h-vol">—</span></div>
     <div id="fg-pill" style="background:rgba(100,100,100,.2);color:#888;">F&G —</div>
+    <div id="mi-pill" title="BTC Risk Score / Market Regime — v15 Market Intelligence Engine" style="background:rgba(100,100,100,.2);color:#888;">🧠 —</div>
     <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">
       <span class="sdot" id="sdot"></span><span id="sstatus">INIT</span>
     </div>
@@ -26,8 +27,10 @@
 <!-- TABS -->
 <div class="tabs">
   <button class="tab on"  onclick="switchTab('matrix',this)">◆ SIGNAL MATRIX</button>
+  <button class="tab"     onclick="switchTab('news',this)">📰 NEWS</button>
   <button class="tab"     onclick="switchTab('journal',this)">◆ TRADE JOURNAL</button>
-  <button class="tab"     onclick="switchTab('alerts',this)">🔔 ALERTS</button>
+  <button class="tab"     onclick="switchTab('api-audit',this)">🛡 API AUDIT</button>
+  <button class="tab"     onclick="switchTab('alerts',this)">⚙ CONFIG</button>
   <button class="tab"     onclick="switchTab('watchlist-mgr',this)">⚙ WATCHLIST</button>
 </div>
 
@@ -43,6 +46,11 @@
       </div>
       <div class="wl-body hide" id="wl-body">
       <div class="wl-ctrl">
+        <div class="wl-row" style="margin-bottom:6px;">
+          <select class="wl-sel" id="wlSwitcher" onchange="switchWatchlist(this.value)" style="flex:1;"></select>
+          <button class="btn-add" onclick="createWatchlist()" title="Create a new named watchlist">+ NEW</button>
+          <button class="btn-add" onclick="deleteWatchlist(STATE.activeWatchlistName)" title="Delete the current watchlist" style="color:var(--bear);">✕</button>
+        </div>
         <div class="wl-row">
           <input type="text" id="newT" placeholder="BTC, ETH, XEG.TO…">
           <button class="btn-add" onclick="addTicker()">+ ADD</button>
@@ -63,13 +71,31 @@
     </div>
     <!-- TradingView Chart -->
     <div class="chart-wrap">
-      <div id="tv_chart" style="height:100%;"></div>
+      <div class="chart-toolbar" id="chart-toolbar">
+        <button class="bsm" id="compare-toggle-btn" onclick="toggleCompareMode()">⇄ Compare</button>
+        <div class="compare-symbol-input hide" id="compare-symbol-wrap">
+          <input type="text" id="compareSymbolInput" placeholder="Compare with… e.g. ETH"
+                 onkeydown="if(event.key==='Enter') setCompareSymbol(this.value)">
+          <button class="bsm" onclick="setCompareSymbol(document.getElementById('compareSymbolInput').value)">Load</button>
+        </div>
+      </div>
+      <div id="tv_chart_row" style="height:calc(100% - 34px);display:flex;gap:4px;">
+        <div id="tv_chart"   style="height:100%;flex:1;min-width:0;"></div>
+        <div id="tv_chart_b" style="height:100%;flex:1;min-width:0;display:none;"></div>
+      </div>
     </div>
   </div>
 
 </div><!-- /tab-matrix -->
 
-<!-- ◆ UNIFIED MARKET BAR — outside all tabs, always visible -->
+<!-- ◆ MATRIX-TAB EXTRAS — market bar + leaderboard panel. These live outside
+     the .tc tab divs so they stay visible on desktop no matter which tab is
+     open. On mobile (see #matrix-extras rule in styles.css) this wrapper is
+     hidden whenever a non-Matrix tab (News/Journal/Config/API Audit/Watchlist)
+     is active, so those pages don't get buried under this content. -->
+<div id="matrix-extras">
+
+<!-- ◆ UNIFIED MARKET BAR — outside all tabs, always visible on desktop -->
 <div class="mbar" id="mpulse-panel">
 
   <!-- Row 1: Market Pulse Tiles -->
@@ -127,6 +153,35 @@
 
 </div><!-- /mbar -->
 
+<!-- ◆ MARKET INTELLIGENCE (v15 design doc) — BTC Risk Score, market regime,
+     breadth, populated by renderMarketIntelligence() in js/market-intelligence.js.
+     Reads scripts/market-state.json (written by market-fetcher.js each Job A cycle) -->
+<div class="mbar" id="mi-panel" style="margin-top:6px;">
+  <div class="mbar-pulse" style="align-items:center;">
+    <div class="mp-group">
+      <div class="mp-group-lbl">🧠 MARKET INTEL</div>
+      <div class="mp-tile" id="mi-btcrisk" title="BTC Risk Score (0-30 Buy · 30-50 Reduce · 50-70 Watch · 70+ Block) — composite of BTC 4H/day bias, 15m momentum, volatility, Fear &amp; Greed">
+        <div class="mp-tile-name">BTC RISK</div><div class="mp-tile-val">—</div><div class="mp-tile-chg flat">—</div>
+      </div>
+      <div class="mp-tile" id="mi-regime" title="Market regime — RISK_ON / NEUTRAL / RISK_OFF, combining BTC risk score + breadth">
+        <div class="mp-tile-name">REGIME</div><div class="mp-tile-val">—</div><div class="mp-tile-chg flat">—</div>
+      </div>
+      <div class="mp-tile" id="mi-breadth" title="% of watchlist crypto symbols currently in a bullish 4H posture, and whether that's rising or falling">
+        <div class="mp-tile-name">BREADTH</div><div class="mp-tile-val">—</div><div class="mp-tile-chg flat">—</div>
+      </div>
+    </div>
+    <div class="mp-vsep"></div>
+    <div class="mp-group" style="flex:1;min-width:0;">
+      <div class="mp-group-lbl">TOP MOVERS (CVD/OI/WHALE)</div>
+      <div id="mi-symbols" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);display:flex;gap:10px;flex-wrap:wrap;">—</div>
+    </div>
+    <div class="mp-refresh-wrap">
+      <div class="mp-updated" id="mi-updated">—</div>
+      <button class="mp-refresh-btn" onclick="fetchMarketIntelligence()" title="Refresh market intelligence">↺</button>
+    </div>
+  </div>
+</div><!-- /mi-panel -->
+
 <!-- ◆ SMART MONEY SECTOR FLOW — populated by renderSectorFlow() in render.js -->
 <div id="sector-flow-panel"></div>
 
@@ -179,20 +234,72 @@
   <div class="hcl-alertbar" id="hcl-alertbar"></div>
 </div>
 
-<!-- ◆ NEWS FEED — collapsible, outside tabs, always accessible -->
-<div class="bnews">
-  <div class="bnews-hdr" onclick="toggleNews()">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <span class="pt">◆ NEWS FEED</span>
-      <button id="news-pause-btn" onclick="event.stopPropagation();toggleNewsPause()" title="Pause/resume news feed" style="font-family:var(--mono);font-size:11px;padding:2px 7px;background:rgba(255,165,0,.15);color:#ffa500;border:1px solid rgba(255,165,0,.3);border-radius:3px;cursor:pointer;letter-spacing:1px;">▶</button>
-      <div id="news-tag-bar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;"></div>
-      <span id="news-badge" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">—</span>
-      <span id="bull-n" style="font-family:var(--mono);font-size:8px;color:var(--bull);">▲ 0</span>
-      <span id="bear-n" style="font-family:var(--mono);font-size:8px;color:var(--bear);">▼ 0</span>
-    </div>
-    <span id="news-chevron" style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">▲ COLLAPSE</span>
+</div><!-- /matrix-extras -->
+
+<!-- News Feed / Sentiment / General News panels moved to the dedicated
+     ◆ NEWS tab (with subtabs) — see #tab-news below. -->
+
+<!-- ══ NEWS TAB ══ -->
+<!-- Subtabs: News Feed / Sentiment (Alpha Vantage) / General News (GNews).
+     Panels + all their existing polling/render JS (news.js, sentiment.js,
+     general-news.js) are unchanged — only the container moved here from the
+     old always-visible strip under the Signal Matrix. -->
+<div id="tab-news" class="tc">
+  <div class="news-subtabs">
+    <button class="news-subtab on" onclick="switchNewsSubtab('feed',this)">◆ NEWS FEED</button>
+    <button class="news-subtab"    onclick="switchNewsSubtab('sentiment',this)">◆ SENTIMENT</button>
+    <button class="news-subtab"    onclick="switchNewsSubtab('general',this)">◆ GENERAL NEWS</button>
   </div>
-  <div class="bnews-body" id="bnews-body"></div>
+
+  <!-- ◆ NEWS FEED — crypto/stock headlines -->
+  <div id="news-sub-feed" class="news-sub on">
+    <div class="bnews">
+      <div class="bnews-hdr" onclick="toggleNews()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pt">◆ NEWS FEED</span>
+          <button id="news-pause-btn" onclick="event.stopPropagation();toggleNewsPause()" title="Pause/resume news feed" style="font-family:var(--mono);font-size:11px;padding:2px 7px;background:rgba(255,165,0,.15);color:#ffa500;border:1px solid rgba(255,165,0,.3);border-radius:3px;cursor:pointer;letter-spacing:1px;">▶</button>
+          <div id="news-tag-bar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;"></div>
+          <span id="news-badge" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">—</span>
+          <span id="bull-n" style="font-family:var(--mono);font-size:8px;color:var(--bull);">▲ 0</span>
+          <span id="bear-n" style="font-family:var(--mono);font-size:8px;color:var(--bear);">▼ 0</span>
+        </div>
+        <span id="news-chevron" style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">▲ COLLAPSE</span>
+      </div>
+      <div class="bnews-body" id="bnews-body"></div>
+    </div>
+  </div>
+
+  <!-- ◆ SENTIMENT PANEL — Alpha Vantage News/Sentiment, alert-only -->
+  <div id="news-sub-sentiment" class="news-sub">
+    <div class="bnews">
+      <div class="bnews-hdr" onclick="toggleSentiment()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pt">◆ SENTIMENT (Alpha Vantage)</span>
+          <button id="sentiment-pause-btn" onclick="event.stopPropagation();toggleSentimentPause()" title="Pause/resume sentiment polling" style="font-family:var(--mono);font-size:11px;padding:2px 7px;background:rgba(255,165,0,.15);color:#ffa500;border:1px solid rgba(255,165,0,.3);border-radius:3px;cursor:pointer;letter-spacing:1px;">▶</button>
+          <span id="sentiment-badge" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">—</span>
+          <span id="sentiment-bull-n" style="font-family:var(--mono);font-size:8px;color:var(--bull);">▲ 0</span>
+          <span id="sentiment-bear-n" style="font-family:var(--mono);font-size:8px;color:var(--bear);">▼ 0</span>
+        </div>
+        <span id="sentiment-chevron" style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">▲ COLLAPSE</span>
+      </div>
+      <div class="bnews-body" id="sentiment-body"></div>
+    </div>
+  </div>
+
+  <!-- ◆ GENERAL NEWS PANEL — GNews.io, geopolitics/rates/jobs/crypto, display-only -->
+  <div id="news-sub-general" class="news-sub">
+    <div class="bnews">
+      <div class="bnews-hdr" onclick="toggleGeneralNews()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pt">◆ GENERAL NEWS (GNews)</span>
+          <button id="general-news-pause-btn" onclick="event.stopPropagation();toggleGeneralNewsPause()" title="Pause/resume general news polling" style="font-family:var(--mono);font-size:11px;padding:2px 7px;background:rgba(255,165,0,.15);color:#ffa500;border:1px solid rgba(255,165,0,.3);border-radius:3px;cursor:pointer;letter-spacing:1px;">▶</button>
+          <span id="general-news-badge" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);">—</span>
+        </div>
+        <span id="general-news-chevron" style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">▲ COLLAPSE</span>
+      </div>
+      <div class="bnews-body" id="general-news-body"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ══ JOURNAL TAB ══ -->
@@ -232,6 +339,7 @@
       </div>
     </div>
     <div class="j-right">
+      <!-- ── Manual Journal stats + table ── -->
       <div class="j-stats">
         <div class="jst"><div class="jst-v" id="js-total" style="color:var(--accent)">0</div><div class="jst-l">TRADES</div></div>
         <div class="jst"><div class="jst-v" id="js-wr" style="color:var(--bull)">0%</div><div class="jst-l">WIN RATE</div></div>
@@ -244,13 +352,67 @@
           <tbody id="j-tbody"></tbody>
         </table>
       </div>
+
+      <!-- ── API Trades tracker — fed by the permanent trade-log.json (survives positions.json eviction) ── -->
+      <div class="api-trades-section">
+        <div class="api-trades-header">
+          <span class="api-trades-title">⚡ API TRADES <span class="api-trades-mode" id="api-trade-mode-badge"></span></span>
+          <div class="api-trades-stats" id="api-trades-stats"></div>
+          <button class="bsm" onclick="refreshApiTrades()" title="Reload from GitHub">↻ Refresh</button>
+        </div>
+        <div class="api-tbl-wrap">
+          <table class="jtbl api-tbl">
+            <thead>
+              <tr>
+                <th>DATE</th><th>TIME</th><th>SYMBOL</th><th>MODE</th>
+                <th>BUY QTY</th><th>BUY @ $</th><th>BUY ORDER ID</th>
+                <th>SELL QTY</th><th>SELL @ $</th><th>SELL ORDER ID</th>
+                <th>P&L %</th><th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="api-trades-tbody">
+              <tr><td colspan="12" style="text-align:center;color:var(--text-dim);padding:20px;">
+                Click ↻ Refresh to load API trade history from GitHub
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="api-trades-footer" id="api-trades-footer"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ══ ALERTS TAB ══ -->
+<!-- ══ CONFIG TAB (nav label renamed from "Alerts"; internal id/tab key unchanged) ══ -->
 <div id="tab-alerts" class="tc" style="height:calc(100vh - 80px);overflow:hidden;flex-direction:column;">
   <!-- Populated by renderAlertCfgPage() in alerts.js -->
+</div>
+
+<!-- ══ API AUDIT TAB ══ -->
+<!-- Fed by audit-log.json — every API/trade action the headless job takes -->
+<!-- (buys, sells, skips, failures, GitHub pushes, mode changes, etc). Read- -->
+<!-- only, most-recent-first; capped server-side at ~3000 rows. -->
+<div id="tab-api-audit" class="tc" style="height:calc(100vh - 80px);overflow:hidden;">
+  <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;">
+    <div class="api-trades-header">
+      <span class="api-trades-title">🛡 API AUDIT</span>
+      <div class="api-trades-stats" id="api-audit-stats"></div>
+      <button class="bsm" onclick="refreshApiAudit()" title="Reload from GitHub">↻ Refresh</button>
+    </div>
+    <div class="api-tbl-wrap">
+      <table class="jtbl api-tbl">
+        <thead>
+          <tr><th>TIME</th><th>ACTION</th><th>DETAILS</th></tr>
+        </thead>
+        <tbody id="api-audit-tbody">
+          <tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px;">
+            Click ↻ Refresh to load the API audit trail from GitHub
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="api-trades-footer" id="api-audit-footer"></div>
+  </div>
 </div>
 
 <!-- ══ WATCHLIST MANAGER TAB ══ -->
@@ -316,8 +478,11 @@
 <script src="js/journal.js"></script>
 <script src="js/watchlist-manager.js"></script>
 <script src="js/position-tracker.js"></script>
-<!-- env.js: auto-generated by GitHub Actions — exposes __GH_PAT / __GH_REPO for Option B sync -->
-<script src="scripts/env.js" onerror="console.warn('env.js not found — Option B sync unavailable')"></script>
+<!-- env.js: auto-generated by GitHub Actions — exposes __GH_PAT / __GH_REPO / __AV_KEY / __GNEWS_KEY -->
+<script src="scripts/env.js" onerror="console.warn('env.js not found')"></script>
+<script src="js/sentiment.js"></script>
+<script src="js/market-intelligence.js"></script>
+<script src="js/general-news.js"></script>
 <script src="js/github-sync.js"></script>
 <script src="js/app.js"></script>
 

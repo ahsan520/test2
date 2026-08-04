@@ -12,6 +12,24 @@ const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const DRY_RUN    = process.argv.includes('--dry-run');
 const STATE_FILE = path.join(__dirname, '.alert-state.json');
 const AUDIT_PATH = path.join(__dirname, 'audit.json');
+const MARKET_DATA_PATH = path.join(__dirname, 'market-data.json');
+
+// Cache of market-data.json's per-symbol fr, loaded once per run. Avoids
+// re-fetching funding rate a third time (market-fetcher.js/leaderboard-scanner.js
+// already fetch + carry-forward it every cycle) — reuse what's already
+// committed rather than hitting a confirmed-geo-blocked endpoint again.
+let _marketDataCache = null;
+function loadMarketDataFr(bare) {
+  if (_marketDataCache === null) {
+    try {
+      _marketDataCache = JSON.parse(fs.readFileSync(MARKET_DATA_PATH, 'utf8'));
+    } catch {
+      _marketDataCache = { symbols: {} };
+    }
+  }
+  const entry = _marketDataCache.symbols?.[bare];
+  return (entry && typeof entry.d?.fr === 'number') ? entry.d.fr : null;
+}
 
 // ── Audit logging — rolling 1-hour window (shared with market-fetcher + leaderboard-decider) ──
 function logAudit(action, details = {}) {
@@ -152,7 +170,7 @@ const HEADLESS_EVICT_MS = {
   exiting: 30 * 60 * 1000,
 };
 
-async function sweepAndPushPositions(positions) {
+async function sweepAndPushPositions(positions, statusChanged = false) {
   const now     = Date.now();
   const cleaned = { ...positions };
   let   swept   = 0;
@@ -169,7 +187,11 @@ async function sweepAndPushPositions(positions) {
     }
   }
 
-  if (!swept) return; // nothing to do
+  // Push whenever a status changed this cycle (stop/T1/T2/exit fired), even
+  // if nothing was evicted yet — otherwise those in-memory status updates
+  // are silently discarded and positions.json stays stuck on the old status
+  // (e.g. 'watching') until a later run happens to also evict something.
+  if (!swept && !statusChanged) return; // nothing to do
 
   logAudit('positions_sweep_start', { swept, remaining: Object.keys(cleaned).length });
 
@@ -200,15 +222,17 @@ async function sweepAndPushPositions(positions) {
 
     const content = Buffer.from(JSON.stringify(cleaned, null, 2), 'utf8').toString('base64');
     const body    = {
-      message: `chore: sweep ${swept} terminal position(s) [skip ci]`,
+      message: swept
+        ? `chore: sweep ${swept} terminal position(s) [skip ci]`
+        : `chore: position status update [skip ci]`,
       content, branch,
     };
     if (sha) body.sha = sha;
 
     const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
     if (!putRes.ok) throw new Error(`PUT ${putRes.status}`);
-    console.log(`[sweep] ✓ Pushed cleaned positions.json (${swept} removed, ${Object.keys(cleaned).length} remaining)`);
-    logAudit('positions_sweep_pushed', { swept, remaining: Object.keys(cleaned).length });
+    console.log(`[sweep] ✓ Pushed positions.json (${swept} removed, ${Object.keys(cleaned).length} remaining)`);
+    logAudit('positions_sweep_pushed', { swept, remaining: Object.keys(cleaned).length, statusChanged });
   } catch (e) {
     console.warn(`[sweep] ⚠ Failed to push: ${e.message}`);
     logAudit('positions_sweep_failed', { error: e.message });
@@ -324,16 +348,45 @@ async function fetchJSON(url, headers = {}, timeoutMs = 9000) {
 //      down/blocked instead.
 //   3. Public CORS proxy (corsproxy.io) — last resort, free but not
 //      uptime-guaranteed, mirrors the browser's own proxy fallback.
-// NOTE: fapi.binance.com (futures — funding rate) has no public mirror
-// equivalent, so it only gets steps 2+3.
+// NOTE: fapi.binance.com (futures — funding rate, open interest) is
+// CONFIRMED geo-blocked (HTTP 451) from GitHub-hosted runner IPs, same
+// restriction as spot, and — unlike spot — has no public mirror
+// equivalent (data-api.binance.vision only serves spot). Futures data is
+// therefore sourced from Bybit instead (see fetchBybitTicker below),
+// which is not subject to this same block.
 const BINANCE_MIRROR = 'https://data-api.binance.vision';
 const BINANCE_DIRECT = 'https://api.binance.com';
+const FAPI_DIRECT     = 'https://fapi.binance.com'; // kept only as a last-resort fallback attempt
 const PROXY_PREFIX   = 'https://corsproxy.io/?url=';
 
+// ── Bybit fallback for futures data (funding rate + open interest) ───────
+// fapi.binance.com is geo-blocked (451) on GitHub runners with no public
+// mirror, unlike spot. Bybit's v5 public tickers endpoint returns both
+// funding rate AND open interest in a single call, no auth required, same
+// bare symbol format Binance uses (BTCUSDT) — no symbol-mapping needed.
+const BYBIT_DIRECT = 'https://api.bybit.com';
+
+async function fetchBybitTicker(bare) {
+  const url = `${BYBIT_DIRECT}/v5/market/tickers?category=linear&symbol=${bare}`;
+  const d = await fetchJSON(url);
+  const row = d?.result?.list?.[0];
+  if (!row) throw new Error('Bybit: no ticker row returned');
+  return {
+    fundingRate: parseFloat(row.fundingRate || 0),      // decimal, e.g. 0.0001 = 0.01%
+    openInterest: parseFloat(row.openInterest || 0),    // in base asset units, comparable to Binance's openInterest field
+  };
+}
+
 async function fetchBinance(urlPath, { useMirror = true } = {}) {
+  const isFutures = urlPath.startsWith('/fapi/');
+  const directHost = isFutures ? FAPI_DIRECT : BINANCE_DIRECT;
+
   const candidates = [];
-  if (useMirror) candidates.push(`${BINANCE_MIRROR}${urlPath}`);
-  candidates.push(`${BINANCE_DIRECT}${urlPath}`);
+  // The public spot mirror (data-api.binance.vision) only serves spot
+  // endpoints — never applicable for /fapi/* futures paths regardless of
+  // the useMirror flag.
+  if (useMirror && !isFutures) candidates.push(`${BINANCE_MIRROR}${urlPath}`);
+  candidates.push(`${directHost}${urlPath}`);
 
   let lastErr = null;
   for (const url of candidates) {
@@ -345,7 +398,7 @@ async function fetchBinance(urlPath, { useMirror = true } = {}) {
   }
   // Last resort — public CORS proxy around the direct URL.
   try {
-    return await fetchJSON(`${PROXY_PREFIX}${encodeURIComponent(`${BINANCE_DIRECT}${urlPath}`)}`);
+    return await fetchJSON(`${PROXY_PREFIX}${encodeURIComponent(`${directHost}${urlPath}`)}`);
   } catch (e) {
     lastErr = e;
   }
@@ -750,12 +803,29 @@ async function fetchCvdTrending(sym) {
 async function fetchFundingRate(sym) {
   const bare = stripExchangePrefix(sym);
   if (!isCrypto(bare)) return 0;
+
+  // Prefer what market-fetcher.js already computed this cycle (or carried
+  // forward from last cycle) — avoids a third redundant call to funding-rate
+  // endpoints that are confirmed geo-blocked on GitHub runners anyway.
+  const cached = loadMarketDataFr(bare);
+  if (cached !== null) return cached;
+
   try {
-    // fapi.binance.com (futures) has no public-mirror equivalent — direct + proxy only.
-    const d = await fetchBinance(`/fapi/v1/premiumIndex?symbol=${bare}`, { useMirror: false });
-    return parseFloat(d.lastFundingRate || 0) * 100; // convert to % like GUI
+    // Primary: Bybit — not geo-blocked on GitHub runners (unlike Binance
+    // futures, confirmed 451). Same bare symbol format as Binance.
+    const { fundingRate } = await fetchBybitTicker(bare);
+    return fundingRate * 100; // convert to % like GUI
   } catch (e) {
-    console.log(`  ⚠  fetchFundingRate failed for ${bare}: ${e.message}`);
+    console.log(`  ⚠  fetchFundingRate (Bybit) failed for ${bare}: ${e.message} — trying Binance fapi fallback`);
+  }
+  try {
+    // Fallback: Binance futures directly — confirmed 451 on GitHub
+    // runners as of 2026-07-23, kept only in case that ever changes or
+    // this runs from a non-restricted IP (e.g. local testing).
+    const d = await fetchBinance(`/fapi/v1/premiumIndex?symbol=${bare}`, { useMirror: false });
+    return parseFloat(d.lastFundingRate || 0) * 100;
+  } catch (e) {
+    console.log(`  ⚠  fetchFundingRate (Binance fapi fallback) also failed for ${bare}: ${e.message}`);
     return 0;
   }
 }
@@ -795,6 +865,7 @@ async function checkPositions(state) {
   const TIER2_COOLDOWN   = 2 * 60 * 60 * 1000;
 
   const STALE_HOURS = 48; // positions older than this with no close = warn once then skip
+  let statusChanged = false;
 
   for (const [sym, pos] of entries) {
     if (pos.status === 'stopped' || pos.status === 'tp2_hit') continue;
@@ -860,6 +931,7 @@ async function checkPositions(state) {
         );
         pos.status          = 'stopped';
         pos.statusChangedAt = now;
+        statusChanged       = true;
       }
       continue;
     }
@@ -875,6 +947,11 @@ async function checkPositions(state) {
           `  T1 $${t1}  Current $${price}  Entry $${entry}\n` +
           `  P&L +${pnlPct}%  → Trail stop, watch T2 $${t2}`
         );
+        // Was missing entirely before — status never advanced past 'watching'
+        // so positions.json looked stuck even after T1 fired.
+        pos.status          = 'tp1_hit';
+        pos.statusChangedAt = now;
+        statusChanged       = true;
       }
     }
 
@@ -891,6 +968,7 @@ async function checkPositions(state) {
         );
         pos.status          = 'tp2_hit';
         pos.statusChangedAt = now;
+        statusChanged       = true;
       }
     }
 
@@ -982,6 +1060,7 @@ async function checkPositions(state) {
       // Mark exiting so grace period timer starts
       pos.status          = 'exiting';
       pos.statusChangedAt = now;
+      statusChanged       = true;
     }
   }
 
@@ -991,7 +1070,12 @@ async function checkPositions(state) {
   // GUI Tracker Alerts panel clean, without needing manual intervention.
   // fire-key deduplication in .alert-state.json ensures no re-alerts even
   // if a symbol re-enters the leaderboard after being swept here.
-  await sweepAndPushPositions(positions);
+  //
+  // statusChanged is passed through so a stop/T1/T2/exit that fired THIS
+  // cycle gets pushed immediately too — previously these in-memory status
+  // updates were silently dropped unless a sweep also happened to run,
+  // which is why positions.json could get stuck showing 'watching' forever.
+  await sweepAndPushPositions(positions, statusChanged);
 }
 
 // ════════════════════════════════════════════════════
@@ -1292,7 +1376,8 @@ function calcEntryLevels(price, shock) {
   const atr = p * 0.015 * Math.max(1, shock * 0.5);
   const dp  = p < 0.01 ? 6 : p < 1 ? 4 : p < 100 ? 3 : 2;
   const entry = (p * 1.004).toFixed(dp);
-  const stop  = (p - atr * 1.5).toFixed(dp);
+  const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1'); // fixed %, not volatility-scaled — kept in sync with leaderboard-decider.js
+  const stop  = (p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp);
   const t1    = (p + atr * 2).toFixed(dp);
   const t2    = (p + atr * 4).toFixed(dp);
   const rr    = (parseFloat(t1) - parseFloat(entry)) / (parseFloat(entry) - parseFloat(stop));
@@ -1307,15 +1392,18 @@ function markLbCooldown(state, sym) { state[lbBuyCooldownKey(sym)] = Date.now();
 
 async function scoreCryptoSymbol(pair) {
   try {
-    const [ticker, k15r, k4r, kDr, depr, premr, oiCurr, oiPrevr] = await Promise.allSettled([
+    // NOTE: funding rate now sourced from Bybit (fetchBybitTicker), not
+    // Binance fapi — fapi.binance.com is confirmed geo-blocked (451) on
+    // GitHub runners as of 2026-07-23. The two openInterest fapi calls
+    // that used to be here were dead code anyway: oiDiv below is derived
+    // purely from fr + chg (see below), never actually read those values.
+    const [ticker, k15r, k4r, kDr, depr, bybitr] = await Promise.allSettled([
       fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=60`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
       fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
-      fetchBinance(`/fapi/v1/premiumIndex?symbol=${pair}`, { useMirror: false }),
-      fetchBinance(`/fapi/v1/openInterest?symbol=${pair}`, { useMirror: false }),
-      fetchBinance(`/fapi/v1/openInterest?symbol=${pair}`, { useMirror: false }), // placeholder for prev OI
+      fetchBybitTicker(pair),
     ]);
 
     const v = r => r.status === 'fulfilled' ? r.value : null;
@@ -1330,8 +1418,10 @@ async function scoreCryptoSymbol(pair) {
     const k4   = v(k4r)  || [];
     const kD   = v(kDr)  || [];
     const dep  = v(depr);
-    const prem = v(premr);
-    const oiNow = v(oiCurr);
+    const bybit = v(bybitr);
+    if (bybitr.status === 'rejected') {
+      console.log(`  ⚠  scoreCryptoSymbol: Bybit funding-rate fetch failed for ${pair}: ${bybitr.reason?.message}`);
+    }
 
     const price = parseFloat(t.lastPrice);
     const chg   = parseFloat(t.priceChangePercent);
@@ -1349,7 +1439,10 @@ async function scoreCryptoSymbol(pair) {
     const r4h      = calcRSI(k4c);
     const cvd      = calcCvdTrend(k15);
     const obi      = calcOBI(dep);
-    const fr       = prem ? parseFloat(prem.lastFundingRate) * 100 : 0;
+    const cachedFr = loadMarketDataFr(pair);
+    const fr = bybit
+      ? bybit.fundingRate * 100 // Bybit returns decimal (e.g. 0.0001 = 0.01%), convert to %
+      : (cachedFr !== null ? cachedFr : 0);
     const bias4h   = calc4hBias(k4);
     const biasDay  = calcDayBias(kD);
     const ema20    = calcEMA(k4c, Math.min(20, k4c.length));

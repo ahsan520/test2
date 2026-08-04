@@ -17,10 +17,12 @@ import fs   from 'fs';
 import path from 'path';
 import { scoreSymbol, scoreStock, initYahoo } from './leaderboard-scanner.js';
 import { resolveExchange, getMarketSession, EXCHANGES } from './exchange-registry.js';
+import { computeMarketState } from './market-intelligence.js';
 
-const WATCHLIST_PATH   = path.join(process.cwd(), '..', 'watchlist.json');
-const MARKET_DATA_PATH = path.join(process.cwd(), 'market-data.json');
-const AUDIT_PATH       = path.join(process.cwd(), 'audit.json');
+const WATCHLIST_PATH    = path.join(process.cwd(), '..', 'watchlist.json');
+const MARKET_DATA_PATH  = path.join(process.cwd(), 'market-data.json');
+const MARKET_STATE_PATH = path.join(process.cwd(), 'market-state.json');
+const AUDIT_PATH        = path.join(process.cwd(), 'audit.json');
 
 const STALE_MINUTES = 30;
 
@@ -51,6 +53,15 @@ function saveMarketData(data) {
   fs.writeFileSync(MARKET_DATA_PATH, JSON.stringify(data, null, 2));
 }
 
+function loadPrevMarketState() {
+  try { return JSON.parse(fs.readFileSync(MARKET_STATE_PATH, 'utf8')); }
+  catch { return {}; }
+}
+
+function saveMarketState(state) {
+  fs.writeFileSync(MARKET_STATE_PATH, JSON.stringify(state, null, 2));
+}
+
 function logAudit(action, details = {}) {
   const entry = { timestamp: new Date().toISOString(), job: 'market-fetcher', action, ...details };
   let logs = [];
@@ -69,6 +80,34 @@ function logAudit(action, details = {}) {
 function buildEntry(r, prev, now, session) {
   const shock = r.d.shock || 1;
   const obi   = r.d.obi   || 0;
+
+  // ── Persistent bull4hCount ──
+  // Counts CONSECUTIVE fetch cycles (this job runs every 5 min) where
+  // bias4h has NOT read as bearish — used downstream by
+  // leaderboard-decider.js to require the (non-bearish) trend to have
+  // persisted for a minimum number of cycles before buying, rather than
+  // acting on a single-cycle flip that may reverse next cycle.
+  //
+  // Increments on BULL 4H, LEAN BULL, or NEUTRAL — reset to 0 only on an
+  // actual bear reading (LEAN BEAR or BEAR 4H). This is intentionally
+  // broader than "only full BULL 4H counts" (the original design) —
+  // during a genuine recovery, price often transitions bear -> neutral
+  // -> lean bull -> bull gradually, and the earlier design meant the
+  // neutral/lean-bull phase contributed nothing toward persistence,
+  // delaying entries until the LATER, more-confirmed part of the move.
+  // Broadening the count lets persistence start building as soon as the
+  // bearish pressure itself has actually let up, not only once a full
+  // bull reading has already been confirmed.
+  // Configurable via BULL4H_COUNT_BEAR_VALUES (comma-separated), so which
+  // bias4h readings reset the count can be changed later without a code
+  // edit — e.g. add "NEUTRAL" here if you decide neutral should also
+  // reset it instead of counting toward persistence. Same
+  // comma-separated pattern as GUARD_BTC_BEAR_VALUES in market-guard.js.
+  const BEAR_VALUES = (process.env.BULL4H_COUNT_BEAR_VALUES || 'LEAN BEAR,BEAR 4H')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const isBearish4h = BEAR_VALUES.includes(r.d.bias4h);
+  const bull4hCount  = isBearish4h ? 0 : (prev?.bull4hCount || 0) + 1;
+
   return {
     pair:           r.pair,
     price:          r.price,
@@ -91,6 +130,7 @@ function buildEntry(r, prev, now, session) {
     peakShock:      Math.max(shock, prev?.peakShock ?? shock),
     peakObi:        Math.abs(obi) > Math.abs(prev?.peakObi ?? 0) ? obi : (prev?.peakObi ?? obi),
     peakSince:      prev?.peakSince ?? now,
+    bull4hCount,
     updatedAt:      now,
   };
 }
@@ -100,6 +140,50 @@ function buildEntry(r, prev, now, session) {
 function freezeEntry(prev, session) {
   if (!prev) return null;
   return { ...prev, session, marketClosed: true };
+}
+
+async function fetchBtcShortTermChange() {
+  // Fetch last 4 × 5m candles for BTC to compute 15m change and recent volatility
+  // (candle range as a proxy for intraday shock size).
+  try {
+    const res = await fetch(
+      'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=4',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const klines = await res.json();
+    if (!Array.isArray(klines) || klines.length < 2) return null;
+
+    const latest   = klines[klines.length - 1];
+    const oldest   = klines[0];
+    const openOld  = parseFloat(oldest[1]);
+    const closeNew = parseFloat(latest[4]);
+    const btcChg15m = openOld > 0 ? parseFloat(((closeNew - openOld) / openOld * 100).toFixed(3)) : null;
+
+    // Volatility = max high - min low across all 4 candles, as % of close
+    const highs = klines.map(k => parseFloat(k[2]));
+    const lows  = klines.map(k => parseFloat(k[3]));
+    const range = Math.max(...highs) - Math.min(...lows);
+    const btcVolatility = closeNew > 0 ? parseFloat((range / closeNew * 100).toFixed(3)) : null;
+
+    return { btcChg15m, btcVolatility };
+  } catch (e) {
+    console.log(`  ⚠  btcShortTerm fetch failed: ${e.message}`);
+    return null;
+  }
+}
+
+async function fetchFearGreed() {
+  try {
+    const res = await fetch('https://api.alternative.me/fng/?limit=1',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    const data = await res.json();
+    const val  = parseInt(data?.data?.[0]?.value ?? '-1');
+    return val >= 0 ? val : null;
+  } catch (e) {
+    console.log(`  ⚠  F&G fetch failed: ${e.message}`);
+    return null;
+  }
 }
 
 async function main() {
@@ -133,10 +217,12 @@ async function main() {
   // Init Yahoo once if any stocks need scoring
   if (stocksToScore.length) await initYahoo();
 
-  // ── Fetch in parallel ──
-  const [cryptoResults, stockResults] = await Promise.all([
-    Promise.all(cryptoPairs.map(scoreSymbol)),
+  // ── Fetch in parallel — symbols + global guard data ──
+  const [cryptoResults, stockResults, btcShort, fgVal] = await Promise.all([
+    Promise.all(cryptoPairs.map(pair => scoreSymbol(pair, existing.symbols?.[pair]?.d?.fr ?? null))),
     Promise.all(stocksToScore.map(({ sym }) => scoreStock(sym))),
+    fetchBtcShortTermChange(),
+    fetchFearGreed(),
   ]);
 
   const symbols      = {};
@@ -187,8 +273,49 @@ async function main() {
     fetchResults.push({ pair: sym, status: 'ok', conv: r.conv, session, setup: r.setup.label, assetType: 'stock' });
   }
 
-  const out = { fetchedAt: now, staleAfterMinutes: STALE_MINUTES, symbols };
+  // ── Global market guard data ──
+  // BTC's own bias4h/emaTrend/etc. are already fully computed above (as
+  // part of symbols['BTCUSDT'], via buildEntry -> evaluateSymbol) — no
+  // new fetch needed, just surfaced here for cheap access by every other
+  // symbol's buy decision (market-guard.js's BTC regime gate).
+  const btcEntry = symbols['BTCUSDT'] || {};
+  const btcD     = btcEntry.d || {};
+  const global = {
+    btcChg15m:    btcShort?.btcChg15m    ?? null,
+    btcVolatility:btcShort?.btcVolatility ?? null,
+    fearGreed:    fgVal,
+    btcBias4h:    btcD.bias4h   || null,
+    btcBiasDay:   btcD.biasDay  || null,
+    btcEmaTrend:  btcD.emaTrend || null,
+    btcOiDiv:     btcD.oiDiv    ?? null,
+    btcCvdTrend:  btcD.cvdTrend || null,
+    // 24h % change, same field/timeframe every other symbol's entry.chg
+    // uses (Binance's priceChangePercent) — needed for a fair
+    // apples-to-apples comparison in calcRelativeStrength() rather than
+    // mixing timeframes (see market-guard.js for why this matters).
+    btcChg24h:    btcEntry.chg ?? btcD.chg ?? null,
+    btcBull4hCount: btcEntry.bull4hCount ?? 0,
+    updatedAt:    now,
+  };
+
+  if (btcShort) {
+    const arrow = (btcShort.btcChg15m || 0) >= 0 ? '▲' : '▼';
+    console.log(`  📊  BTC 15m: ${arrow}${btcShort.btcChg15m}%  volatility: ${btcShort.btcVolatility}%  F&G: ${fgVal ?? '—'}`);
+  }
+
+  const out = { fetchedAt: now, staleAfterMinutes: STALE_MINUTES, global, symbols };
   saveMarketData(out);
+
+  // ── Market Intelligence Engine (v15 design doc) — never mutates market-data.json,
+  // writes its own market-state.json with rolling history + derived metrics. ──
+  try {
+    const prevState = loadPrevMarketState();
+    const marketState = computeMarketState(prevState, out);
+    saveMarketState(marketState);
+    console.log(`  🧠  Market Intelligence: BTC risk ${marketState.btcRiskScore} (${marketState.btcRiskBand}), regime ${marketState.marketRegime}, breadth ${marketState.breadth.score ?? '—'}%`);
+  } catch (err) {
+    console.error('[market-fetcher] market-intelligence error (non-fatal):', err.message);
+  }
 
   logAudit('fetch_complete', {
     totalPairs:    totalSymbols,

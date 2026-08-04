@@ -101,6 +101,15 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .tc{display:none;flex-direction:column;}
 .tc.on{display:flex;}
 
+/* ── NEWS TAB — subtabs ── */
+#tab-news{overflow-y:auto;overflow-x:hidden;padding:10px;gap:0;}
+.news-subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:10px;flex-shrink:0;}
+.news-subtab{font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:7px 14px;border:none;background:none;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:.2s;white-space:nowrap;}
+.news-subtab:hover{color:var(--text);}
+.news-subtab.on{color:var(--accent);border-bottom-color:var(--accent);}
+.news-sub{display:none;}
+.news-sub.on{display:block;}
+
 /* ── MATRIX LAYOUT ── */
 #tab-matrix{overflow-y:auto;overflow-x:hidden;}
 .grid2{display:grid;grid-template-columns:230px 1fr;height:calc(100vh - 80px);}
@@ -128,6 +137,13 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .wli-name{font-family:var(--mono);font-weight:700;font-size:10px;color:var(--text-bright);}
 .wli-price{font-family:var(--mono);font-size:8px;color:var(--text-dim);}
 .wli-chg{font-family:var(--mono);font-size:10px;font-weight:700;margin-left:auto;}
+.wl-chg{margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:700;}
+.wl-del{
+  background:none;border:none;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--bear);
+  opacity:.35;flex-shrink:0;padding:2px 4px;line-height:1;
+}
+.wl-del:hover{opacity:1;}
 .del{color:var(--bear);font-size:13px;padding:0 3px;cursor:pointer;opacity:.35;line-height:1;}
 .del:hover{opacity:1;}
 .wl-btns{padding:7px;display:grid;grid-template-columns:1fr 1fr;gap:4px;flex-shrink:0;border-top:1px solid var(--border);}
@@ -138,7 +154,14 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .rbtn:disabled{cursor:default;}
 
 /* chart */
-.chart-wrap{grid-column:2;grid-row:1;overflow:hidden;}
+.chart-wrap{grid-column:2;grid-row:1;overflow:hidden;display:flex;flex-direction:column;}
+.chart-toolbar{display:flex;align-items:center;gap:8px;padding:4px 8px;height:34px;flex-shrink:0;
+  border-bottom:1px solid var(--border);background:var(--card);}
+.compare-symbol-input{display:flex;align-items:center;gap:6px;}
+.compare-symbol-input.hide{display:none;}
+.compare-symbol-input input{background:var(--bg2);border:1px solid var(--border2);color:var(--text-bright);
+  font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:4px;width:140px;}
+#compare-toggle-btn.on{background:rgba(61,155,255,0.15);border-color:rgba(61,155,255,0.4);color:#4da6ff;}
 
 /* ── SIGNAL TABLE ── */
 .tbl-wrap{display:flex;flex-direction:column;border-top:2px solid var(--border2);}
@@ -371,6 +394,72 @@ canvas.sp{display:block;}
 .jst-v{font-family:var(--mono);font-size:15px;font-weight:700;margin-bottom:2px;}
 .jst-l{font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;}
 .j-tbl-wrap{overflow-y:auto;flex:1;padding:8px;}
+
+/* ── API Trades tracker panel ── */
+.api-trades-section{
+  border-top:2px solid var(--border2);
+  flex-shrink:0;
+  display:flex;flex-direction:column;
+  max-height:45%;min-height:140px;
+}
+.api-trades-header{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+  flex-wrap:wrap; /* mobile: let title/stats/refresh wrap onto their own lines instead of squeezing or overflowing */
+}
+.api-trades-title{
+  font-family:var(--mono);font-size:9px;font-weight:700;
+  color:var(--text-bright);letter-spacing:2px;flex:1;
+  min-width:120px; /* keeps the title from collapsing to near-zero width when stats/button wrap alongside it */
+}
+.api-trades-mode{
+  font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:1px;
+  background:rgba(255,200,0,0.12);color:#f0c040;border:1px solid rgba(240,192,64,0.3);
+}
+.api-trades-mode.live{
+  background:rgba(61,255,120,0.10);color:#3dff78;border-color:rgba(61,255,120,0.3);
+}
+.api-trades-mode.off{
+  background:rgba(120,120,120,0.10);color:var(--text-dim);border-color:var(--border);
+}
+.api-trades-stats{
+  font-family:var(--mono);font-size:9px;color:var(--text-dim);
+  display:flex;gap:16px;flex-wrap:wrap;
+}
+.api-trades-stats span{color:var(--text-bright);}
+/* Wide tables (API Trades has 12 columns incl. order IDs; API Audit's
+   DETAILS column can be long JSON) don't fit a phone-width viewport at
+   readable font sizes. Without overflow-x, the browser's only option is
+   to render the table at its natural wide content size and let the WHOLE
+   PAGE pan/zoom horizontally — which is exactly "shows desktop browser
+   only" on mobile. Scoping overflow-x to just this wrapper instead means
+   only the table scrolls sideways, the rest of the page (header, tabs,
+   nav) stays put and reflows normally. -webkit-overflow-scrolling gives
+   iOS Safari/mobile Chrome momentum/inertia scrolling instead of a stiff
+   scrollbar drag. */
+.api-tbl-wrap{
+  overflow-y:auto;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  flex:1;
+}
+.api-tbl .pnl-pos{color:var(--bull);}
+.api-tbl .pnl-neg{color:var(--bear);}
+.api-tbl .status-open{color:#4da6ff;}
+.api-tbl .status-closed{color:var(--text-dim);}
+.api-tbl .status-stale{color:#e0a030;}
+.api-tbl .status-stopped{color:var(--bear);}
+.api-tbl .ord-id{
+  font-size:8px;color:var(--text-dim);
+  max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  cursor:default;
+}
+.api-trades-footer{
+  padding:4px 12px;font-family:var(--mono);font-size:8px;
+  color:var(--text-dim);border-top:1px solid var(--border);flex-shrink:0;
+}
 .jtbl{width:100%;border-collapse:collapse;}
 .jtbl th{font-family:var(--mono);font-size:8px;color:var(--text-dim);padding:7px 9px;border-bottom:1px solid var(--border);text-align:left;letter-spacing:1px;}
 .jtbl td{font-family:var(--mono);font-size:10px;padding:9px 9px;border-bottom:1px solid rgba(30,37,48,.6);}
@@ -378,6 +467,20 @@ canvas.sp{display:block;}
 .delbtn{background:none;border:none;color:var(--bear);cursor:pointer;font-size:12px;opacity:.35;font-family:var(--mono);}
 .delbtn:hover{opacity:1;}
 .pos-calc{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:11px;margin-top:4px;}
+
+/* ── API Trades / API Audit — mobile tightening ──
+   The tables themselves already scroll horizontally within
+   .api-tbl-wrap above; these rules shrink padding/font-size on narrow
+   viewports so more columns are visible before a user needs to scroll
+   at all, and prevent the header row's title/stats/refresh button from
+   competing for space against the tab bar above it. */
+@media(max-width:600px){
+  .api-trades-title{font-size:8px;letter-spacing:1px;}
+  .api-trades-stats{font-size:8px;gap:10px;}
+  .jtbl th{padding:5px 6px;font-size:7px;white-space:nowrap;}
+  .jtbl td{padding:6px 6px;font-size:9px;}
+  .api-tbl .ord-id{max-width:60px;}
+}
 .pc-title{font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:2px;margin-bottom:8px;}
 .pc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
 .pc-val{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-family:var(--mono);font-size:10px;text-align:center;}
@@ -385,7 +488,7 @@ canvas.sp{display:block;}
 .pc-vn{font-weight:700;margin-top:2px;}
 
 /* ── ALERT CONFIG TAB ── */
-#tab-alerts{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
+#tab-alerts{overflow-y:auto;padding:20px;flex-direction:column;gap:16px;} /* display intentionally NOT set here — .tc/.tc.on controls visibility; an ID-scoped display:flex here previously beat .tc{display:none} on specificity and made this panel render on every tab */
 .alert-cfg{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;}
 .alert-cfg-title{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text-bright);letter-spacing:2px;margin-bottom:12px;}
 .alert-cfg label{font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;display:block;margin-bottom:3px;}
@@ -434,6 +537,16 @@ canvas.sp{display:block;}
   .tbl-scroll{overflow-x:scroll;-webkit-overflow-scrolling:touch;}
   table.mx{min-width:980px;}
   table.mx td,table.mx th{padding:5px 6px;font-size:9px;}
+
+  /* ── Matrix-tab extras (market bar, live ticker, leaderboard) are outside
+     the .tc tab system so they can stay visible on desktop no matter which
+     tab is open (news/sentiment/general-news now live in their own News tab
+     instead of here). On mobile that means they were always rendered —
+     bleeding through behind News/Journal/Config/API Audit/Watchlist — since
+     nothing here actually hid them. Hide by default on mobile, only show
+     when the Signal Matrix tab is the active one. ── */
+  #matrix-extras{display:none;}
+  body:has(#tab-matrix.on) #matrix-extras{display:block;}
 }
 
 /* ── Alert log (cfg panel) ── */

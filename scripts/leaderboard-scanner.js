@@ -243,16 +243,77 @@ function calcOBI(depth) {
   return total > 0 ? ((bidVol - askVol) / total * 100) : 0;
 }
 
+// Full EMA series (not just the final value) — needed to derive MACD,
+// which requires an EMA-of-an-EMA-derived-series, not a single number.
+function emaSeries(values, period) {
+  if (!values || values.length < period) return [];
+  const k = 2 / (period + 1);
+  const out = [];
+  let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  out[period - 1] = ema;
+  for (let i = period; i < values.length; i++) {
+    ema = values[i] * k + ema * (1 - k);
+    out[i] = ema;
+  }
+  return out;
+}
+
+// MACD(12,26,9) histogram — last value only. Returns null if there isn't
+// enough history for a stable signal line (needs ~35+ bars); callers must
+// treat null as "unknown", not as bearish/bullish.
+function calcMACDHistogram(closes) {
+  if (!closes || closes.length < 35) return null;
+  const ema12 = emaSeries(closes, 12);
+  const ema26 = emaSeries(closes, 26);
+  const macdLine = [];
+  for (let i = 25; i < closes.length; i++) macdLine.push(ema12[i] - ema26[i]);
+  if (macdLine.length < 9) return null;
+  const signal = emaSeries(macdLine, 9);
+  const lastSignal = signal[signal.length - 1];
+  if (lastSignal === undefined) return null;
+  return macdLine[macdLine.length - 1] - lastSignal;
+}
+
+// ── 4h bias — weighted score, not a rigid 2-factor AND-gate ────────────
+// The old version (price>EMA20 && RSI4h>50 → BULL, else piecewise) could
+// stay pinned to BEAR/LEAN BEAR for hours during a fast V-shaped recovery,
+// because EMA20 (a lagging average) hadn't caught up to price yet even
+// once RSI, MACD, and the EMA's own slope had already turned bullish.
+//
+// price vs EMA20 stays the one SYMMETRIC (bidirectional ±2) factor — it's
+// the primary structural trend read this gate is built to trust. Every
+// other factor is BONUS-ONLY (adds when true, never subtracts when
+// false) — deliberately, so a recovery with strong confirming momentum
+// (RSI>55 and rising, MACD flipped positive, EMA20 itself turning up)
+// can out-vote a not-yet-reclaimed EMA20 and reach NEUTRAL 4H (which does
+// NOT block buys) instead of staying floored at LEAN BEAR/BEAR 4H.
+// Score range: -2 (nothing bullish at all) .. +7 (everything aligned).
 function calc4hBias(k4h) {
-  if (!k4h || k4h.length < 10) return '—';
+  if (!k4h || k4h.length < 20) return '—';
   const closes = k4h.map(c => parseFloat(c[4]));
-  const ema20  = calcEMA(closes, 20);
   const price  = closes[closes.length - 1];
-  const r4h    = calcRSI(closes);
+
+  const ema20     = calcEMA(closes, 20);
+  const ema20Prev = calcEMA(closes.slice(0, -1), 20);
+  const ema50     = closes.length >= 50 ? calcEMA(closes, 50) : null;
+  const r4h       = calcRSI(closes);
+  const r4hPrev   = calcRSI(closes.slice(0, -1));
+  const macdHist  = calcMACDHistogram(closes);
+
   if (!ema20) return '—';
-  if (price > ema20 && r4h > 50) return 'BULL 4H';
-  if (price < ema20 && r4h < 50) return 'BEAR 4H';
-  return price > ema20 ? 'LEAN BULL' : 'LEAN BEAR';
+
+  let score = price > ema20 ? 2 : -2;                          // symmetric anchor
+  if (ema20Prev !== null && ema20 > ema20Prev) score += 1;      // EMA20 rising (bonus only)
+  if (r4h > 55)                                score += 1;      // bonus only
+  if (r4hPrev !== null && r4h > r4hPrev)       score += 1;      // RSI rising (bonus only)
+  if (macdHist !== null && macdHist > 0)       score += 1;      // bonus only
+  if (ema50 !== null && price > ema50)         score += 1;      // bonus only — never penalizes a not-yet-reclaimed EMA50
+
+  if (score >= 6)  return 'BULL 4H';
+  if (score >= 4)  return 'LEAN BULL';
+  if (score >= 1)  return 'NEUTRAL 4H';
+  if (score >= -1) return 'LEAN BEAR';
+  return 'BEAR 4H';
 }
 
 function calcDailyBias(kDay) {
@@ -286,7 +347,8 @@ function calcEntryLevels(price, shock) {
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
   const dp    = p < 10 ? 4 : 2;
   const entry = (p * 1.004).toFixed(dp);
-  const stop  = (p - atr * 1.5).toFixed(dp);
+  const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1'); // fixed %, not volatility-scaled — kept in sync with leaderboard-decider.js
+  const stop  = (p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp);
   const t1    = (p + atr * 2).toFixed(dp);
   const t2    = (p + atr * 4).toFixed(dp);
   const rr    = (parseFloat(t1) - parseFloat(entry)) / (parseFloat(entry) - parseFloat(stop));
@@ -382,9 +444,21 @@ export function calcFlow(d, whaleScore) {
   return 'Mixed Flow';
 }
 
-export function calcGrade(bullConf, whaleScore) {
+export function calcGrade(bullConf, whaleScore, btcMult = 1) {
   const stabilityProxy = Math.round(bullConf * 9 + 10);
-  const gradeScore = bullConf * 10 + (whaleScore - 50) * 0.3 + (stabilityProxy - 50) * 0.2;
+  let gradeScore = bullConf * 10 + (whaleScore - 50) * 0.3 + (stabilityProxy - 50) * 0.2;
+  // ── Market-wide BTC gate ──────────────────────────────────────────────
+  // Reuses the same continuous curve already tuned for position sizing
+  // (market-guard.js checkBtcGuard / GUARD_BTC_FULL_PCT-FLOOR_PCT-FLOOR_MULT)
+  // instead of a separate threshold. A falling BTC drags every crypto
+  // symbol's grade/win% down proportionally, not just position size — a
+  // technically-strong altcoin signal has repeatedly gotten dragged down
+  // anyway once BTC itself started sliding. btcMult stays 1 (no change)
+  // when BTC is flat/up, or when the caller (market-fetcher.js) has
+  // determined the symbol shows genuine 4h+ structural divergence from
+  // BTC rather than short-term (15-30m) noise that typically converges
+  // back to BTC's direction anyway.
+  gradeScore *= btcMult;
   let grade;
   if      (gradeScore >= 85) grade = 'A+';
   else if (gradeScore >= 70) grade = 'A';
@@ -392,7 +466,7 @@ export function calcGrade(bullConf, whaleScore) {
   else if (gradeScore >= 30) grade = 'C';
   else                       grade = 'D';
   const successProb = Math.max(20, Math.min(92, Math.round(
-    bullConf * 6 + (whaleScore - 50) * 0.25 + (stabilityProxy - 50) * 0.1 + 30
+    (bullConf * 6 + (whaleScore - 50) * 0.25 + (stabilityProxy - 50) * 0.1 + 30) * btcMult
   )));
   return { grade, successProb, stabilityProxy };
 }
@@ -428,7 +502,7 @@ export function calcBullConf(d, whaleScore) {
 // ════════════════════════════════════════════════════════
 // CRYPTO SCORER  (Binance)
 // ════════════════════════════════════════════════════════
-export async function scoreSymbol(pair) {
+export async function scoreSymbol(pair, prevFr = null) {
   try {
     const [ticker, k15m, k1h, k4h, kDay, depth, prem] = await Promise.allSettled([
       fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
@@ -464,18 +538,42 @@ export async function scoreSymbol(pair) {
     const ema20    = calcEMA(k4closes, 20);
     const emaTrend = ema20 ? (price > ema20 ? 'ABOVE' : 'BELOW') : '—';
 
+    // 4h return — the most recent 4h candle's own open→close % change (NOT
+    // r4h, which is a 4h-timeframe RSI reading, not a return). Needed for
+    // Relative Strength vs BTC (Phase 2, BTC Market Regime Filter): comparing
+    // a symbol's own 4h momentum against BTC's over the same window. No new
+    // fetch — k4closes is already pulled above for the EMA20/bias4h calc.
+    const chg4h = k4closes.length >= 2
+      ? parseFloat((((k4closes[k4closes.length - 1] - k4closes[k4closes.length - 2]) / k4closes[k4closes.length - 2]) * 100).toFixed(3))
+      : null;
+
     const bias4h   = calc4hBias(k4);
     const biasDay  = calcDailyBias(kD);
     const cvdTrend = calcCVD(k15);
     const obi      = calcOBI(dep);
-    const fr       = pData ? parseFloat(pData.lastFundingRate) * 100 : 0;
+    // fapi.binance.com is confirmed geo-blocked (451) on GitHub runners
+    // as of 2026-07-23 — this fetch fails every cycle right now. Rather
+    // than silently reporting fr=0 (which reads as "neutral funding" and
+    // corrupts oiDiv/DIP-BUY/CONFIRM classification below), carry forward
+    // the last known-good fr for this symbol if we have one. Still stale,
+    // but stale-and-labeled beats a false "0.000% neutral" every time.
+    let fr;
+    if (pData) {
+      fr = parseFloat(pData.lastFundingRate) * 100;
+    } else if (prevFr !== null && prevFr !== undefined) {
+      fr = prevFr;
+      console.log(`  ⚠  ${pair} — funding-rate fetch failed, carrying forward last known fr: ${fr.toFixed(3)}%`);
+    } else {
+      fr = 0;
+      console.log(`  ⚠  ${pair} — funding-rate fetch failed, no prior value to carry forward, defaulting to 0`);
+    }
 
     let oiDiv = 'NEUTRAL';
     if (fr <= -0.01 && chg > 0)    oiDiv = 'DIP BUY';
     else if (fr <= 0 && chg > 0.5)  oiDiv = 'CONFIRM';
     else if (fr > 0.05 && chg < 0)  oiDiv = 'OI DROP';
 
-    const d = { p: price, chg, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, obi, fr, oiDiv };
+    const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, obi, fr, oiDiv };
     d.conv = calcConviction(d);
 
     const setup     = getSetupMode(d);

@@ -107,11 +107,26 @@ async function seedPositionsFromGitHub() {
     const remoteCount = Object.keys(remote).length;
     if (!remoteCount) return;
 
-    // Merge into localStorage — remote wins only if newer
+    // Merge into localStorage — remote wins only if newer AND not already locally resolved
     const local  = loadPositions();
+    const TERMINAL = new Set(['stopped', 'tp2_hit', 'tp1_hit', 'exiting']);
     let   merged = false;
     for (const [sym, pos] of Object.entries(remote)) {
       const existing = local[sym];
+
+      // Never overwrite a locally-resolved position with a stale remote 'watching' entry.
+      // e.g. browser marked it stopped, but headless hasn't updated positions.json yet.
+      if (existing && TERMINAL.has(existing.status) && pos.status === 'watching') continue;
+
+      // Skip stale remote watching entries — they'll be swept by sweepExpiredPositions
+      // after merge, but skip here if staleWatchingMs already elapsed to avoid flash.
+      const staleMs  = getStaleWatchingMs();
+      const openedAt = pos.alertedAt || 0;
+      if (pos.status === 'watching' && Date.now() - openedAt >= staleMs) {
+        console.log(`[position-tracker] Skipping stale remote position: ${sym} (${Math.round((Date.now()-openedAt)/3600000)}h old)`);
+        continue;
+      }
+
       if (!existing || (pos.alertedAt || 0) > (existing.alertedAt || 0)) {
         local[sym] = pos;
         merged = true;
@@ -215,6 +230,29 @@ async function checkLeaderboardAlerts(ranked) {
     // Watchlist alert gate
     if (typeof isAlertEnabled === 'function' && !isAlertEnabled(sym)) continue;
 
+    // ── Open position gate + rotation queue ──
+    // If the symbol already has an active (non-terminal) position, skip.
+    // If a DIFFERENT symbol is occupying all slots, queue this candidate
+    // so it gets promoted automatically when a slot opens.
+    {
+      const existingPositions = loadPositions();
+      const existingPos = existingPositions[sym];
+      if (existingPos && !['stopped','tp2_hit'].includes(existingPos.status)) {
+        logAlertItem('info', `⏭ ${base} — position already open (${existingPos.status}), skipping`);
+        continue;
+      }
+      // Count active (non-terminal) positions
+      const activeCount = Object.values(existingPositions).filter(
+        p => !['stopped','tp2_hit'].includes(p.status)
+      ).length;
+      const MAX_CONCURRENT = parseInt(localStorage.getItem(`${_REPO_NS}_max_positions`) || '4');
+      if (activeCount >= MAX_CONCURRENT && !existingPos) {
+        // Slots full — queue for rotation
+        queueRotationCandidate(sym, conv, setup, d);
+        continue;
+      }
+    }
+
     // ── Calculate entry levels ──
     const levels  = calcEntryLevels(d);
     const entryP  = levels ? parseFloat(levels.entry) : parseFloat(d.p || 0);
@@ -316,12 +354,19 @@ async function monitorOpenPositions(ranked, cfg, tgReady) {
   for (const [sym, pos] of Object.entries(positions)) {
     if (pos.status === 'stopped' || pos.status === 'tp2_hit') continue;
 
-    // Find current data for this symbol
+    // Find current data — check ranked first, then fall back to STATE.DS.
+    // IMPORTANT: previously only ranked was checked, which meant positions
+    // whose score dropped below the leaderboard threshold (< minScore) were
+    // never monitored — stop/T1/T2 was never detected and the position sat
+    // in positions.json/localStorage forever. STATE.DS always has the latest
+    // price for every synced symbol regardless of leaderboard score.
     const lbEntry = ranked.find(r => r.sym === sym);
-    // NOTE: Only use data from ranked (keyed by correct sym).
-    // STATE.DS can bleed symbols from other tabs — never fall back to it here.
-    const d       = lbEntry?.d;
-    if (!d) continue;
+    const dsEntry = STATE.DS?.[sym];
+    const d       = lbEntry?.d ?? dsEntry;
+    if (!d) {
+      console.log(`[position-tracker] No data for ${sym} — skipping monitor`);
+      continue;
+    }
 
     const price    = parseFloat(d.p || 0);
     const entry    = pos.entryPrice;
@@ -347,6 +392,7 @@ async function monitorOpenPositions(ranked, cfg, tgReady) {
         ],
       });
       logAlertItem('sell', `🔴 STOP HIT — ${pos.base} @ $${price} (entry $${entry})`);
+      if (typeof queueHistoryOutcome === 'function') queueHistoryOutcome(pos, price, 'stopped');
       continue;
     }
 
@@ -385,6 +431,7 @@ async function monitorOpenPositions(ranked, cfg, tgReady) {
         ],
       });
       logAlertItem('buy', `🏆 T2 HIT — ${pos.base} @ $${price} (+${pnlPct}%)`);
+      if (typeof queueHistoryOutcome === 'function') queueHistoryOutcome(pos, price, 'tp2_hit');
       continue;
     }
 
@@ -483,6 +530,34 @@ async function monitorOpenPositions(ranked, cfg, tgReady) {
   if (changed) savePositions(positions);
   if (changed && typeof scheduleGithubSync === 'function') scheduleGithubSync();
 
+  // ── Schedule removal of newly-terminal positions ──
+  // stopped: removed after 5 min, tp2_hit: after 8 min.
+  // We schedule an exact setTimeout rather than waiting for the next
+  // sweepExpiredPositions() render cycle — ensures removal happens even
+  // if the Alerts tab is closed and renderPositionTracker() isn't running.
+  for (const a of [...tier3Alerts]) {
+    const pos   = positions[a.sym];
+    if (!pos) continue;
+    const delay = AUTO_EVICT_MS[pos.status];
+    if (!delay) continue;
+    setTimeout(async () => {
+      const current = loadPositions();
+      if (!current[a.sym]) return; // already removed
+      if (!['stopped','tp2_hit'].includes(current[a.sym].status)) return; // status changed
+      delete current[a.sym];
+      if (window._cvdDeclineCount) delete window._cvdDeclineCount[a.sym];
+      savePositions(current);
+      if (typeof scheduleGithubSync === 'function') scheduleGithubSync();
+      logAlertItem('info', `🗑 Removed ${a.base} (${pos.status}) — slot freed`);
+      // Promote next queued candidate
+      const _cfg     = loadLbAlertCfg();
+      const _tgCfg   = STATE.alertCfg?.telegram || {};
+      const _tgReady = (_tgCfg.enabled !== false) && !!(_tgCfg.botToken || window.__TG_TOKEN) && !!(_tgCfg.chatId || window.__TG_CHAT);
+      await promoteRotationCandidate(_cfg, _tgReady);
+      renderPositionTracker();
+    }, delay);
+  }
+
   // ── Send Tier 3 immediate alerts (one per event) ──
   for (const a of tier3Alerts) {
     if (!tgReady) continue;
@@ -532,60 +607,280 @@ async function _sendSellDigest(alerts) {
 // UI — Position tracker panel rendered inside Alerts tab
 // ══════════════════════════════════════════════════════════════════
 
-// Auto-eviction delays (ms) — how long a terminal-state position stays visible
-// before being automatically removed. Long enough to read, short enough to clean up.
+// ── Auto-eviction delays (ms) ──
+// How long a terminal-state position stays in the tracker before removal.
+// After removal the slot is freed for the next leaderboard candidate.
 const AUTO_EVICT_MS = {
-  stopped:  5 * 60 * 1000,   //  5 min — stop was hit, position closed, remove quickly
-  tp2_hit:  8 * 60 * 1000,   //  8 min — full target hit, celebrate briefly then clear
-  tp1_hit: 20 * 60 * 1000,   // 20 min — partial target, still watching for T2
-  exiting: 10 * 60 * 1000,   // 10 min — distribution confirmed, should be closing
+  stopped:  5 * 60 * 1000,   //  5 min — stop hit → free slot fast
+  tp2_hit:  8 * 60 * 1000,   //  8 min — full target → celebrate then clear
+  tp1_hit: 20 * 60 * 1000,   // 20 min — partial target, still watching T2
+  exiting: 10 * 60 * 1000,   // 10 min — distribution confirmed, closing
 };
 
-// ── Auto-eviction sweep — called on every renderPositionTracker() tick ──
-// Removes positions that have been in a terminal state longer than AUTO_EVICT_MS.
-// Preserves 'watching' forever — only auto-removes after a status change.
-function sweepExpiredPositions() {
+// ── Stale-watching timeout ──
+// 'watching' has no entry in AUTO_EVICT_MS because it's the active/open
+// state — but if price never tags stop OR target, it sits forever with
+// no eviction path. This caps how long a 'watching' position can stay
+// open without resolution before being force-closed as STALE and the
+// slot freed for rotation. Configurable via localStorage; default 48hr.
+function getStaleWatchingMs() {
+  const hrs = parseFloat(localStorage.getItem(`${_REPO_NS}_stale_watch_hrs`) || '24');
+  return hrs * 60 * 60 * 1000;
+}
+
+// ── Rotation queue ──
+// When a position is evicted (stop hit or target hit), the next best
+// leaderboard candidate is promoted automatically if one is queued.
+// Queue entries: { sym, conv, setup, d, timestamp }
+if (!window._rotationQueue) window._rotationQueue = [];
+
+const ROTATION_QUEUE_MAX = 10;   // max candidates to buffer
+const ROTATION_QUEUE_TTL = 5 * 60 * 1000; // candidates expire after 5 min
+
+// ── Add a candidate to the rotation queue ──
+// Called from checkLeaderboardAlerts when a symbol passes all gates
+// but an existing position is already open for that slot.
+function queueRotationCandidate(sym, conv, setup, d) {
+  // Prune expired entries first
+  const now = Date.now();
+  window._rotationQueue = window._rotationQueue.filter(e => now - e.timestamp < ROTATION_QUEUE_TTL);
+
+  // Don't add if already queued
+  if (window._rotationQueue.find(e => e.sym === sym)) return;
+
+  window._rotationQueue.push({ sym, conv, setup, d, timestamp: now });
+  // Keep sorted by conviction score desc
+  window._rotationQueue.sort((a, b) => b.conv - a.conv);
+  // Cap queue size
+  if (window._rotationQueue.length > ROTATION_QUEUE_MAX)
+    window._rotationQueue = window._rotationQueue.slice(0, ROTATION_QUEUE_MAX);
+
+  const base = sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
+  logAlertItem('info', `📋 Queued ${base} [${setup.label}] conv:${conv} for rotation`);
+}
+
+// ── Promote next queued candidate after a slot opens ──
+// Called by sweepExpiredPositions after each eviction.
+async function promoteRotationCandidate(cfg, tgReady) {
+  const now = Date.now();
+  // Prune stale entries
+  window._rotationQueue = window._rotationQueue.filter(e => now - e.timestamp < ROTATION_QUEUE_TTL);
+  if (!window._rotationQueue.length) return;
+
+  // Find best candidate not already on cooldown and not already in positions
+  const positions = loadPositions();
+  const candidate = window._rotationQueue.find(e =>
+    !positions[e.sym] && !_lbIsOnCooldown(e.sym, cfg?.cooldownMins || 60)
+  );
+  if (!candidate) return;
+
+  // Remove from queue
+  window._rotationQueue = window._rotationQueue.filter(e => e.sym !== candidate.sym);
+
+  // Open the position
+  const { sym, conv, setup, d } = candidate;
+  const base   = sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
+  const levels = typeof calcEntryLevels === 'function' ? calcEntryLevels(d) : null;
+  const entryP = levels ? parseFloat(levels.entry) : parseFloat(d.p || 0);
+  const stopP  = levels ? parseFloat(levels.stop)  : 0;
+  const t1P    = levels ? parseFloat(levels.t1)    : 0;
+  const t2P    = levels ? parseFloat(levels.t2)    : 0;
+
+  positions[sym] = {
+    sym, base,
+    setup:         setup.label,
+    dir:           setup.label === 'SHORT SETUP' ? 'bear' : 'bull',
+    alertedAt:     now,
+    holdLockUntil: now + (cfg?.holdLockMins || 20) * 60000,
+    entryPrice:    entryP,
+    stop:          stopP,
+    t1:            t1P,
+    t2:            t2P,
+    score:         conv,
+    spikeScore:    0,
+    session:       typeof getSessionLabel === 'function' ? (getSessionLabel() || '—') : '—',
+    exitAlertedAt: null,
+    tier1AlertedAt:null,
+    status:        'watching',
+    rotatedIn:     true,   // flag: this position was promoted from rotation queue
+  };
+  savePositions(positions);
+  _lbMarkBuyFired(sym);
+  if (typeof scheduleGithubSync === 'function') scheduleGithubSync();
+
+  logAlertItem('buy', `🔄 ROTATED IN — ${base} [${setup.label}] conv:${conv}`);
+
+  // Send Telegram rotation alert
+  if (tgReady && typeof isAlertEnabled === 'function' && isAlertEnabled(sym)) {
+    const session = typeof getSessionLabel === 'function' ? (getSessionLabel() || '—') : '—';
+    const utc     = new Date().toUTCString().slice(17, 22) + ' UTC';
+    const msg = [
+      `🔄 *ROTATION — New Position Opened* — ${utc}`,
+      `${setup.emoji} *${base}* — ${setup.label}  [${conv}/20]`,
+      `  Entry $${entryP}  Stop $${stopP}  T1 $${t1P}  T2 $${t2P}`,
+      `  _Slot freed by previous stop/target — next best candidate promoted_`,
+      `  Session: ${session}`,
+    ].join('\n');
+    if (typeof sendTelegramAlert === 'function') await sendTelegramAlert(msg);
+  }
+
+  renderPositionTracker();
+}
+
+// ── Auto-eviction sweep ──
+// Removes positions in terminal state, frees slot, promotes next candidate.
+async function sweepExpiredPositions(cfg, tgReady) {
   const positions = loadPositions();
   const now = Date.now();
   let changed = false;
+  let slotFreed = false;
+  const staleWatchMs = getStaleWatchingMs();
 
   for (const [sym, pos] of Object.entries(positions)) {
-    const delay = AUTO_EVICT_MS[pos.status];
-    if (!delay) continue; // 'watching' has no auto-evict
+    const base = sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
 
-    // statusChangedAt is set when status changes (see checkPositionTracker)
-    // Fall back to alertedAt if missing (positions created before v12.9.7)
+    // ── Stale 'watching' — never hit stop or target ──
+    if (pos.status === 'watching') {
+      const openedAt = pos.alertedAt || 0;
+      if (now - openedAt >= staleWatchMs) {
+        delete positions[sym];
+        if (window._cvdDeclineCount) delete window._cvdDeclineCount[sym];
+        const ageHrs = Math.round((now - openedAt) / 3600000);
+        logAlertItem('info', `🗑 STALE — ${base} watching ${ageHrs}h → evicted, slot freed`);
+        changed   = true;
+        slotFreed = true;
+      }
+      continue;
+    }
+
+    // ── Terminal states — remove after eviction window ──
+    // Covers: stopped (5min), tp2_hit (8min), tp1_hit (20min), exiting (10min)
+    const delay = AUTO_EVICT_MS[pos.status];
+    if (!delay) continue; // unknown status — leave alone
+
     const changedAt = pos.statusChangedAt || pos.alertedAt || 0;
     if (now - changedAt >= delay) {
       delete positions[sym];
       if (window._cvdDeclineCount) delete window._cvdDeclineCount[sym];
-      const base = sym.replace('BINANCE:','').replace('USDT','').replace('.TO','');
-      logAlertItem('info', `🗑 Auto-removed ${base} (${pos.status}) after ${Math.round(delay/60000)}min`);
-      changed = true;
+      logAlertItem('info', `🗑 Removed ${base} (${pos.status} ${Math.round(delay/60000)}min) → slot freed`);
+      changed   = true;
+      slotFreed = true;
     }
   }
 
   if (changed) savePositions(positions);
   if (changed && typeof scheduleGithubSync === 'function') scheduleGithubSync();
+
+  // Promote next candidate if a slot was freed
+  if (slotFreed) await promoteRotationCandidate(cfg, tgReady);
+
   return changed;
 }
 
-function renderPositionTracker() {
+async function renderPositionTracker() {
   const el = document.getElementById('position-tracker-panel');
   if (!el) return;
 
   // Sweep expired positions first — may remove entries before render
-  sweepExpiredPositions();
+  // Pass cfg + tgReady so promoteRotationCandidate can fire Telegram if needed
+  const _cfg     = loadLbAlertCfg();
+  const _tgCfg   = STATE.alertCfg?.telegram || {};
+  const _tgReady = (_tgCfg.enabled !== false || window.__TG_TOKEN)
+    && (_tgCfg.botToken || window.__TG_TOKEN)
+    && (_tgCfg.chatId   || window.__TG_CHAT);
+  await sweepExpiredPositions(_cfg, _tgReady);
 
   const positions = loadPositions();
   const cfg       = loadLbAlertCfg();
-  const entries   = Object.values(positions);
+  const entries   = Object.values(positions)
+    .sort((a, b) => (b.alertedAt || 0) - (a.alertedAt || 0)); // newest alert first
 
-  if (!entries.length) {
-    el.innerHTML = `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);padding:12px;">
+  // ── Rotation queue panel ──
+  const queueEntries = (window._rotationQueue || []).filter(
+    e => Date.now() - e.timestamp < ROTATION_QUEUE_TTL
+  );
+
+  const activeCount = entries.filter(p => !['stopped','tp2_hit'].includes(p.status)).length;
+  const MAX_CONCURRENT = parseInt(localStorage.getItem(`${_REPO_NS}_max_positions`) || '4');
+  const slotsAvailable = Math.max(0, MAX_CONCURRENT - activeCount);
+
+  // ── Browser alerts pause/resume pill ──
+  const paused   = STATE.browserAlertsPaused;
+  const pausePill = `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;margin-bottom:8px;
+                background:${paused ? 'rgba(255,140,0,.07)' : 'rgba(61,255,120,.05)'};
+                border:1px solid ${paused ? 'rgba(255,140,0,.3)' : 'rgba(61,255,120,.2)'};
+                border-radius:5px;font-family:var(--mono);font-size:8px;">
+      <span style="color:${paused ? '#ff8c00' : '#3dff78'};font-weight:700;letter-spacing:1px;">
+        ${paused ? '⏸ BROWSER ALERTS PAUSED' : '▶ BROWSER ALERTS ACTIVE'}
+      </span>
+      <span style="color:var(--text-dim);flex:1;">
+        ${paused
+          ? 'Telegram alerts from this browser tab are suppressed. Headless Job B alerts still fire.'
+          : 'This browser tab will send Telegram alerts when price conditions are met.'}
+      </span>
+      <button onclick="toggleBrowserAlerts()"
+        style="padding:4px 14px;border-radius:4px;cursor:pointer;font-family:var(--mono);
+               font-size:8px;font-weight:700;letter-spacing:1px;border:1px solid;
+               background:${paused ? 'rgba(61,255,120,.1)' : 'rgba(255,140,0,.1)'};
+               color:${paused ? '#3dff78' : '#ff8c00'};
+               border-color:${paused ? 'rgba(61,255,120,.4)' : 'rgba(255,140,0,.4)'};">
+        ${paused ? '▶ RESUME' : '⏸ PAUSE'}
+      </button>
+    </div>`;
+
+  // Queue panel HTML
+  const queueHTML = queueEntries.length ? `
+    <div style="background:rgba(77,166,255,.07);border:1px solid rgba(77,166,255,.2);
+                border-radius:5px;padding:8px 10px;margin-bottom:8px;font-family:var(--mono);font-size:8px;">
+      <div style="color:#4da6ff;font-weight:700;margin-bottom:5px;letter-spacing:1px;">
+        📋 ROTATION QUEUE (${queueEntries.length}) — ${slotsAvailable} slot${slotsAvailable !== 1 ? 's' : ''} free
+      </div>
+      ${queueEntries.map((e,i) => {
+        const qBase = e.sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
+        const ageSec = Math.round((Date.now() - e.timestamp) / 1000);
+        const ttlSec = Math.round(ROTATION_QUEUE_TTL / 1000 - ageSec);
+        return `<div style="display:flex;gap:8px;align-items:center;padding:2px 0;
+                            border-top:${i>0?'1px solid rgba(77,166,255,.1)':'none'};">
+          <span style="color:#4da6ff;min-width:16px;">#${i+1}</span>
+          <span style="color:var(--text-bright);font-weight:700;">${qBase}</span>
+          <span style="color:var(--accent);">${e.setup?.emoji || ''} ${e.setup?.label || ''}</span>
+          <span style="color:var(--text-dim);">conv:${e.conv}</span>
+          <span style="color:var(--text-dim);margin-left:auto;font-size:7px;">
+            ${ttlSec > 0 ? `expires ${ttlSec}s` : 'expiring…'}
+          </span>
+          <button onclick="dequeueCandidate('${e.sym}')"
+            style="background:none;border:1px solid var(--border2);color:var(--text-dim);
+                   padding:0 5px;border-radius:3px;cursor:pointer;font-size:7px;">✕</button>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  if (!entries.length && !queueEntries.length) {
+    el.innerHTML = pausePill + `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);padding:12px;">
       No active positions — leaderboard buy alert will create entries here.</div>`;
     return;
   }
+
+  // Pause pill — managed element so it doesn't force a full innerHTML wipe
+  let pillEl = el.querySelector('.pt-pause-pill');
+  if (!pillEl) {
+    pillEl = document.createElement('div');
+    pillEl.className = 'pt-pause-pill';
+    el.prepend(pillEl);
+  }
+  pillEl.innerHTML = pausePill;
+
+  // Prepend queue panel to output
+  const queuePanelEl = el.querySelector('.pt-queue-panel') || (() => {
+    const d = document.createElement('div');
+    d.className = 'pt-queue-panel';
+    pillEl.after(d);
+    return d;
+  })();
+  queuePanelEl.innerHTML = queueHTML;
+
+  if (!entries.length) return; // only queue, no active positions
 
   const statusColor = s => ({
     watching: 'var(--bull)',
@@ -603,19 +898,34 @@ function renderPositionTracker() {
     stopped:  '🔴 STOPPED',
   }[s] || s);
 
-  // Countdown to auto-eviction for terminal states
+  // Countdown to auto-eviction for terminal states — updates every second
   function evictCountdown(pos) {
     const delay = AUTO_EVICT_MS[pos.status];
-    if (!delay) return ''; // watching = stays forever
+    if (!delay) return '';
     const changedAt = pos.statusChangedAt || pos.alertedAt || 0;
     const remaining = Math.max(0, delay - (Date.now() - changedAt));
     const remMins   = Math.ceil(remaining / 60000);
     const remSecs   = Math.ceil(remaining / 1000);
+    const id        = `evict-cd-${pos.sym.replace(/[^a-z0-9]/gi,'')}`;
     const txt = remaining <= 0
       ? 'removing…'
-      : remaining < 60000 ? `auto-remove in ${remSecs}s`
-      :                     `auto-remove in ${remMins}min`;
-    return `<span style="color:var(--text-dim);font-size:7px;font-family:var(--mono);opacity:.7;">⏳ ${txt}</span>`;
+      : remaining < 60000 ? `removing in ${remSecs}s`
+      :                     `removing in ${remMins}min`;
+    // Kick off a live countdown ticker on first render
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (!el || el._ticking) return;
+      el._ticking = true;
+      const tick = setInterval(() => {
+        const rem2 = Math.max(0, delay - (Date.now() - changedAt));
+        if (!document.getElementById(id)) { clearInterval(tick); return; }
+        if (rem2 <= 0) { clearInterval(tick); el.textContent = '⏳ removing…'; return; }
+        const s = Math.ceil(rem2 / 1000);
+        const m = Math.ceil(rem2 / 60000);
+        el.textContent = `⏳ ${rem2 < 60000 ? `removing in ${s}s` : `removing in ${m}min`}`;
+      }, 1000);
+    }, 0);
+    return `<span id="${id}" style="color:var(--text-dim);font-size:7px;font-family:var(--mono);opacity:.7;">⏳ ${txt}</span>`;
   }
 
   el.innerHTML = entries.map(pos => {
@@ -644,19 +954,67 @@ function renderPositionTracker() {
                      : spikeInfo.cls === 'spike-med'  ? '#00c8ff'
                      : 'var(--text-dim)';
 
+    // Recommendation tags written by leaderboard-decider.js at alert time —
+    // undefined on older positions opened before this feature, so guard.
+    const recoBadge = pos.recommended
+      ? `<span title="Ranked top pick when this alert fired — current signal + history bonus"
+               style="color:#ffd700;font-size:8px;font-weight:700;">⭐</span>`
+      : '';
+    const histTip = pos.histSample
+      ? `Past history at alert time: ${Math.round((pos.histWinRate||0) * pos.histSample)}W-${pos.histSample - Math.round((pos.histWinRate||0) * pos.histSample)}L (${Math.round((pos.histWinRate||0)*100)}%)`
+      : 'No trade history yet at alert time';
+    const cautionBadge = pos.caution
+      ? `<span title="${histTip} — rough recent record, treat as a reversal bet not a repeat pattern"
+               style="color:#ff8c00;font-size:7px;font-weight:700;border:1px solid #ff8c00;
+                      padding:1px 5px;border-radius:3px;">⚠ CAUTION</span>`
+      : '';
+
+    // v15 Position Intelligence — written every cycle by position-monitor.js
+    // (position-intelligence.js's evaluatePosition) onto pos.lastPI. Absent
+    // on positions opened before this feature, or before the first Job B
+    // cycle after opening (min position age gate) — guard accordingly.
+    const pi = pos.lastPI;
+    const piActionColor = pi && (pi.action === 'EMERGENCY_EXIT' ? 'var(--bear)'
+                        : pi.action === 'EXIT'      ? 'var(--bear)'
+                        : pi.action === 'REDUCE_50' ? '#ff8c00'
+                        : pi.action === 'REDUCE_25' ? '#ffa500'
+                        : 'var(--text-dim)');
+    const piBadge = pi && pi.action && pi.action !== 'HOLD'
+      ? `<span title="${(pi.reason || '').replace(/"/g,'&quot;')}"
+               style="color:${piActionColor};font-size:7px;font-weight:700;border:1px solid ${piActionColor};
+                      padding:1px 5px;border-radius:3px;">🧠 ${pi.action.replace('_',' ')}</span>`
+      : '';
+    const piRow = pi
+      ? `<div style="display:flex;gap:10px;align-items:center;margin-top:4px;font-size:7px;color:var(--text-dim);"
+              title="Falling Knife / Thesis Drop / Confidence Decay / Exit Probability — v15 Position Intelligence Engine">
+          <span>Knife: <b style="color:${pi.fallingKnifeScore > 70 ? 'var(--bear)' : 'var(--text-dim)'}">${pi.fallingKnifeScore}</b></span>
+          <span>Thesis Δ: <b>${pi.thesisDrop != null ? pi.thesisDrop.toFixed(0) : '—'}</b></span>
+          <span>Decay: <b>${pi.confidenceDecay}%</b></span>
+          <span>Exit prob: <b style="color:${pi.exitProbability > 70 ? 'var(--bear)' : pi.exitProbability > 50 ? '#ff8c00' : 'var(--text-dim)'}">${pi.exitProbability}</b></span>
+          ${pi.recovery?.recovering ? `<span style="color:var(--bull);">↗ recovering</span>` : ''}
+        </div>`
+      : '';
+
     return `
     <div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${statusColor(pos.status)};
                 border-radius:6px;padding:10px 12px;margin-bottom:8px;font-family:var(--mono);font-size:9px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <span style="color:var(--text-bright);font-weight:700;font-size:10px;">${pos.base}</span>
+        <span style="color:var(--text-bright);font-weight:700;font-size:10px;" title="${pos.histSample ? histTip : ''}">${pos.base}</span>
+        ${recoBadge}
         <span style="color:${statusColor(pos.status)};font-size:8px;letter-spacing:1px;">${statusLabel(pos.status)}</span>
+        ${cautionBadge}
         ${evictCountdown(pos)}
+        ${piBadge}
         <span title="Live spike potential: ${liveSpikeScore}/100 — resistance room + vol + funding + short squeeze fuel"
               style="color:${spikeColor};font-size:7px;font-weight:700;border:1px solid ${spikeColor};
                      padding:1px 5px;border-radius:3px;opacity:.8;">SPIKE ${liveSpikeScore}</span>
         <button onclick="removePosition('${pos.sym}')"
           style="background:none;border:1px solid var(--border2);color:var(--text-dim);
                  padding:1px 7px;border-radius:3px;cursor:pointer;font-size:8px;">✕</button>
+        ${pos.status === 'watching' && age > 120 ? `
+        <button onclick="forceEvictPosition('${pos.sym}')" title="Force-evict this stale position and free the slot for rotation"
+          style="background:rgba(255,140,0,.15);border:1px solid #ff8c00;color:#ff8c00;
+                 padding:1px 7px;border-radius:3px;cursor:pointer;font-size:8px;">⚠ STALE</button>` : ''}
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px;">
         <div><div style="color:var(--text-dim);font-size:7px;">SETUP</div><div style="color:var(--accent);">${pos.setup}</div></div>
@@ -673,6 +1031,7 @@ function renderPositionTracker() {
           ? `<span style="color:var(--bear);font-size:8px;">CVD↓ ${window._cvdDeclineCount[pos.sym]}/${cfg.exitCvdCycles}</span>`
           : ''}
       </div>
+      ${piRow}
     </div>`;
   }).join('');
 }
@@ -682,10 +1041,43 @@ function removePosition(sym) {
   delete positions[sym];
   savePositions(positions);
   if (typeof scheduleGithubSync === 'function') scheduleGithubSync();
-  // Clear CVD counter
   if (window._cvdDeclineCount) delete window._cvdDeclineCount[sym];
   renderPositionTracker();
-  logAlertItem('info', `🗑 Position removed: ${sym.replace('BINANCE:','').replace('USDT','')}`);
+  logAlertItem('info', `🗑 Position removed: ${sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'')}`);
+}
+
+// ── Remove a single candidate from the rotation queue ──
+function dequeueCandidate(sym) {
+  window._rotationQueue = (window._rotationQueue || []).filter(e => e.sym !== sym);
+  const base = sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
+  logAlertItem('info', `✕ Removed ${base} from rotation queue`);
+  renderPositionTracker();
+}
+
+// ── Clear entire rotation queue ──
+function clearRotationQueue() {
+  const count = (window._rotationQueue || []).length;
+  window._rotationQueue = [];
+  logAlertItem('info', `🗑 Rotation queue cleared (${count} candidate${count !== 1 ? 's' : ''})`);
+  renderPositionTracker();
+}
+
+// ── Manually force-evict a stale watching position ──
+function forceEvictPosition(sym) {
+  const positions = loadPositions();
+  if (!positions[sym]) return;
+  const base = sym.replace('BINANCE:','').replace('USDT','').replace(/\.\w+$/,'');
+  delete positions[sym];
+  savePositions(positions);
+  if (window._cvdDeclineCount) delete window._cvdDeclineCount[sym];
+  if (typeof scheduleGithubSync === 'function') scheduleGithubSync();
+  logAlertItem('info', `⚠️ Force-evicted ${base} → slot freed`);
+  renderPositionTracker();
+  // Immediately try to promote from queue
+  const _cfg     = loadLbAlertCfg();
+  const _tgCfg   = STATE.alertCfg?.telegram || {};
+  const _tgReady = (_tgCfg.enabled !== false) && !!(_tgCfg.botToken || window.__TG_TOKEN) && !!(_tgCfg.chatId || window.__TG_CHAT);
+  promoteRotationCandidate(_cfg, _tgReady);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -746,6 +1138,10 @@ function renderLbAlertCard() {
          'Min minutes between buy alerts for the same symbol. 60 = 1hr.'],
         ['lb-holdlock', 'Hold Lock (min)', cfg.holdLockMins, 5, 60, 5,
          'No exit alerts in first N minutes after entry. Prevents panic on retest.'],
+        ['lb-max-pos', 'Max Concurrent Positions', parseInt(localStorage.getItem(`${_REPO_NS}_max_positions`) || '4'), 1, 10, 1,
+         'Max open positions before new signals are queued for rotation instead of immediately opened.'],
+        ['lb-stale-hrs', 'Stale-Watch Timeout (hrs)', parseFloat(localStorage.getItem(`${_REPO_NS}_stale_watch_hrs`) || '48'), 4, 168, 4,
+         'Force-evict a watching position after N hours with no stop or target hit. Fixes the stuck-symbol bug. 48hr = 2 trading days.'],
       ].map(([id, lbl, val, min, max, step, tip]) => `
         <div title="${tip}">
           <label style="font-family:var(--mono);font-size:7px;color:var(--text-dim);display:block;margin-bottom:3px;">${lbl}</label>
@@ -795,7 +1191,12 @@ function saveLbAlertCfgFromUI() {
     exitCvdCycles:  parseInt(document.getElementById('lb-cvd-cycles')?.value) || 3,
   };
   saveLbAlertCfg(cfg);
-  logAlertItem('info', '💾 Leaderboard alert config saved.');
+  // max_positions and stale_watch_hrs stored separately (localStorage only — not in positions.json)
+  const maxPos   = parseInt(document.getElementById('lb-max-pos')?.value)   || 4;
+  const staleHrs = parseFloat(document.getElementById('lb-stale-hrs')?.value) || 48;
+  localStorage.setItem(`${_REPO_NS}_max_positions`,  String(maxPos));
+  localStorage.setItem(`${_REPO_NS}_stale_watch_hrs`, String(staleHrs));
+  logAlertItem('info', `💾 Config saved — max positions: ${maxPos} · stale timeout: ${staleHrs}h`);
   renderAlertCfgPage();
 }
 

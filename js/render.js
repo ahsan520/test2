@@ -75,6 +75,20 @@ function render() { renderWL(); renderTable(); scheduleLeaderboard(); }
 // Skeleton built once on init / structure change. Live updates = textContent only.
 function renderWL() {
   const { watchlist, DS, currentS } = STATE;
+
+  // Keep the watchlist-switcher dropdown in sync with STATE.namedWatchlists.
+  const switcher = document.getElementById('wlSwitcher');
+  if (switcher && STATE.namedWatchlists) {
+    const names = Object.keys(STATE.namedWatchlists);
+    const optKey = names.join(',') + '|' + STATE.activeWatchlistName;
+    if (switcher.dataset.optKey !== optKey) {
+      switcher.innerHTML = names.map(n =>
+        `<option value="${n}"${n === STATE.activeWatchlistName ? ' selected' : ''}>${n} (${(STATE.namedWatchlists[n] || []).length})</option>`
+      ).join('');
+      switcher.dataset.optKey = optKey;
+    }
+  }
+
   const cont = document.getElementById('wl-cont');
   if (!cont) return;
 
@@ -84,13 +98,24 @@ function renderWL() {
     cont.innerHTML = watchlist.map(s => {
       const name = s.includes(':') ? s.split(':')[1].replace('USDT','') : s;
       const mktB = typeof marketStatusBadge === 'function' ? marketStatusBadge(s) : '';
+      const spId = 'wlsp_' + s.replace(/[^a-z0-9]/gi, '_');
       return `<div class="wli" onclick="switchT('${s}')" data-sym="${s}">
         <span class="wl-name">${name}${mktB}</span>
+        <canvas id="${spId}" width="46" height="16" class="sp" style="flex-shrink:0;"></canvas>
         <span class="wl-chg">—</span>
+        <button class="wl-del" onclick="event.stopPropagation();delT('${s}')" title="Remove ${name} from this watchlist">✕</button>
       </div>`;
     }).join('');
     _rendered.wl = wlKey;
     watchlist.forEach(s => { delete _dv[s+':wlchg']; delete _dv[s+':wlcolor']; });
+    // Register the new sparkline canvases for viewport-only lazy drawing
+    requestAnimationFrame(() => {
+      _initSparkIO();
+      watchlist.forEach(s => {
+        const spEl = document.getElementById('wlsp_' + s.replace(/[^a-z0-9]/gi,'_'));
+        if (spEl) _registerSpark(spEl);
+      });
+    });
   }
 
   // Patch-only: textContent + className, no innerHTML writes
@@ -108,6 +133,17 @@ function renderWL() {
     }
     const isOn = s === currentS;
     if (el.classList.contains('on') !== isOn) el.classList.toggle('on', isOn);
+  });
+
+  // Sparklines: only draw canvases currently in the viewport (same lazy
+  // IntersectionObserver machinery the Signal Matrix table sparklines use)
+  requestAnimationFrame(() => {
+    watchlist.forEach(s => {
+      const d       = DS[s];
+      const spId    = 'wlsp_' + s.replace(/[^a-z0-9]/gi,'_');
+      const spData  = d?.sparkBars?.length > 1 ? d.sparkBars : (STATE.PH[s]?.length > 1 ? STATE.PH[s] : null);
+      if (spData) _drawSparkLazy(spId, spData, null);
+    });
   });
 }
 
@@ -251,6 +287,12 @@ function patchSymbolRow(s) {
   if (!tbody) return;
   const d = STATE.DS[s];
   if (!d) return;
+  // Background-scanned symbol from a non-active watchlist — it has no row
+  // in the currently displayed matrix by design (only the active list is
+  // rendered here). Alerts already fired off this data in processAI; skip
+  // the DOM patch/rebuild entirely rather than forcing a spurious
+  // renderTable() for a symbol that will never appear in this table.
+  if (!(STATE.watchlist || []).includes(s)) return;
 
   const tr = tbody.querySelector(`tr[data-sym="${CSS.escape(s)}"]`);
   if (!tr) { renderTable(); return; } // new symbol — rebuild structure once
