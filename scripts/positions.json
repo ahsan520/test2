@@ -199,7 +199,7 @@
     "spikeScore": 0.5570025370272087,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -213,7 +213,9 @@
       "usdSize": 71.77,
       "qty": 39872.22222222222,
       "fillPrice": 0.0018,
-      "buyOrderId": "PAPER_1785883393637"
+      "buyOrderId": "PAPER_1785883393637",
+      "closedAt": 1785884595708,
+      "exitFillPrice": 0.001809
     },
     "entrySnapshot": {
       "at": 1785883393637,
@@ -253,7 +255,10 @@
         "sustainedMin": 0
       },
       "evaluatedAt": 1785884594522
-    }
+    },
+    "exitPrice": 0.001809,
+    "statusChangedAt": 1785884597373,
+    "rotatedOut": true
   },
   "BINANCE:APTUSDT": {
     "sym": "BINANCE:APTUSDT",
@@ -327,6 +332,66 @@
         "sustainedMin": 0
       },
       "evaluatedAt": 1785884594522
+    }
+  },
+  "BINANCE:SUIUSDT": {
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1785884595706,
+    "holdLockUntil": 1785885795706,
+    "entryPrice": 0.6952,
+    "stop": 0.6882,
+    "t1": 0.7161,
+    "t2": 0.7369,
+    "score": 6,
+    "spikeScore": 0.0619651145858962,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "latest",
+    "recommended": true,
+    "rankScore": 0.21,
+    "histWinRate": 0,
+    "histSample": 40,
+    "caution": true,
+    "liveOrder": {
+      "mode": "paper",
+      "buyAt": 1785884597679,
+      "usdSize": 72.84,
+      "qty": 104.77560414269274,
+      "fillPrice": 0.6952,
+      "buyOrderId": "PAPER_1785884597679"
+    },
+    "entrySnapshot": {
+      "at": 1785884597679,
+      "price": 0.6952,
+      "conv": 6,
+      "whaleScore": 80,
+      "bullConfCount": 7,
+      "bullChecks": {
+        "dailyBiasBull": false,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": true,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "LEAN BULL",
+      "cvdTrend": "up",
+      "thesisScore": 75,
+      "btcRiskScore": 0,
+      "breadthScore": 64,
+      "marketRegime": "RISK_ON"
     }
   }
 }
