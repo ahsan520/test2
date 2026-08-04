@@ -78,6 +78,20 @@ const BTC_BUY_GATE          = (process.env.GUARD_BTC_BUY_GATE || 'true') !== 'fa
 const BTC_BEAR_VALUES       = (process.env.GUARD_BTC_BEAR_VALUES || 'BEAR 4H,LEAN BEAR')
   .split(',').map(s => s.trim()).filter(Boolean);
 
+// ── EXHAUSTED_BULL — Market Intelligence Enhancement Proposal v2, Scenario 2 ──
+// BTC's own 4H bias is still BULL (not bearish), but btcRiskScore (from
+// market-state.json, see market-intelligence.js) has climbed into a "topping"
+// band — momentum/volatility/breadth deteriorating even though the label
+// hasn't flipped to BEAR yet. Per the proposal this REJECTS regular buys
+// outright, even for a candidate with high Relative Strength — unlike the
+// BEAR case below, EXHAUSTED_BULL does NOT route through the Alpha Exception.
+// Requires marketState (market-state.json) — silently skipped (not blocked)
+// until that file has real history, same "notReady" convention used by
+// checkMarketIntelligenceGate().
+const EXHAUSTED_BULL_GATE   = (process.env.GUARD_BTC_EXHAUSTED_BULL_GATE || 'true') !== 'false';
+const EXHAUSTED_BULL_MIN    = parseFloat(process.env.GUARD_BTC_EXHAUSTED_MIN || '45');
+const EXHAUSTED_BULL_MAX    = parseFloat(process.env.GUARD_BTC_EXHAUSTED_MAX || '60');
+
 // ── BTC Stop Override — DISABLED BY DEFAULT, reserved for a future phase ──
 // When (eventually) enabled, this would let a hit stop-loss continue
 // holding rather than close immediately, UNLESS BTC itself is bearish —
@@ -89,20 +103,46 @@ const BTC_BEAR_VALUES       = (process.env.GUARD_BTC_BEAR_VALUES || 'BEAR 4H,LEA
 const BTC_STOP_OVERRIDE           = (process.env.GUARD_BTC_STOP_OVERRIDE || 'false') === 'true';
 const STOP_OVERRIDE_MAX_LOSS_PCT  = parseFloat(process.env.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5');
 
-// Returns { blocked, reason } — used by the buy-scan gate, NOT by rotation
-// or exits. BTC's own bias fields come from market.global (written once
-// per fetch cycle by market-fetcher.js), so this is a cheap in-memory
-// check, no extra API calls.
-export function checkBtcRegimeGate(global = {}) {
-  if (!BTC_BUY_GATE) return { blocked: false, reason: null };
+// Returns { blocked, reason, regime, allowAlphaException } — used by the
+// buy-scan gate, NOT by rotation or exits. BTC's own bias fields come from
+// market.global (written once per fetch cycle by market-fetcher.js); the
+// EXHAUSTED_BULL check additionally reads marketState.btcRiskScore from
+// market-state.json (market-intelligence.js) when available.
+//
+// `regime` distinguishes WHY it blocked, since the two cases are handled
+// differently downstream: BEAR still allows a per-candidate Alpha Exception
+// bypass (allowAlphaException: true); EXHAUSTED_BULL is a hard reject with
+// no exception (allowAlphaException: false) — see leaderboard-decider.js.
+export function checkBtcRegimeGate(global = {}, marketState = {}) {
+  if (!BTC_BUY_GATE) return { blocked: false, reason: null, regime: null, allowAlphaException: false };
   const bias4h = global.btcBias4h;
-  if (!bias4h) return { blocked: false, reason: null }; // no data yet — don't block on missing data
+  if (!bias4h) return { blocked: false, reason: null, regime: null, allowAlphaException: false }; // no data yet — don't block on missing data
+
   const isBear = BTC_BEAR_VALUES.some(v => bias4h.includes(v));
-  if (!isBear) return { blocked: false, reason: null };
-  return {
-    blocked: true,
-    reason: `BTC 4H bias is ${bias4h} — new buys paused (market-regime gate)`,
-  };
+  if (isBear) {
+    return {
+      blocked: true,
+      reason: `BTC 4H bias is ${bias4h} — new buys paused (market-regime gate)`,
+      regime: 'BEAR',
+      allowAlphaException: true,
+    };
+  }
+
+  // EXHAUSTED_BULL — bias4h still BULL, but btcRiskScore has drifted into
+  // the topping band. notReady (btcRiskScore == null) never blocks.
+  if (EXHAUSTED_BULL_GATE && bias4h.includes('BULL')) {
+    const btcRiskScore = marketState?.btcRiskScore;
+    if (btcRiskScore != null && btcRiskScore >= EXHAUSTED_BULL_MIN && btcRiskScore <= EXHAUSTED_BULL_MAX) {
+      return {
+        blocked: true,
+        reason: `BTC bias is ${bias4h} but risk score ${btcRiskScore} is in the exhausted-bull band [${EXHAUSTED_BULL_MIN}-${EXHAUSTED_BULL_MAX}] — regular buys blocked (no Alpha Exception)`,
+        regime: 'EXHAUSTED_BULL',
+        allowAlphaException: false,
+      };
+    }
+  }
+
+  return { blocked: false, reason: null, regime: null, allowAlphaException: false };
 }
 
 // ── Phase 2 — Alpha Exception ──
@@ -463,7 +503,7 @@ export function checkTimeBlackout() {
 // compounding reflects that. A GLOBAL_FLOOR_MULT stops this from ever
 // compounding all the way to a near-zero/locked-up size.
 // ══════════════════════════════════════════════════════════════════════════════
-export function runAllBuyGuards(market, positions) {
+export function runAllBuyGuards(market, positions, marketState = {}) {
   const global     = market.global || {};
   const reasons    = [];
   let   canBuy     = true;
@@ -517,11 +557,15 @@ export function runAllBuyGuards(market, positions) {
   // deliberately does not set closeAll and never touches existing
   // positions; STOP_LOSS_PCT elsewhere continues to close a hit stop
   // unconditionally regardless of this gate's state.
-  const btcRegime = checkBtcRegimeGate(global);
+  const btcRegime = checkBtcRegimeGate(global, marketState);
   let btcRegimeBlocked = false;
+  let btcRegimeName = null;
+  let btcRegimeAllowsAlpha = false;
   if (btcRegime.blocked) {
     canBuy = false;
     btcRegimeBlocked = true;
+    btcRegimeName = btcRegime.regime;
+    btcRegimeAllowsAlpha = btcRegime.allowAlphaException;
     reasons.push(btcRegime.reason);
   }
 
@@ -533,7 +577,7 @@ export function runAllBuyGuards(market, positions) {
     reasons.push(`Combined size ${(rawSizeMult * 100).toFixed(1)}% floored to global minimum ${(GLOBAL_FLOOR_MULT * 100).toFixed(0)}%`);
   }
 
-  return { canBuy, hardBlocked, closeAll, sizeMult, fearRegime, btcChg, btcRegimeBlocked, reasons };
+  return { canBuy, hardBlocked, closeAll, sizeMult, fearRegime, btcChg, btcRegimeBlocked, btcRegimeName, btcRegimeAllowsAlpha, reasons };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -391,7 +391,7 @@ async function main() {
   // Runs AFTER monitoring (so fresh position P&L is available for circuit
   // breaker) and BEFORE opening any new positions.
   // ══════════════════════════════════════════════════════════════════════════
-  const guard = runAllBuyGuards(market, positions);
+  const guard = runAllBuyGuards(market, positions, marketState);
 
   if (guard.reasons.length) {
     console.log('  🛡  Market guard fired:');
@@ -520,7 +520,18 @@ async function main() {
     // checkBtcAlphaException()). This is deliberately evaluated per
     // candidate, not once globally, since "does THIS coin show real
     // relative strength" is a per-symbol question.
+    //
+    // EXHAUSTED_BULL (guard.btcRegimeName) is a hard reject with NO Alpha
+    // Exception route — per the Market Intelligence Enhancement Proposal
+    // v2 (Scenario 2), a candidate is blocked here even with high Relative
+    // Strength, since the concern is the market's own topping risk, not
+    // this coin's individual quality. Only a BEAR-labeled block
+    // (guard.btcRegimeAllowsAlpha) gets evaluated for the exception.
     if (guard.btcRegimeBlocked && entry.assetType === 'crypto') {
+      if (!guard.btcRegimeAllowsAlpha) {
+        console.log(`  🛡  ${pair} — BTC regime block (${guard.btcRegimeName || 'unknown'}) — no Alpha Exception available for this regime`);
+        continue;
+      }
       const alpha = checkBtcAlphaException({ ...entry, d: entry.d, conv: evald.conv });
       if (!alpha.allowed) {
         console.log(`  🛡  ${pair} — BTC regime block, no Alpha Exception (failed: ${alpha.failedChecks.join(', ')})`);
