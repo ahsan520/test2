@@ -1,85 +1,4 @@
 {
-  "BINANCE:BTCUSDT": {
-    "sym": "BINANCE:BTCUSDT",
-    "base": "BTC",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "SQUEEZE NOW",
-    "dir": "bull",
-    "alertedAt": 1785765586875,
-    "holdLockUntil": 1785766786875,
-    "entryPrice": 63643.56,
-    "stop": 63007.12,
-    "t1": 65651.04,
-    "t2": 67912.07,
-    "score": 7,
-    "spikeScore": 2.3779106143599438,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "watching",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": false,
-    "rankScore": 0.25,
-    "histWinRate": 0,
-    "histSample": 9,
-    "caution": true
-  },
-  "BINANCE:DOGEUSDT": {
-    "sym": "BINANCE:DOGEUSDT",
-    "base": "DOGE",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "SQUEEZE NOW",
-    "dir": "bull",
-    "alertedAt": 1785765586878,
-    "holdLockUntil": 1785766786878,
-    "entryPrice": 0.0707,
-    "stop": 0.069993,
-    "t1": 0.0752,
-    "t2": 0.08,
-    "score": 7,
-    "spikeScore": 4.566305157132961,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "watching",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": false,
-    "rankScore": 0.25,
-    "histWinRate": 0,
-    "histSample": 40,
-    "caution": true
-  },
-  "BINANCE:SOLUSDT": {
-    "sym": "BINANCE:SOLUSDT",
-    "base": "SOL",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785765586879,
-    "holdLockUntil": 1785766786879,
-    "entryPrice": 73.56,
-    "stop": 72.82,
-    "t1": 76.41,
-    "t2": 79.54,
-    "score": 6,
-    "spikeScore": 2.8545143878583215,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "watching",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": false,
-    "rankScore": 0.18,
-    "histWinRate": 0,
-    "histSample": 40,
-    "caution": true
-  },
   "BINANCE:SUIUSDT": {
     "sym": "BINANCE:SUIUSDT",
     "base": "SUI",
@@ -141,17 +60,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 6 below 50 threshold",
-      "fallingKnifeScore": 14,
-      "thesisDrop": 8,
-      "confidenceDecay": 13,
-      "exitProbability": 6,
-      "dynamicPositionRisk": 6,
+      "reason": "dynamicPositionRisk 45 below 50 threshold",
+      "fallingKnifeScore": 37,
+      "thesisDrop": 51,
+      "confidenceDecay": 50,
+      "exitProbability": 45,
+      "dynamicPositionRisk": 45,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785850994319
+      "evaluatedAt": 1785852199633
     }
   },
   "BINANCE:XRPUSDT": {
@@ -170,9 +89,9 @@
     "t2": 1.1397,
     "score": 8,
     "spikeScore": 1.1811541418040448,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1785852199633,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -186,7 +105,9 @@
       "usdSize": 329.37,
       "qty": 305.11347846225107,
       "fillPrice": 1.0795,
-      "buyOrderId": "PAPER_1785841396571"
+      "buyOrderId": "PAPER_1785841396571",
+      "closedAt": 1785852199636,
+      "exitFillPrice": 1.0716
     },
     "entrySnapshot": {
       "at": 1785841396572,
@@ -214,19 +135,21 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 5 below 50 threshold",
-      "fallingKnifeScore": 14,
-      "thesisDrop": 5,
-      "confidenceDecay": 14,
-      "exitProbability": 5,
-      "dynamicPositionRisk": 5,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 69 → current 0 (drop 69 > 60)",
+      "fallingKnifeScore": 58,
+      "thesisDrop": 69,
+      "confidenceDecay": 71,
+      "exitProbability": 64,
+      "dynamicPositionRisk": 64,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785850994319
-    }
+      "evaluatedAt": 1785852199633
+    },
+    "exitPrice": 1.0716,
+    "statusChangedAt": 1785852199633
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -288,19 +211,20 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 25 below 50 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 20,
+      "action": "REDUCE_50",
+      "reason": "Confidence decay 38% > 35% with falling-knife 58",
+      "fallingKnifeScore": 58,
+      "thesisDrop": 55,
       "confidenceDecay": 38,
-      "exitProbability": 25,
-      "dynamicPositionRisk": 25,
+      "exitProbability": 53,
+      "dynamicPositionRisk": 53,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785850994319
-    }
+      "evaluatedAt": 1785852199633
+    },
+    "piReduceAlertedAt": 1785852199633
   },
   "BINANCE:ETHUSDT": {
     "sym": "BINANCE:ETHUSDT",
