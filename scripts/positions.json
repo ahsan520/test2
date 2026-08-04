@@ -98,7 +98,7 @@
     "spikeScore": 1.0240407483205276,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -112,7 +112,9 @@
       "usdSize": 2.23,
       "qty": 3.842839910391177,
       "fillPrice": 0.5803,
-      "buyOrderId": "PAPER_1785815361413"
+      "buyOrderId": "PAPER_1785815361413",
+      "closedAt": 1785843785357,
+      "exitFillPrice": 0.574
     },
     "entrySnapshot": {
       "at": 1785815361413,
@@ -153,7 +155,9 @@
       },
       "evaluatedAt": 1785842593117
     },
-    "piReduceAlertedAt": 1785825792913
+    "piReduceAlertedAt": 1785825792913,
+    "exitPrice": 0.574,
+    "statusChangedAt": 1785843785356
   },
   "BINANCE:SUIUSDT": {
     "sym": "BINANCE:SUIUSDT",
@@ -217,16 +221,16 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 3 below 50 threshold",
-      "fallingKnifeScore": 10,
-      "thesisDrop": 5,
+      "fallingKnifeScore": 0,
+      "thesisDrop": -2,
       "confidenceDecay": 13,
       "exitProbability": 3,
       "dynamicPositionRisk": 3,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785842593117
+      "evaluatedAt": 1785843785356
     }
   },
   "BINANCE:GALAUSDT": {
@@ -362,6 +366,20 @@
       "btcRiskScore": 16,
       "breadthScore": 64,
       "marketRegime": "RISK_ON"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 11 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 16,
+      "confidenceDecay": 29,
+      "exitProbability": 11,
+      "dynamicPositionRisk": 11,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 6
+      },
+      "evaluatedAt": 1785843785356
     }
   },
   "BINANCE:ZECUSDT": {
@@ -422,6 +440,20 @@
       "btcRiskScore": 16,
       "breadthScore": 64,
       "marketRegime": "RISK_ON"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 1 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 2,
+      "confidenceDecay": 0,
+      "exitProbability": 1,
+      "dynamicPositionRisk": 1,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "evaluatedAt": 1785843785356
     }
   },
   "BINANCE:ETHUSDT": {
@@ -435,7 +467,7 @@
     "alertedAt": 1785842594003,
     "holdLockUntil": 1785843794003,
     "entryPrice": 1877.75,
-    "stop": 1851.57,
+    "stop": 1858.97,
     "t1": 1926.38,
     "t2": 1982.49,
     "score": 8,
