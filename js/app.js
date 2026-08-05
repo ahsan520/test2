@@ -99,6 +99,27 @@ function _normalizeNamedLists(raw) {
 // it's opened, not just once at page load. Returns the resolved `base`
 // symbol list for the active watchlist.
 async function reloadWatchlistSource() {
+  // ── Pending-edit guard ──────────────────────────────────────────────
+  // If the last local edit never got confirmed as pushed (tab was
+  // reloaded/closed before the debounced sync completed — a plain
+  // setTimeout doesn't survive that), fetching the server copy right now
+  // would just re-fetch the OLD pre-edit version and silently overwrite
+  // the newer local edit that's sitting in localStorage. Load from
+  // localStorage instead, keep it as-is, and kick off a fresh push
+  // attempt for it — don't touch the network read path below at all.
+  if (localStorage.getItem('a49_wl_pending_push') === '1') {
+    try {
+      const saved = JSON.parse(localStorage.getItem('a49_named_wl') || 'null');
+      if (saved && typeof saved === 'object') {
+        STATE.namedWatchlists = saved;
+        STATE.activeWatchlistName = localStorage.getItem('a49_active_wl') || Object.keys(saved)[0] || 'Default';
+        logAlertItem('info', '⚠ Unsynced watchlist edit found from before reload — retrying push instead of pulling from server.');
+        if (typeof scheduleWatchlistSync === 'function') scheduleWatchlistSync(0);
+        return Object.keys(saved[STATE.activeWatchlistName] || {});
+      }
+    } catch { /* fall through to normal network path if the saved copy is unreadable */ }
+  }
+
   let fetchedRaw = null;
   let fetchedFrom = null;
 
@@ -842,9 +863,18 @@ function _renderComparePane() {
 // (github-sync.js) so the change survives a cache clear / different
 // device, not just this browser. Call after ANY mutation to
 // namedWatchlists (create, delete, add symbol, remove symbol, TG toggle).
+//
+// Also sets a49_wl_pending_push=1 — a flag that survives page reload,
+// unlike scheduleWatchlistSync()'s in-memory setTimeout. If the tab is
+// reloaded before that debounced push actually completes, reloadWatchlistSource()
+// checks this flag on the next init() and skips overwriting local state
+// from the (still-stale) server copy — see reloadWatchlistSource() below.
+// Cleared only once syncWatchlistsToGitHub() confirms a successful push
+// (github-sync.js).
 function _persistNamedWatchlists() {
   localStorage.setItem('a49_named_wl', JSON.stringify(STATE.namedWatchlists));
   localStorage.setItem('a49_active_wl', STATE.activeWatchlistName);
+  localStorage.setItem('a49_wl_pending_push', '1');
   if (typeof scheduleWatchlistSync === 'function') scheduleWatchlistSync();
 }
 

@@ -473,6 +473,7 @@ async function _syncWatchlistsViaPat(cfg, namedLists, json) {
     window._ghWatchlistSyncState.lastError      = null;
     window._ghWatchlistSyncState.lastPushedJSON = json;
 
+    localStorage.removeItem('a49_wl_pending_push'); // confirmed pushed — safe for reloadWatchlistSource() to pull from server again
     logAlertItem('info', `☁ Watchlist sync OK — ${listNames} (${totalSymbols} symbol${totalSymbols === 1 ? '' : 's'}) → ${resolvedRepo}`);
     if (typeof logBrowserAudit === 'function') {
       logBrowserAudit('browser_watchlist_sync_ok', { lists: listNames, count: totalSymbols, repo: resolvedRepo });
@@ -528,6 +529,7 @@ async function _syncWatchlistsViaWorker(cfg, namedLists, json) {
     window._ghWatchlistSyncState.lastError      = null;
     window._ghWatchlistSyncState.lastPushedJSON = json;
 
+    localStorage.removeItem('a49_wl_pending_push'); // confirmed pushed — safe for reloadWatchlistSource() to pull from server again
     logAlertItem('info', `☁ Watchlist sync OK (via Worker) — ${listNames} (${totalSymbols} symbol${totalSymbols === 1 ? '' : 's'})`);
     if (typeof logBrowserAudit === 'function') {
       logBrowserAudit('browser_watchlist_sync_ok', { lists: listNames, count: totalSymbols, via: 'worker' });
