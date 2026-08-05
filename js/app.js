@@ -451,11 +451,16 @@ function switchTab(tab, btn) {
   btn.classList.add('on');
   if (tab === 'alerts')        renderAlertCfgPage();
   if (tab === 'watchlist-mgr') {
+    // Render from the current in-memory STATE, not a fresh network re-fetch.
+    // STATE.namedWatchlists is already the authoritative copy mid-session —
+    // it's what gets PUSHED to watchlist-source.json (via
+    // syncWatchlistsToGitHub), not something that should be pulled back
+    // down and overwritten from the server every time this tab opens.
+    // Re-fetching here used to silently stomp edits made seconds earlier
+    // if GitHub Pages hadn't yet re-served the just-pushed file — see
+    // reloadWatchlistSource()'s docstring. Only init() (true page load)
+    // should ever pull from the server now.
     renderWatchlistManager();
-    reloadWatchlistSource().then(base => {
-      STATE.watchlist = [...base, ...STATE._sessionAdded.filter(s => !base.includes(s))];
-      renderWatchlistManager();
-    });
   }
   if (tab === 'journal')       renderApiTrades();  // always refresh on open
   if (tab === 'api-audit')     refreshApiAudit();  // always refresh on open
