@@ -17,7 +17,7 @@
     "spikeScore": 2.4228248348874915,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -31,7 +31,9 @@
       "usdSize": 71.33,
       "qty": 121.30952380952381,
       "fillPrice": 0.588,
-      "buyOrderId": "PAPER_1785932592514"
+      "buyOrderId": "PAPER_1785932592514",
+      "closedAt": 1785948191629,
+      "exitFillPrice": 0.593
     },
     "entrySnapshot": {
       "at": 1785932592514,
@@ -71,7 +73,10 @@
         "sustainedMin": 0
       },
       "evaluatedAt": 1785948190561
-    }
+    },
+    "exitPrice": 0.593,
+    "statusChangedAt": 1785948192950,
+    "rotatedOut": true
   },
   "BINANCE:ETHUSDT": {
     "sym": "BINANCE:ETHUSDT",
@@ -199,6 +204,93 @@
         "sustainedMin": 1
       },
       "evaluatedAt": 1785948190561
+    }
+  },
+  "BINANCE:BTCUSDT": {
+    "sym": "BINANCE:BTCUSDT",
+    "base": "BTC",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1785948191625,
+    "holdLockUntil": 1785949391625,
+    "entryPrice": 64695.86,
+    "stop": 63725.42,
+    "t1": 66636.74,
+    "t2": 68577.61,
+    "score": 9,
+    "spikeScore": 0.8675927537968575,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "latest",
+    "recommended": true,
+    "rankScore": 0.48,
+    "histWinRate": 0,
+    "histSample": 9,
+    "caution": true
+  },
+  "BINANCE:SOLUSDT": {
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1785948191625,
+    "holdLockUntil": 1785949391625,
+    "entryPrice": 74.37,
+    "stop": 73.25,
+    "t1": 76.6,
+    "t2": 78.83,
+    "score": 9,
+    "spikeScore": 0.507266450398697,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "latest",
+    "recommended": true,
+    "rankScore": 0.48,
+    "histWinRate": 0,
+    "histSample": 40,
+    "caution": true,
+    "liveOrder": {
+      "mode": "paper",
+      "buyAt": 1785948193213,
+      "usdSize": 72.66,
+      "qty": 0.9770068576038724,
+      "fillPrice": 74.37,
+      "buyOrderId": "PAPER_1785948193213"
+    },
+    "entrySnapshot": {
+      "at": 1785948193214,
+      "price": 74.37,
+      "conv": 9,
+      "whaleScore": 95,
+      "bullConfCount": 9,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": true,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": true,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 95,
+      "btcRiskScore": 6,
+      "breadthScore": 64,
+      "marketRegime": "RISK_ON"
     }
   }
 }
