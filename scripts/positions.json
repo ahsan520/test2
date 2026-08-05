@@ -114,17 +114,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 16 below 50 threshold",
-      "fallingKnifeScore": 6,
-      "thesisDrop": 26,
-      "confidenceDecay": 22,
-      "exitProbability": 16,
-      "dynamicPositionRisk": 16,
+      "reason": "dynamicPositionRisk 34 below 50 threshold",
+      "fallingKnifeScore": 38,
+      "thesisDrop": 28,
+      "confidenceDecay": 33,
+      "exitProbability": 34,
+      "dynamicPositionRisk": 34,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785966185428
+      "evaluatedAt": 1785967392628
     }
   },
   "BINANCE:BTCUSDT": {
@@ -215,17 +215,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 33 below 50 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 27,
+      "reason": "dynamicPositionRisk 34 below 50 threshold",
+      "fallingKnifeScore": 30,
+      "thesisDrop": 36,
       "confidenceDecay": 38,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "exitProbability": 34,
+      "dynamicPositionRisk": 34,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785966185428
+      "evaluatedAt": 1785967392628
     }
   },
   "TSX:ETHY.TO": {
@@ -284,8 +284,8 @@
     "liveOrder": {
       "mode": "paper",
       "buyAt": 1785952995460,
-      "usdSize": 0.36,
-      "qty": 0.004829621679635095,
+      "usdSize": 0.18,
+      "qty": 0.00241481,
       "fillPrice": 74.54,
       "buyOrderId": "PAPER_1785952995460"
     },
@@ -315,19 +315,20 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 28 below 50 threshold",
-      "fallingKnifeScore": 15,
-      "thesisDrop": 38,
+      "action": "REDUCE_50",
+      "reason": "Confidence decay 38% > 35% with falling-knife 51",
+      "fallingKnifeScore": 51,
+      "thesisDrop": 50,
       "confidenceDecay": 38,
-      "exitProbability": 28,
-      "dynamicPositionRisk": 28,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 48,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785966185428
-    }
+      "evaluatedAt": 1785967392628
+    },
+    "piPartialLevel": 2
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -345,9 +346,9 @@
     "t2": 0.0746,
     "score": 6,
     "spikeScore": 0.3541541927752961,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1785967392628,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -361,7 +362,9 @@
       "usdSize": 0.01,
       "qty": 0.14204545454545453,
       "fillPrice": 0.0704,
-      "buyOrderId": "PAPER_1785955391869"
+      "buyOrderId": "PAPER_1785955391869",
+      "closedAt": 1785967393860,
+      "exitFillPrice": 0.07002
     },
     "entrySnapshot": {
       "at": 1785955391869,
@@ -389,19 +392,21 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 30 below 50 threshold",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 23,
-      "confidenceDecay": 29,
-      "exitProbability": 30,
-      "dynamicPositionRisk": 30,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 74 → current 2 (drop 72 > 60)",
+      "fallingKnifeScore": 30,
+      "thesisDrop": 72,
+      "confidenceDecay": 57,
+      "exitProbability": 50,
+      "dynamicPositionRisk": 50,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785966185428
-    }
+      "evaluatedAt": 1785967392628
+    },
+    "exitPrice": 0.07002,
+    "statusChangedAt": 1785967392628
   },
   "BINANCE:TAOUSDT": {
     "sym": "BINANCE:TAOUSDT",
@@ -464,17 +469,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 26 below 50 threshold",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 15,
-      "confidenceDecay": 25,
-      "exitProbability": 26,
+      "reason": "dynamicPositionRisk 26 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 50,
+      "thesisDrop": 40,
+      "confidenceDecay": 38,
+      "exitProbability": 44,
       "dynamicPositionRisk": 26,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
-      "evaluatedAt": 1785966185428
+      "evaluatedAt": 1785967392628
     }
   },
   "BINANCE:AVAXUSDT": {
