@@ -39,20 +39,28 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true') !== 'false';
-const PROFIT_MIN_PCT    = parseFloat(process.env.PROFIT_MIN_PCT    || '8');  // step 2 — ignore below this peak
-const RSI_ROLLOVER_DROP = parseFloat(process.env.PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
-const RSI_EXTENDED      = parseFloat(process.env.PROFIT_RSI_EXTENDED      || '70');
+// Floor rescaled to this system's actual T1/T2 geometry — t1 = entry +
+// 2*atr, t2 = entry + 4*atr, where atr = price*0.015*shock, which lands
+// T1 ≈ +3% and T2 ≈ +6% at baseline shock. 4% sits just past T1, so a
+// trade has to clear a real move (not noise) before Profit Intelligence
+// starts watching it — the PDF's own default of 8% would leave most
+// T1/T2-sized winners completely unprotected.
+const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '4');
+const RSI_ROLLOVER_DROP = parseFloat(process.env.SELL_PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
+const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      || '70');
 
 // ── Adaptive give-back thresholds, keyed by how high the peak ran ──
 // { minPeak: highestPnLSeen must be >= this to use this tier, giveBack: how
 // much drawdown-from-peak is tolerated before this tier is willing to exit }
 // Order matters — first (highest) match wins, so check A+ before A before
-// B before C. Overridable individually via env without touching the others.
+// B before C. Rescaled to T1 (~3%) / T2 (~6%) rather than the PDF's generic
+// 8/15/20 numbers, which assume much bigger average moves than this system
+// targets. Overridable individually via env without touching the others.
 const TIERS = [
-  { label: 'A+', minPeak: parseFloat(process.env.PROFIT_TIER_APLUS_PEAK || '20'), giveBack: parseFloat(process.env.PROFIT_TIER_APLUS_GIVEBACK || '10') },
-  { label: 'A',  minPeak: parseFloat(process.env.PROFIT_TIER_A_PEAK     || '15'), giveBack: parseFloat(process.env.PROFIT_TIER_A_GIVEBACK     || '8')  },
-  { label: 'B',  minPeak: parseFloat(process.env.PROFIT_TIER_B_PEAK     || '10'), giveBack: parseFloat(process.env.PROFIT_TIER_B_GIVEBACK     || '5')  },
-  { label: 'C',  minPeak: parseFloat(process.env.PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.PROFIT_TIER_C_GIVEBACK || '3') },
+  { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '18'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '9') },
+  { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '12'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '6') },
+  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '7'),  giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '3.5') },
+  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '2') },
 ];
 
 export function profitIntelligenceEnabled() { return ENABLED; }
