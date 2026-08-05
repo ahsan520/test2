@@ -123,9 +123,9 @@
     "t2": 0.7369,
     "score": 6,
     "spikeScore": 0.0619651145858962,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1785890586383,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -139,7 +139,9 @@
       "usdSize": 72.84,
       "qty": 104.77560414269274,
       "fillPrice": 0.6952,
-      "buyOrderId": "PAPER_1785884597679"
+      "buyOrderId": "PAPER_1785884597679",
+      "closedAt": 1785890586385,
+      "exitFillPrice": 0.6907
     },
     "entrySnapshot": {
       "at": 1785884597679,
@@ -167,19 +169,21 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 38 below 40 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 37,
-      "confidenceDecay": 43,
-      "exitProbability": 38,
-      "dynamicPositionRisk": 38,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 75 → current 13 (drop 62 > 45)",
+      "fallingKnifeScore": 30,
+      "thesisDrop": 62,
+      "confidenceDecay": 71,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785889398209
-    }
+      "evaluatedAt": 1785890586383
+    },
+    "exitPrice": 0.6907,
+    "statusChangedAt": 1785890586383
   },
   "BINANCE:XRPUSDT": {
     "sym": "BINANCE:XRPUSDT",
@@ -207,83 +211,5 @@
     "histWinRate": 0,
     "histSample": 52,
     "caution": true
-  },
-  "BINANCE:ZECUSDT": {
-    "sym": "BINANCE:ZECUSDT",
-    "base": "ZEC",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785885798419,
-    "holdLockUntil": 1785886998419,
-    "entryPrice": 507.18,
-    "stop": 502.11,
-    "t1": 522.4,
-    "t2": 537.61,
-    "score": 10,
-    "spikeScore": 0.27306284878551523,
-    "exitAlertedAt": 1785889398209,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.55,
-    "histWinRate": 0,
-    "histSample": 29,
-    "caution": true,
-    "liveOrder": {
-      "mode": "paper",
-      "buyAt": 1785885798424,
-      "usdSize": 0.73,
-      "qty": 0.001439331203911826,
-      "fillPrice": 507.18,
-      "buyOrderId": "PAPER_1785885798424",
-      "closedAt": 1785889398213,
-      "exitFillPrice": 504.9
-    },
-    "entrySnapshot": {
-      "at": 1785885798424,
-      "price": 507.18,
-      "conv": 10,
-      "whaleScore": 95,
-      "bullConfCount": 9,
-      "bullChecks": {
-        "dailyBiasBull": true,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": true,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 99,
-      "btcRiskScore": 6,
-      "breadthScore": 71,
-      "marketRegime": "RISK_ON"
-    },
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 99 → current 44 (drop 55 > 45)",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 55,
-      "confidenceDecay": 33,
-      "exitProbability": 42,
-      "dynamicPositionRisk": 25,
-      "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
-      },
-      "evaluatedAt": 1785889398209
-    },
-    "exitPrice": 504.9,
-    "statusChangedAt": 1785889398209
   }
 }
