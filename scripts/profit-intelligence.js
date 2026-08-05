@@ -1,0 +1,167 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// profit-intelligence.js — Profit Intelligence Engine
+// (Design Proposal: "Profit Intelligence Engine", Aug 2026)
+//
+// Position Intelligence (position-intelligence.js) protects against LOSING
+// trades by validating the original buy thesis. It does NOT protect
+// unrealized profit — a trade can go +22% then round-trip all the way back
+// to breakeven/loss while Position Intelligence still says HOLD, because the
+// *thesis* never actually broke.
+//
+// This engine is a fully independent sell reason that runs alongside
+// Position Intelligence and the existing CVD/OI/FR/RSI exit score. It never
+// touches those — it only adds a new possible close reason:
+//
+//   "Profit Protection Triggered"
+//
+// Design (from the proposal doc):
+//   1. Track highest unrealized PnL seen since entry (highestPnLSeen).
+//   2. Ignore the position entirely until it has reached a minimum profit
+//      (PROFIT_MIN_PCT, default 8%) — never fires on a trade that was never
+//      meaningfully in profit.
+//   3. Once above that floor, watch drawdown-from-peak
+//      (highestPnLSeen - currentPnL).
+//   4. Also require momentum deterioration (CVD/OI/breadth fading, or RSI
+//      rolling over from an extended reading) — a peak alone isn't enough,
+//      the move actually has to be turning.
+//   5. Only sell when BOTH the drawdown and the momentum weakness are
+//      confirmed together.
+//   6. Adaptive give-back thresholds: the higher the peak reached, the more
+//      give-back is tolerated before exiting (a trade that ran to +22% is
+//      allowed to give back more than one that barely cleared +8%) —
+//      rewards runners instead of clipping them at the same fixed distance
+//      a small winner would be clipped at.
+//
+// Buy → +18% → +22% (peak) → +17% → +13% → +9%: existing sell reasons may
+// all still say HOLD (thesis intact, no falling-knife, no CVD exit score) —
+// Profit Intelligence is what actually exits this trade, once drawdown from
+// the +22% peak and weakening momentum are both confirmed.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true') !== 'false';
+const PROFIT_MIN_PCT    = parseFloat(process.env.PROFIT_MIN_PCT    || '8');  // step 2 — ignore below this peak
+const RSI_ROLLOVER_DROP = parseFloat(process.env.PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
+const RSI_EXTENDED      = parseFloat(process.env.PROFIT_RSI_EXTENDED      || '70');
+
+// ── Adaptive give-back thresholds, keyed by how high the peak ran ──
+// { minPeak: highestPnLSeen must be >= this to use this tier, giveBack: how
+// much drawdown-from-peak is tolerated before this tier is willing to exit }
+// Order matters — first (highest) match wins, so check A+ before A before
+// B before C. Overridable individually via env without touching the others.
+const TIERS = [
+  { label: 'A+', minPeak: parseFloat(process.env.PROFIT_TIER_APLUS_PEAK || '20'), giveBack: parseFloat(process.env.PROFIT_TIER_APLUS_GIVEBACK || '10') },
+  { label: 'A',  minPeak: parseFloat(process.env.PROFIT_TIER_A_PEAK     || '15'), giveBack: parseFloat(process.env.PROFIT_TIER_A_GIVEBACK     || '8')  },
+  { label: 'B',  minPeak: parseFloat(process.env.PROFIT_TIER_B_PEAK     || '10'), giveBack: parseFloat(process.env.PROFIT_TIER_B_GIVEBACK     || '5')  },
+  { label: 'C',  minPeak: parseFloat(process.env.PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.PROFIT_TIER_C_GIVEBACK || '3') },
+];
+
+export function profitIntelligenceEnabled() { return ENABLED; }
+
+function pickTier(highestPnLSeen) {
+  for (const t of TIERS) {
+    if (highestPnLSeen >= t.minPeak) return t;
+  }
+  return null; // below even the lowest tier's floor
+}
+
+// ── Momentum deterioration — reuses the same per-symbol momentum feeds
+// Position Intelligence's Falling Knife Score already reads (cvdMomentum /
+// oiMomentum come from market-state.json's symbolState, breadthMomentum
+// from the top-level marketState) so this stays consistent with the rest
+// of the sell-side stack instead of inventing a second momentum source. ──
+function isMomentumWeak({ symbolState, marketState, r15, lastR15 }) {
+  const cvdFading     = symbolState?.cvdMomentum?.trend === 'FADING';
+  const oiFading      = symbolState?.oiMomentum?.trend === 'FADING';
+  const breadthFading = marketState?.breadthMomentum?.trend === 'FADING';
+
+  // RSI "rolling over": was extended last cycle (or currently still above
+  // the extended line) and has dropped by RSI_ROLLOVER_DROP+ points since
+  // the last reading we have on file for this position — a genuine
+  // hook-down out of overbought, not just a fixed level check.
+  const rsiRollingOver =
+    lastR15 != null && r15 != null &&
+    lastR15 >= RSI_EXTENDED &&
+    (lastR15 - r15) >= RSI_ROLLOVER_DROP;
+
+  return {
+    weak: cvdFading || oiFading || breadthFading || rsiRollingOver,
+    cvdFading, oiFading, breadthFading, rsiRollingOver,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// evaluateProfitProtection — called once per open crypto position per cycle,
+// AFTER Position Intelligence and BEFORE the CVD/OI/FR/RSI exit score, from
+// position-monitor.js's monitorPositions() loop.
+//
+// Mutates pos.highestPnLSeen and pos.lastR15 as a side effect (that's the
+// whole point — it's a running peak tracker), same pattern job-state.js
+// positions already use for pos.stop / pos.piPartialLevel etc.
+//
+// pos:          tracked position object (positions.json entry)
+// symbolState:  market-state.json's symbols[sym] (cvdMomentum/oiMomentum)
+// marketState:  top-level market-state.json (breadthMomentum)
+// r15:          current 15m RSI reading (mData.d.r15)
+// pnlPct:       current unrealized P&L %, already computed by the caller
+// ══════════════════════════════════════════════════════════════════════════════
+export function evaluateProfitProtection({ pos, symbolState, marketState, r15, pnlPct }) {
+  if (!ENABLED) return { action: 'HOLD', reason: 'profit intelligence disabled', skipped: true };
+  if (pnlPct == null || isNaN(pnlPct)) return { action: 'HOLD', reason: 'no pnl available', skipped: true };
+
+  // ── Step 1: track highest unrealized PnL seen since entry ──
+  const priorHigh       = pos.highestPnLSeen ?? -Infinity;
+  const highestPnLSeen  = Math.max(priorHigh, pnlPct);
+  pos.highestPnLSeen    = highestPnLSeen;
+
+  const lastR15 = pos.lastR15 ?? null;
+  pos.lastR15   = r15 ?? lastR15;
+
+  // ── Step 2: ignore until the position has reached minimum profit ──
+  if (highestPnLSeen < PROFIT_MIN_PCT) {
+    return {
+      action: 'HOLD', reason: `peak ${highestPnLSeen.toFixed(2)}% below ${PROFIT_MIN_PCT}% floor — not evaluated yet`,
+      highestPnLSeen, drawdownFromPeak: 0, skipped: true,
+    };
+  }
+
+  // ── Step 3: drawdown from peak ──
+  const drawdownFromPeak = highestPnLSeen - pnlPct;
+
+  // ── Step 4: momentum deterioration ──
+  const momentum = isMomentumWeak({ symbolState, marketState, r15, lastR15 });
+
+  // ── Adaptive tier selection — higher peaks tolerate more give-back ──
+  const tier = pickTier(highestPnLSeen);
+  if (!tier) {
+    return {
+      action: 'HOLD', reason: `peak ${highestPnLSeen.toFixed(2)}% did not clear a give-back tier`,
+      highestPnLSeen, drawdownFromPeak, momentum,
+    };
+  }
+
+  // ── Step 5: sell only if BOTH drawdown and weakening momentum confirm ──
+  const drawdownConfirmed = drawdownFromPeak >= tier.giveBack;
+
+  if (drawdownConfirmed && momentum.weak) {
+    const signals = [
+      momentum.cvdFading     ? 'CVD fading'        : null,
+      momentum.oiFading      ? 'OI fading'          : null,
+      momentum.breadthFading ? 'Breadth weakening'  : null,
+      momentum.rsiRollingOver ? `RSI rolling over (${lastR15?.toFixed(0)}→${r15?.toFixed(0)})` : null,
+    ].filter(Boolean).join(' · ');
+
+    return {
+      action: 'EXIT',
+      reason: `Profit Protection Triggered: peak +${highestPnLSeen.toFixed(2)}% (tier ${tier.label}) → now +${pnlPct.toFixed(2)}%, gave back ${drawdownFromPeak.toFixed(2)}% ≥ ${tier.giveBack}% with weakening momentum [${signals}]`,
+      highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: tier.giveBack, momentum,
+    };
+  }
+
+  return {
+    action: 'HOLD',
+    reason: !drawdownConfirmed
+      ? `drawdown ${drawdownFromPeak.toFixed(2)}% below tier ${tier.label} give-back ${tier.giveBack}%`
+      : `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${tier.giveBack}% but momentum not yet weak — holding, letting it run`,
+    highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: tier.giveBack, momentum,
+  };
+}

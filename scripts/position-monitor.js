@@ -23,6 +23,7 @@ import {
 } from './job-state.js';
 import { calcConviction } from './leaderboard-scanner.js';
 import { evaluatePosition, positionIntelligenceEnabled } from './position-intelligence.js';
+import { evaluateProfitProtection, profitIntelligenceEnabled } from './profit-intelligence.js';
 
 const LB_STALE_WATCH_HRS = parseFloat(process.env.LB_STALE_WATCH_HRS || '24');
 const LB_HOLD_LOCK       = parseInt(process.env.LB_HOLD_LOCK       || '20');
@@ -813,6 +814,67 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
             );
           }
         }
+      }
+    }
+
+    // ── 5c. Profit Intelligence Engine (Design Proposal, Aug 2026) ──
+    // Independent of Position Intelligence (5b) and the CVD/OI/FR/RSI exit
+    // score (6) below — those protect against a broken thesis; this
+    // protects unrealized PROFIT that's giving itself back, even while the
+    // thesis technically still holds. New sell reason: "Profit Protection
+    // Triggered". See profit-intelligence.js for the full design writeup.
+    if (profitIntelligenceEnabled()) {
+      const symbolState = marketState?.symbols?.[mKey];
+      const pp = evaluateProfitProtection({
+        pos, symbolState, marketState, r15: parseFloat(d.r15), pnlPct: parseFloat(pnlPct),
+      });
+
+      // Persist the latest read (peak, drawdown, tier) on the position
+      // itself, same pattern as pos.lastPI, so the dashboard can show it
+      // without a separate data source.
+      if (!pp.skipped || pp.highestPnLSeen != null) {
+        pos.lastProfitIntel = {
+          action: pp.action, reason: pp.reason,
+          highestPnLSeen: pp.highestPnLSeen, drawdownFromPeak: pp.drawdownFromPeak,
+          tier: pp.tier || null, giveBack: pp.giveBack ?? null,
+          evaluatedAt: now,
+        };
+        changed = true;
+      }
+
+      if (pp.action === 'EXIT') {
+        console.log(`  💰  ${pos.base} — Profit Protection Triggered (${pp.reason})`);
+        pos.exitPrice = price;
+        const closeResult  = await closeLiveOrder(pos, 'Profit Protection Triggered', telegramAlerts);
+        const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
+        if (isLiveCrypto && !closeResult.closed) {
+          delete pos.exitPrice;
+          continue; // sell didn't complete — retry next cycle, don't evict
+        }
+        pos.status          = 'exiting';
+        pos.statusChangedAt = now;
+        pos.exitAlertedAt   = now;
+        changed              = true;
+
+        closedOutcomes.push({
+          base: pos.base, pair: pos.base + (isCrypto ? 'USDT' : ''),
+          outcome: 'profit_protection', score: pos.score, spikeScore: pos.spikeScore,
+          pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
+        });
+
+        logAudit('profit_protection_triggered', {
+          sym, price, entry, pnlPct, highestPnLSeen: pp.highestPnLSeen,
+          drawdownFromPeak: pp.drawdownFromPeak, tier: pp.tier, giveBack: pp.giveBack,
+          closeReason: closeResult.reason,
+        });
+
+        telegramAlerts.push(
+          `💰 *PROFIT PROTECTION TRIGGERED${isLiveCrypto ? ' — SOLD' : isCrypto ? ' — SIGNAL CLOSED (watchlist only)' : ' — CLOSE MANUALLY'}* — ${pos.base} — ${utc}\n` +
+          `  Peak +${pp.highestPnLSeen.toFixed(2)}% (tier ${pp.tier}) → now ${pnlPct >= 0 ? '+' : ''}${pnlPct}%  Gave back ${pp.drawdownFromPeak.toFixed(2)}% ≥ ${pp.giveBack}%\n` +
+          `  Entry $${entry}  Current $${price}\n` +
+          (isLiveCrypto ? `  _Position removed in 5 min_` : isCrypto ? `  _Tracked signal only — no live position was held_` : `  _Close your position manually on the exchange_`)
+        );
+        continue; // slot freed, no further checks this cycle
       }
     }
 
