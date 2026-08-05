@@ -123,9 +123,9 @@
     "t2": 0.0745,
     "score": 6,
     "spikeScore": 0.6710608116728719,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1785888184541,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -139,7 +139,9 @@
       "usdSize": 141.59,
       "qty": 2005.5240793201135,
       "fillPrice": 0.0706,
-      "buyOrderId": "PAPER_1785882195078"
+      "buyOrderId": "PAPER_1785882195078",
+      "closedAt": 1785888184543,
+      "exitFillPrice": 0.07002
     },
     "entrySnapshot": {
       "at": 1785882195078,
@@ -167,97 +169,21 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 40 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -2,
-      "confidenceDecay": 14,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
-      "recovery": {
-        "recovering": true,
-        "sustainedMin": 1
-      },
-      "evaluatedAt": 1785886994704
-    }
-  },
-  "BINANCE:APTUSDT": {
-    "sym": "BINANCE:APTUSDT",
-    "base": "APT",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785883391209,
-    "holdLockUntil": 1785884591209,
-    "entryPrice": 0.5853,
-    "stop": 0.579447,
-    "t1": 0.6005,
-    "t2": 0.618,
-    "score": 9,
-    "spikeScore": 0.1431008391435881,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "stopped",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.48,
-    "histWinRate": 0,
-    "histSample": 27,
-    "caution": true,
-    "liveOrder": {
-      "mode": "paper",
-      "buyAt": 1785883392503,
-      "usdSize": 71.77,
-      "qty": 122.6208781821288,
-      "fillPrice": 0.5853,
-      "buyOrderId": "PAPER_1785883392503",
-      "closedAt": 1785886994707,
-      "exitFillPrice": 0.579
-    },
-    "entrySnapshot": {
-      "at": 1785883392503,
-      "price": 0.583,
-      "conv": 9,
-      "whaleScore": 88,
-      "bullConfCount": 9,
-      "bullChecks": {
-        "dailyBiasBull": true,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": true,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 92,
-      "btcRiskScore": 0,
-      "breadthScore": 64,
-      "marketRegime": "RISK_ON"
-    },
-    "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 40 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 4,
-      "confidenceDecay": 11,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 68 → current 0 (drop 68 > 45)",
+      "fallingKnifeScore": 36,
+      "thesisDrop": 68,
+      "confidenceDecay": 71,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 48,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785885797378
+      "evaluatedAt": 1785888184541
     },
-    "exitPrice": 0.579,
-    "statusChangedAt": 1785886994704
+    "exitPrice": 0.07002,
+    "statusChangedAt": 1785888184541
   },
   "BINANCE:SUIUSDT": {
     "sym": "BINANCE:SUIUSDT",
@@ -322,15 +248,15 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 40 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": -16,
-      "confidenceDecay": 0,
+      "thesisDrop": 1,
+      "confidenceDecay": 14,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 1
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "evaluatedAt": 1785886994704
+      "evaluatedAt": 1785888184541
     }
   },
   "BINANCE:XRPUSDT": {
@@ -418,6 +344,20 @@
       "btcRiskScore": 6,
       "breadthScore": 71,
       "marketRegime": "RISK_ON"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 24 below 40 threshold",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 27,
+      "confidenceDecay": 22,
+      "exitProbability": 24,
+      "dynamicPositionRisk": 24,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "evaluatedAt": 1785888184541
     }
   }
 }
