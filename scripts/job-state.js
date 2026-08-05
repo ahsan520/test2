@@ -150,6 +150,46 @@ export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize })
   return log;
 }
 
+// Called when Position Intelligence auto-executes a REDUCE_25/REDUCE_50
+// partial sell. Unlike recordTradeClose (which closes the ORIGINAL open
+// row and is meant to be called exactly once per position), this APPENDS a
+// new row representing just the slice sold — the original open row is left
+// untouched, still representing the position's full original entry.
+// closeLiveOrder()'s eventual full close later still works correctly off
+// the real remaining exchange balance at that time, independent of what's
+// recorded here — this function exists purely so the permanent trade-log /
+// API Trades panel shows each partial reduction as its own visible row,
+// instead of the partial silently vanishing into the final close's numbers.
+export function recordTradePartialExit(pos, reason, sell = {}) {
+  const log = loadTradeLog();
+  const orderId = pos.liveOrder?.buyOrderId;
+  log.push({
+    id:          `${pos.sym}_${orderId}_partial_${Date.now()}`,
+    sym:         pos.sym,
+    base:        pos.base,
+    assetType:   pos.assetType,
+    setup:       pos.setup,
+    mode:        pos.liveOrder?.mode,
+    status:      'closed',
+    partial:     true,
+    buyAt:       pos.liveOrder?.buyAt || null,
+    buyOrderId:  orderId,
+    buyQty:      sell.qty,
+    buyPrice:    pos.entryPrice,
+    usdSize:     sell.qty * pos.entryPrice,
+    sellAt:      Date.now(),
+    sellOrderId: sell.orderId || null,
+    sellQty:     sell.qty,
+    sellPrice:   sell.fillPrice ?? null,
+    reason,
+    pnlPct: (pos.entryPrice && sell.fillPrice)
+      ? parseFloat(((sell.fillPrice - pos.entryPrice) / pos.entryPrice * 100).toFixed(2))
+      : null,
+  });
+  saveTradeLog(log);
+  return log;
+}
+
 // Called the moment a position closes (stop/T1/T2/exit/rotation), for both
 // paper and live trades. Matches the open entry by buyOrderId, falling back
 // to the most recent still-open entry for the same symbol.

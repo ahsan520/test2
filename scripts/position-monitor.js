@@ -18,7 +18,7 @@
 import { mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, getBaseSizePrecision, floorToStep, mexcGetOrderStatus, mexcCancelOrder } from './mexc-client.js';
 import {
   logAudit, loadCvdState, saveCvdState, TERMINAL_EVICT_MS, MEXC_API_KEY, MEXC_API_SECRET,
-  loadTradeLog, recordTradeClose, pushTradeLogToGitHub,
+  loadTradeLog, recordTradeClose, recordTradePartialExit, pushTradeLogToGitHub,
   TRADE_SIZE_MODE, adjustPaperBalance,
 } from './job-state.js';
 import { calcConviction } from './leaderboard-scanner.js';
@@ -36,6 +36,13 @@ const LB_EXIT_SCORE_MIN  = parseInt(process.env.LB_EXIT_SCORE_MIN  || '3');
 // cycle forever. Set via repo Variable MEXC_MIN_SELL_NOTIONAL_USDT.
 const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USDT || '1');
 const QUOTE_ASSETS = new Set(['USDT', 'USDC', 'BUSD', 'TUSD', 'DAI', 'FDUSD']);
+
+// Position Intelligence's REDUCE_25/REDUCE_50 actions are recommend-only
+// until this is explicitly turned on — off by default so the newly-built
+// partial-sell execution path (closeLiveOrderPartial below) isn't live on
+// a real account the first time it's exercised. Flip to 'true' once you've
+// watched it fire correctly in paper mode a few times.
+const AUTO_PARTIAL_EXIT = (process.env.SELL_AUTO_PARTIAL_EXIT || 'false') === 'true';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // reconcileTrackedLiveBalances — runs EVERY live cycle, independent of rotation.
@@ -334,6 +341,97 @@ export async function closeLiveOrder(pos, reason, telegramAlerts) {
   }
 }
 
+// ── Partial sell for Position Intelligence's REDUCE_25/REDUCE_50 ──
+// Sells `pct` of whatever the position CURRENTLY holds (not a fraction of
+// the original entry) — so REDUCE_25 firing once, then REDUCE_50 firing
+// later as risk keeps climbing, compounds naturally (25% off, then 50% of
+// what's left, ≈62.5% of the original total gone) without either action
+// needing to know what the other already did. The position stays open and
+// tracked afterward — the software stop / T1 / T2 checks above, and any
+// later Position Intelligence EXIT/EMERGENCY_EXIT, keep working against
+// whatever quantity remains, same as a manually-reduced position would.
+//
+// No exchange-side stop to reconcile first (see the NOTE in mexc-trader.js
+// — MEXC's spot API has no stop-order type, the software check here is the
+// only stop mechanism), so this is simpler than closeLiveOrder: read real
+// free balance, sell pct of it, done.
+//
+// Returns { executed, reason, qty?, fillPrice? }. reason ∈ 'paper_partial'
+// | 'sold' | 'slice_too_small' | 'remainder_would_be_dust' | 'error' |
+// 'noncrypto' | 'already_closed' | 'nothing_to_sell'.
+// escalateToFullClose:true on 'remainder_would_be_dust' tells the caller
+// to fall through to a normal closeLiveOrder() full close instead — a
+// partial that would leave an unsellable dust remainder open forever isn't
+// actually safer than just closing the whole thing.
+export async function closeLiveOrderPartial(pos, pct, reason, currentPrice, telegramAlerts) {
+  if (!pos.liveOrder || pos.liveOrder.closedAt) return { executed: false, reason: 'already_closed' };
+  if (pos.assetType && pos.assetType !== 'crypto') {
+    logAudit('mexc_partial_sell_skipped_noncrypto', { base: pos.base, assetType: pos.assetType, reason });
+    return { executed: false, reason: 'noncrypto' };
+  }
+
+  // Paper: reduce tracked qty locally, credit partial proceeds, record a
+  // partial trade-log row. No exchange call.
+  if (pos.liveOrder.mode !== 'live') {
+    const totalQty = pos.liveOrder.qty || 0;
+    const sellQty  = parseFloat((totalQty * pct).toFixed(8));
+    if (sellQty <= 0) return { executed: false, reason: 'nothing_to_sell' };
+    const fillPrice = currentPrice || pos.liveOrder.fillPrice;
+    pos.liveOrder.qty     = parseFloat((totalQty - sellQty).toFixed(8));
+    pos.liveOrder.usdSize = parseFloat((pos.liveOrder.qty * fillPrice).toFixed(2));
+    recordTradePartialExit(pos, reason, { qty: sellQty, fillPrice });
+    await pushTradeLogToGitHub(loadTradeLog());
+    if (TRADE_SIZE_MODE === 'percent') adjustPaperBalance(sellQty * fillPrice);
+    telegramAlerts.push(`🟡 *PAPER PARTIAL SELL* — ${pos.base} sold ${sellQty} (${Math.round(pct * 100)}%) @ $${fillPrice.toFixed(6)} (${reason}) — ${pos.liveOrder.qty} remains open.`);
+    return { executed: true, reason: 'paper_partial', qty: sellQty, fillPrice };
+  }
+
+  const symbol = pos.base + 'USDT';
+  try {
+    const [step, bal] = await Promise.all([
+      getBaseSizePrecision(symbol),
+      mexcFreeBalance(MEXC_API_KEY, MEXC_API_SECRET, pos.base, true),
+    ]);
+    const free = typeof bal === 'object' ? bal.free : bal;
+    const sellQty = floorToStep(free * pct, step);
+
+    const refPrice          = parseFloat(currentPrice || pos.entryPrice || 0);
+    const sellNotional      = sellQty * refPrice;
+    const remainderQty      = free - sellQty;
+    const remainderNotional = remainderQty * refPrice;
+
+    if (sellQty <= 0 || (refPrice > 0 && sellNotional < MIN_SELL_NOTIONAL_USDT)) {
+      telegramAlerts.push(`⚠️ *PARTIAL SKIPPED* — ${pos.base} ${reason}: computed slice (~$${sellNotional.toFixed(2)}) is below MEXC's $${MIN_SELL_NOTIONAL_USDT} minimum — holding full position instead.`);
+      logAudit('mexc_partial_sell_skipped_small', { sym: symbol, reason, pct, free, sellQty, sellNotional });
+      return { executed: false, reason: 'slice_too_small' };
+    }
+    if (remainderQty > 0 && refPrice > 0 && remainderNotional < MIN_SELL_NOTIONAL_USDT) {
+      // What's LEFT after this partial would be unsellable dust forever —
+      // better to just fully close now than strand an unmanageable sliver.
+      logAudit('mexc_partial_sell_escalated_dust_remainder', { sym: symbol, reason, pct, free, sellQty, remainderNotional });
+      return { executed: false, reason: 'remainder_would_be_dust', escalateToFullClose: true };
+    }
+
+    const sell = await mexcMarketSell(MEXC_API_KEY, MEXC_API_SECRET, symbol, sellQty);
+    pos.liveOrder.qty     = parseFloat((free - sellQty).toFixed(8));
+    pos.liveOrder.usdSize = parseFloat((pos.liveOrder.qty * (pos.entryPrice || sell.fillPrice)).toFixed(2));
+    telegramAlerts.push(`🟡 *PARTIAL SELL* — sold ${sellQty} ${pos.base} (${Math.round(pct * 100)}%) @ $${sell.fillPrice.toFixed(6)} on MEXC (${reason}) — ${pos.liveOrder.qty} ${pos.base} remains open.`);
+    logAudit('mexc_partial_sell', { sym: symbol, reason, pct, qty: sellQty, fillPrice: sell.fillPrice, orderId: sell.orderId, remainingQty: pos.liveOrder.qty });
+    recordTradePartialExit(pos, reason, { orderId: sell.orderId, qty: sellQty, fillPrice: sell.fillPrice });
+    await pushTradeLogToGitHub(loadTradeLog());
+    return { executed: true, reason: 'sold', qty: sellQty, fillPrice: sell.fillPrice };
+  } catch (e) {
+    if (/minimum transaction volume/i.test(e.message || '')) {
+      telegramAlerts.push(`⚠️ *PARTIAL SKIPPED* — ${pos.base} ${reason}: MEXC rejected the slice as below its minimum — holding full position instead.`);
+      logAudit('mexc_partial_sell_skipped_dust', { sym: symbol, reason, error: e.message });
+      return { executed: false, reason: 'slice_too_small' };
+    }
+    telegramAlerts.push(`🚨 *PARTIAL SELL FAILED* — ${pos.base} ${reason} but MEXC order errored: ${e.message} — position kept fully open, will retry next cycle.`);
+    logAudit('mexc_partial_sell_failed', { sym: symbol, reason, pct, error: e.message });
+    return { executed: false, reason: 'error', error: e.message };
+  }
+}
+
 // ── CVD decline tracking (persisted across Job B runs) ──
 // Browser uses window._cvdDeclineCount; headless uses .cvd-decline-state.json
 function trackCvdDecline(sym, trending) {
@@ -600,11 +698,10 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     // returns skipped:true), never retroactively evaluated on partial data.
     // EXIT / EMERGENCY_EXIT reuse the same proven closeLiveOrder() full-close
     // path as every other exit above. REDUCE_25 / REDUCE_50 (partial exits)
-    // are NOT auto-executed yet — no partial-sell primitive exists in this
-    // codebase, and building one untested against a live account is a
-    // separate, deliberate piece of work. They're surfaced as a Telegram
-    // recommendation instead so you can act on it manually until a partial-
-    // sell path is added and tested (see SELL_AUTO_PARTIAL_EXIT, off by default).
+    // auto-execute via closeLiveOrderPartial() when SELL_AUTO_PARTIAL_EXIT=true
+    // (off by default) — crypto only, each level fires at most once per
+    // position (pos.piPartialLevel). With it off, or for non-crypto
+    // positions, these stay a Telegram recommendation for manual action.
     if (isCrypto && positionIntelligenceEnabled() && pos.entrySnapshot) {
       const symbolState = marketState?.symbols?.[mKey];
       const pi = evaluatePosition({
@@ -661,18 +758,60 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
           continue;
         }
 
-        // REDUCE_25 / REDUCE_50 — recommend only, don't cool down repeat alerts too aggressively
-        const reduceCooldown = 30 * 60 * 1000;
-        if (!pos.piReduceAlertedAt || now - pos.piReduceAlertedAt > reduceCooldown) {
-          pos.piReduceAlertedAt = now;
-          changed = true;
-          telegramAlerts.push(
-            `⚠️ *POSITION INTELLIGENCE — ${pi.action.replace('_', ' ')} RECOMMENDED* — ${pos.base} — ${utc}\n` +
-            `  ${pi.reason}\n` +
-            `  Exit prob ${pi.exitProbability} · Falling knife ${pi.fallingKnifeScore} · Confidence decay ${pi.confidenceDecay}%\n` +
-            `  Price $${price}  Entry $${entry}  P&L ${pnlPct}%\n` +
-            `  _Auto partial-exit not yet enabled — reduce manually if you agree_`
-          );
+        // REDUCE_25 / REDUCE_50 — auto-executed via closeLiveOrderPartial when
+        // AUTO_PARTIAL_EXIT is on (crypto only; each level fires at most once
+        // per position — pos.piPartialLevel tracks 0/1/2 so a risk score
+        // sitting in the same band across several cycles doesn't re-cut the
+        // position every single cycle). Falls back to alert-only for
+        // non-crypto positions, or whenever AUTO_PARTIAL_EXIT is off.
+        const levelNum = pi.action === 'REDUCE_25' ? 1 : 2;
+        const alreadyAtLevel = (pos.piPartialLevel || 0) >= levelNum;
+
+        if (isCrypto && AUTO_PARTIAL_EXIT && !alreadyAtLevel) {
+          const pct = pi.action === 'REDUCE_25' ? 0.25 : 0.5;
+          const partial = await closeLiveOrderPartial(pos, pct, `position intelligence: ${pi.reason}`, price, telegramAlerts);
+
+          if (partial.executed) {
+            pos.piPartialLevel = levelNum;
+            changed = true;
+            logAudit('position_intelligence_partial', { sym, action: pi.action, level: levelNum, qty: partial.qty, fillPrice: partial.fillPrice });
+          } else if (partial.escalateToFullClose) {
+            // Remainder after the partial would be unsellable dust — do a
+            // full close instead, same path as a normal EXIT.
+            pos.exitPrice = price;
+            const closeResult = await closeLiveOrder(pos, `position intelligence: ${pi.reason} (partial would leave dust — full close instead)`, telegramAlerts);
+            if (!closeResult.closed) { delete pos.exitPrice; continue; }
+            pos.status = 'exiting'; pos.statusChangedAt = now; pos.exitAlertedAt = now; changed = true;
+            closedOutcomes.push({
+              base: pos.base, pair: pos.base + 'USDT', outcome: 'pi_exit',
+              score: pos.score, spikeScore: pos.spikeScore, pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
+            });
+            continue;
+          }
+          // slice_too_small / error / nothing_to_sell — closeLiveOrderPartial
+          // already alerted; position stays open, retried next cycle if the
+          // condition persists (no separate cooldown needed here since the
+          // level guard above prevents re-attempting after any success).
+        } else {
+          // Alert-only path (non-crypto, or AUTO_PARTIAL_EXIT off) — same
+          // cooldown as before so this doesn't spam every cycle.
+          const reduceCooldown = 30 * 60 * 1000;
+          if (!pos.piReduceAlertedAt || now - pos.piReduceAlertedAt > reduceCooldown) {
+            pos.piReduceAlertedAt = now;
+            changed = true;
+            const manualNote = !isCrypto
+              ? '_Non-crypto — no execution path, reduce manually._'
+              : alreadyAtLevel
+                ? '_Already reduced at this level — holding._'
+                : '_Auto partial-exit is OFF (SELL_AUTO_PARTIAL_EXIT) — reduce manually if you agree._';
+            telegramAlerts.push(
+              `⚠️ *POSITION INTELLIGENCE — ${pi.action.replace('_', ' ')} RECOMMENDED* — ${pos.base} — ${utc}\n` +
+              `  ${pi.reason}\n` +
+              `  Exit prob ${pi.exitProbability} · Falling knife ${pi.fallingKnifeScore} · Confidence decay ${pi.confidenceDecay}%\n` +
+              `  Price $${price}  Entry $${entry}  P&L ${pnlPct}%\n` +
+              `  ${manualNote}`
+            );
+          }
         }
       }
     }
