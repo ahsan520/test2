@@ -194,6 +194,43 @@ function scheduleWatchlistSync(delayMs = 4000) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// FLUSH-ON-EXIT — a pending scheduleWatchlistSync() timer is a plain
+// in-memory setTimeout. If the tab is closed, reloaded, or navigated
+// away from before that timer fires, the edit sitting in
+// STATE.namedWatchlists (already in localStorage) never actually
+// reaches the Worker/GitHub — it just gets silently overwritten by
+// the next init() re-fetch of the (stale) repo copy on reload. This
+// fires the pending sync immediately, best-effort, the moment the tab
+// starts going away, instead of waiting out the rest of the debounce.
+// keepalive:true lets the fetch survive the page unload in most
+// browsers (same mechanism sendBeacon relies on).
+// ══════════════════════════════════════════════════════════════════
+function _flushPendingWatchlistSync() {
+  if (!_ghWatchlistSyncTimer) return; // nothing pending — normal case, no-op
+  clearTimeout(_ghWatchlistSyncTimer);
+  _ghWatchlistSyncTimer = null;
+
+  const cfg = loadGhSyncCfg();
+  if (!cfg.enabled || cfg.mode !== 'secrets' || !cfg.workerUrl) return;
+
+  const namedLists = (typeof STATE !== 'undefined' && STATE.namedWatchlists) ? STATE.namedWatchlists : {};
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (cfg.workerToken) headers['Authorization'] = `Bearer ${cfg.workerToken}`;
+    fetch(cfg.workerUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ namedWatchlists: namedLists }),
+      keepalive: true, // survives page unload — best-effort, no response is read
+    });
+  } catch { /* best-effort only — nothing more we can do during unload */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') _flushPendingWatchlistSync();
+});
+window.addEventListener('pagehide', _flushPendingWatchlistSync);
+
+// ══════════════════════════════════════════════════════════════════
 // CORE SYNC — GET sha (if file exists) → PUT updated content.
 // manual=true bypasses the "enabled" gate so the Sync Now button
 // always works even mid-setup, and surfaces config errors in the log.
