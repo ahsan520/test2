@@ -115,8 +115,8 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 7,
-      "thesisDrop": 1,
+      "fallingKnifeScore": 0,
+      "thesisDrop": 0,
       "confidenceDecay": 11,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
@@ -124,7 +124,7 @@
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785960197258
+      "evaluatedAt": 1785961391159
     }
   },
   "BINANCE:BTCUSDT": {
@@ -215,17 +215,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 25 below 50 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 27,
-      "confidenceDecay": 25,
-      "exitProbability": 25,
-      "dynamicPositionRisk": 25,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 0,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 6
       },
-      "evaluatedAt": 1785960197258
+      "evaluatedAt": 1785961391159
     }
   },
   "TSX:ETHY.TO": {
@@ -254,84 +254,6 @@
     "histWinRate": null,
     "histSample": 0,
     "caution": false
-  },
-  "BINANCE:LINKUSDT": {
-    "sym": "BINANCE:LINKUSDT",
-    "base": "LINK",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1785952995456,
-    "holdLockUntil": 1785954195456,
-    "entryPrice": 8.238,
-    "stop": 8.1144,
-    "t1": 8.4851,
-    "t2": 8.7323,
-    "score": 9,
-    "spikeScore": 1.7789557290115852,
-    "exitAlertedAt": 1785960197258,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": true,
-    "rankScore": 0.42,
-    "histWinRate": 0,
-    "histSample": 29,
-    "caution": true,
-    "liveOrder": {
-      "mode": "paper",
-      "buyAt": 1785952996937,
-      "usdSize": 0.36,
-      "qty": 0.043699927166788055,
-      "fillPrice": 8.238,
-      "buyOrderId": "PAPER_1785952996937",
-      "closedAt": 1785960197262,
-      "exitFillPrice": 8.187
-    },
-    "entrySnapshot": {
-      "at": 1785952996937,
-      "price": 8.238,
-      "conv": 6,
-      "whaleScore": 80,
-      "bullConfCount": 7,
-      "bullChecks": {
-        "dailyBiasBull": false,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": true,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": false,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "LEAN BULL",
-      "cvdTrend": "up",
-      "thesisScore": 75,
-      "btcRiskScore": 6,
-      "breadthScore": 71,
-      "marketRegime": "RISK_ON"
-    },
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 75 → current 0 (drop 75 > 60)",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 75,
-      "confidenceDecay": 71,
-      "exitProbability": 51,
-      "dynamicPositionRisk": 51,
-      "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
-      },
-      "evaluatedAt": 1785960197258
-    },
-    "exitPrice": 8.187,
-    "statusChangedAt": 1785960197258
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -394,17 +316,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 33 below 50 threshold",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 46,
-      "confidenceDecay": 38,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 4,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1785960197258
+      "evaluatedAt": 1785961391159
     }
   },
   "BINANCE:DOGEUSDT": {
@@ -470,15 +392,15 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": 9,
-      "confidenceDecay": 14,
+      "thesisDrop": -5,
+      "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 6
       },
-      "evaluatedAt": 1785960197258
+      "evaluatedAt": 1785961391159
     }
   },
   "BINANCE:UNIUSDT": {
@@ -567,5 +489,59 @@
       "breadthScore": 60,
       "marketRegime": "RISK_ON"
     }
+  },
+  "BINANCE:AVAXUSDT": {
+    "sym": "BINANCE:AVAXUSDT",
+    "base": "AVAX",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "SQUEEZE NOW",
+    "dir": "bull",
+    "alertedAt": 1785961392147,
+    "holdLockUntil": 1785962592147,
+    "entryPrice": 6.69,
+    "stop": 6.5897,
+    "t1": 6.9532,
+    "t2": 7.2164,
+    "score": 8,
+    "spikeScore": 2.6230317756316843,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "peak",
+    "recommended": true,
+    "rankScore": 0.41,
+    "histWinRate": null,
+    "histSample": 0,
+    "caution": false
+  },
+  "BINANCE:SUIUSDT": {
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "SQUEEZE NOW",
+    "dir": "bull",
+    "alertedAt": 1785961392147,
+    "holdLockUntil": 1785962592147,
+    "entryPrice": 0.6932,
+    "stop": 0.6828,
+    "t1": 0.715,
+    "t2": 0.7368,
+    "score": 7,
+    "spikeScore": 2.0960094676105423,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "peak",
+    "recommended": true,
+    "rankScore": 0.28,
+    "histWinRate": 0,
+    "histSample": 41,
+    "caution": true
   }
 }
