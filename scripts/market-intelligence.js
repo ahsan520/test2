@@ -98,13 +98,14 @@ function trendLabel(m) {
   return 'FLAT';
 }
 
-// Funding rate moves in hundredths of a percent per cycle under normal
-// conditions (e.g. 0.008% → 0.0095%), nowhere near slope()'s 0.05
+// Funding rate moves in thousandths of a percent per cycle under normal
+// conditions (e.g. observed live range ~0.00001% to ~0.0003%/cycle, IMX's
+// -0.00075% being the most extreme seen), nowhere near slope()'s 0.05
 // threshold (tuned for %-of-mean price/whale-score movement) — so this
 // needs its own, much smaller threshold on the RAW %-point change.
 function frTrendLabel(m) {
-  if (m > 0.002)  return 'ACCELERATING';
-  if (m < -0.002) return 'FADING';
+  if (m > 0.0001)  return 'ACCELERATING';
+  if (m < -0.0001) return 'FADING';
   return 'FLAT';
 }
 
