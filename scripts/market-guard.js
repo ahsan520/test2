@@ -209,8 +209,16 @@ export function checkBull4hPersistence(entry) {
 // leaderboard-decider.js already has in its candidate loop (entry.d,
 // entry.whale, entry.bullConf, entry.conv — all fields already computed
 // by leaderboard-scanner.js, nothing new needed here).
-export function checkBtcAlphaException(entry) {
-  if (!ALPHA_EXCEPTION_ENABLED) return { allowed: false, failedChecks: ['alpha exception disabled'], passedChecks: [] };
+// Shared core — parametrized so different callers can require the same
+// SHAPE of evidence (whale/volume/score/bullConf/persistence + N-of-5
+// flexible trend checks) against their own, independently-tunable bar.
+// The BTC-bear exception below uses the strict ALPHA_* defaults (bypassing
+// an actually-bearish BTC regime warrants a high bar); the breadth
+// exception further down uses its own, separately-configured bar, since
+// "BTC itself is fine but most of the watchlist isn't trending yet" is a
+// materially different (milder) situation than "BTC is bearish."
+function evaluateStrengthException(entry, opts) {
+  if (!opts.enabled) return { allowed: false, failedChecks: ['exception disabled'], passedChecks: [] };
 
   const d          = entry.d || {};
   const whaleScore = entry.whale?.score ?? 0;
@@ -223,26 +231,23 @@ export function checkBtcAlphaException(entry) {
   // These are the strongest, most predictive signals; loosening these
   // specifically would undermine the whole point of the exception.
   const coreChecks = [
-    { name: `Volume shock ≥${ALPHA_MIN_VOLUME}x`, pass: shock >= ALPHA_MIN_VOLUME },
-    { name: `Whale ≥${ALPHA_MIN_WHALE}`,          pass: whaleScore >= ALPHA_MIN_WHALE },
-    { name: `Score ≥${ALPHA_SCORE_MIN}`,          pass: conv >= ALPHA_SCORE_MIN },
-    { name: `BullConf ≥7`,                        pass: bullConf >= 7 },
-    ...(BTC_ALPHA_REQUIRE_BULL4H_COUNT
-      ? [{ name: `4H persistence ≥${BTC_ALPHA_BULL4H_COUNT_MIN} cycles`, pass: bull4hCount >= BTC_ALPHA_BULL4H_COUNT_MIN }]
+    { name: `Volume shock ≥${opts.minVolume}x`, pass: shock >= opts.minVolume },
+    { name: `Whale ≥${opts.minWhale}`,          pass: whaleScore >= opts.minWhale },
+    { name: `Score ≥${opts.minScore}`,          pass: conv >= opts.minScore },
+    { name: `BullConf ≥${opts.minBullConf}`,    pass: bullConf >= opts.minBullConf },
+    ...(opts.requireBull4hCount
+      ? [{ name: `4H persistence ≥${opts.bull4hCountMin} cycles`, pass: bull4hCount >= opts.bull4hCountMin }]
       : []),
   ];
 
-  // ── Flexible checks — only ALPHA_FLEXIBLE_MIN_PASS of whichever of
-  // these are individually enabled (via their own REQUIRE_* flag) need
-  // to actually pass. A REQUIRE_*=false flag removes that check from
-  // the pool entirely (same as before) rather than counting it as an
-  // automatic pass or fail.
+  // ── Flexible checks — only opts.flexibleMinPass of whichever of these
+  // are individually enabled need to actually pass.
   const flexibleChecks = [
-    ALPHA_REQUIRE_4H_BULL      ? { name: '4H bull bias',    pass: (d.bias4h  || '').includes('BULL') } : null,
-    ALPHA_REQUIRE_DAILY_BULL   ? { name: 'Daily bull bias', pass: (d.biasDay || '').includes('BULL') } : null,
-    ALPHA_REQUIRE_EMA_ABOVE    ? { name: 'EMA above',       pass: d.emaTrend === 'ABOVE' } : null,
-    ALPHA_REQUIRE_OI_CONFIRM   ? { name: 'OI confirm',      pass: d.oiDiv === 'CONFIRM' || d.oiDiv === 'DIP BUY' } : null,
-    ALPHA_REQUIRE_POSITIVE_CVD ? { name: 'Positive CVD',    pass: d.cvdTrend === 'up' } : null,
+    opts.requireFlex4hBull    ? { name: '4H bull bias',    pass: (d.bias4h  || '').includes('BULL') } : null,
+    opts.requireFlexDailyBull ? { name: 'Daily bull bias', pass: (d.biasDay || '').includes('BULL') } : null,
+    opts.requireFlexEmaAbove  ? { name: 'EMA above',       pass: d.emaTrend === 'ABOVE' } : null,
+    opts.requireFlexOiConfirm ? { name: 'OI confirm',      pass: d.oiDiv === 'CONFIRM' || d.oiDiv === 'DIP BUY' } : null,
+    opts.requireFlexPosCvd    ? { name: 'Positive CVD',    pass: d.cvdTrend === 'up' } : null,
   ].filter(Boolean);
 
   const failedCore = coreChecks.filter(c => !c.pass).map(c => c.name);
@@ -253,7 +258,7 @@ export function checkBtcAlphaException(entry) {
   // Effective threshold can't exceed how many flexible checks are even
   // enabled — e.g. asking for 3-of-5 when only 2 are enabled would make
   // this unpassable; cap it at the pool size instead.
-  const effectiveMinPass = Math.min(ALPHA_FLEXIBLE_MIN_PASS, flexibleChecks.length);
+  const effectiveMinPass = Math.min(opts.flexibleMinPass, flexibleChecks.length);
   const flexiblePassed   = passedFlexible.length >= effectiveMinPass;
 
   const failedChecks = [
@@ -263,6 +268,45 @@ export function checkBtcAlphaException(entry) {
   const passedChecks = [...passedCore, ...passedFlexible.map(c => c.name)];
 
   return { allowed: failedCore.length === 0 && flexiblePassed, failedChecks, passedChecks };
+}
+
+export function checkBtcAlphaException(entry) {
+  return evaluateStrengthException(entry, {
+    enabled: ALPHA_EXCEPTION_ENABLED,
+    minVolume: ALPHA_MIN_VOLUME, minWhale: ALPHA_MIN_WHALE, minScore: ALPHA_SCORE_MIN, minBullConf: 7,
+    requireBull4hCount: BTC_ALPHA_REQUIRE_BULL4H_COUNT, bull4hCountMin: BTC_ALPHA_BULL4H_COUNT_MIN,
+    requireFlex4hBull: ALPHA_REQUIRE_4H_BULL, requireFlexDailyBull: ALPHA_REQUIRE_DAILY_BULL,
+    requireFlexEmaAbove: ALPHA_REQUIRE_EMA_ABOVE, requireFlexOiConfirm: ALPHA_REQUIRE_OI_CONFIRM,
+    requireFlexPosCvd: ALPHA_REQUIRE_POSITIVE_CVD, flexibleMinPass: ALPHA_FLEXIBLE_MIN_PASS,
+  });
+}
+
+// ── Breadth exception — separately tunable, milder bar than the BTC-bear
+// exception above. Breadth being thin (most of the watchlist not yet
+// trending) is a materially different situation from BTC itself being
+// bearish, so it doesn't warrant demanding the same 1.8x volume-shock
+// spike — that bar is calibrated for "prove you can fight an adverse BTC
+// trend," not "prove you're one of the early movers before the rest of
+// the watchlist catches up." Defaults below are intentionally a bit
+// looser on volume specifically; everything else stays at the same
+// strength bar (whale/score/bullConf/persistence/flexible trend checks).
+const BREADTH_ALPHA_MIN_VOLUME   = parseFloat(process.env.BUY_BREADTH_ALPHA_MIN_VOLUME   || '1.1');
+const BREADTH_ALPHA_MIN_WHALE    = parseFloat(process.env.BUY_BREADTH_ALPHA_MIN_WHALE    || ALPHA_MIN_WHALE);
+const BREADTH_ALPHA_SCORE_MIN    = parseFloat(process.env.BUY_BREADTH_ALPHA_SCORE_MIN    || ALPHA_SCORE_MIN);
+const BREADTH_ALPHA_MIN_BULLCONF = parseFloat(process.env.BUY_BREADTH_ALPHA_MIN_BULLCONF || '7');
+const BREADTH_ALPHA_BULL4H_MIN   = parseInt(process.env.BUY_BREADTH_ALPHA_BULL4H_MIN     || String(BTC_ALPHA_BULL4H_COUNT_MIN), 10);
+const BREADTH_ALPHA_FLEXIBLE_MIN = parseInt(process.env.BUY_BREADTH_ALPHA_FLEXIBLE_MIN   || String(ALPHA_FLEXIBLE_MIN_PASS), 10);
+
+export function checkBreadthException(entry) {
+  return evaluateStrengthException(entry, {
+    enabled: MI_BREADTH_ALLOW_EXCEPTION,
+    minVolume: BREADTH_ALPHA_MIN_VOLUME, minWhale: BREADTH_ALPHA_MIN_WHALE,
+    minScore: BREADTH_ALPHA_SCORE_MIN, minBullConf: BREADTH_ALPHA_MIN_BULLCONF,
+    requireBull4hCount: BTC_ALPHA_REQUIRE_BULL4H_COUNT, bull4hCountMin: BREADTH_ALPHA_BULL4H_MIN,
+    requireFlex4hBull: ALPHA_REQUIRE_4H_BULL, requireFlexDailyBull: ALPHA_REQUIRE_DAILY_BULL,
+    requireFlexEmaAbove: ALPHA_REQUIRE_EMA_ABOVE, requireFlexOiConfirm: ALPHA_REQUIRE_OI_CONFIRM,
+    requireFlexPosCvd: ALPHA_REQUIRE_POSITIVE_CVD, flexibleMinPass: BREADTH_ALPHA_FLEXIBLE_MIN,
+  });
 }
 
 // ── Phase 2 — Relative Strength vs BTC ──
@@ -599,12 +643,32 @@ export function runAllBuyGuards(market, positions, marketState = {}) {
 //   BUY_REQUIRE_BREADTH             (true)  gate on market breadth
 //   BUY_MIN_BREADTH                 (60)    minimum breadth % required when enabled
 //   BUY_REQUIRE_RELATIVE_STRENGTH   (true)  symbol must show positive RS vs BTC
+//   BUY_BREADTH_ALLOW_EXCEPTION     (true)  let an individually strong candidate
+//                                           bypass a failing breadth check
 // ══════════════════════════════════════════════════════════════════════════════
 const MI_BTC_RISK_MAX      = parseFloat(process.env.BUY_BTC_RISK_MAX || '60');
 const MI_DYNAMIC_BULL4H    = (process.env.BUY_DYNAMIC_BULL4H || 'true') !== 'false';
 const MI_REQUIRE_BREADTH   = (process.env.BUY_REQUIRE_BREADTH || 'true') !== 'false';
 const MI_MIN_BREADTH       = parseFloat(process.env.BUY_MIN_BREADTH || '60');
 const MI_REQUIRE_RS        = (process.env.BUY_REQUIRE_RELATIVE_STRENGTH || 'true') !== 'false';
+
+// ── Breadth exception ──
+// Unlike the BTC 4H bear-regime gate (Layer 6, above), the breadth check
+// used to be an unconditional portfolio-wide veto with no per-candidate
+// escape hatch — even a candidate showing genuine individual strength
+// (whale accumulation, volume shock, high conviction score, strong
+// bullConf, persistent 4H trend) got skipped purely because most of the
+// REST of the watchlist wasn't trending. That made the gate collapse to
+// "block everything" during any broad chop/risk-off stretch, since it's
+// rare for 60%+ of a 20-symbol alt watchlist to be simultaneously BULL
+// 4H outside a clear market-wide rally.
+//
+// This reuses the exact same bar as checkBtcAlphaException() (core:
+// whale/volume/score/bullConf/persistence all required; flexible:
+// N-of-5 trend/confirmation checks) — a candidate has to prove it's
+// pulling its own weight independent of the broader tape, same standard
+// already trusted to let a candidate through a BTC-bearish regime block.
+const MI_BREADTH_ALLOW_EXCEPTION = (process.env.BUY_BREADTH_ALLOW_EXCEPTION || 'true') !== 'false';
 
 // Pseudo-code from the design doc: bullRequired scales with btcRiskScore band.
 //   btcRisk < 30  → bullRequired = 1
@@ -620,6 +684,8 @@ export function requiredBull4hCycles(btcRiskScore) {
 export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbolState = {}) {
   const reasons = [];
   let allowed = true;
+  let breadthExceptionUsed = false;
+  let breadthExceptionChecks = [];
 
   const btcRiskScore = marketState.btcRiskScore;
   const notReady = btcRiskScore == null; // market-state.json not populated yet (first run) — don't gate on nothing
@@ -632,8 +698,15 @@ export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbol
   if (!notReady && MI_REQUIRE_BREADTH) {
     const breadthScore = marketState.breadth?.score;
     if (breadthScore != null && breadthScore < MI_MIN_BREADTH) {
-      allowed = false;
-      reasons.push(`Breadth ${breadthScore}% < required ${MI_MIN_BREADTH}%`);
+      const exception = checkBreadthException(entry);
+      if (exception.allowed) {
+        breadthExceptionUsed = true;
+        breadthExceptionChecks = exception.passedChecks;
+        reasons.push(`Breadth ${breadthScore}% < required ${MI_MIN_BREADTH}% — bypassed via strength exception (${exception.passedChecks.join(', ')})`);
+      } else {
+        allowed = false;
+        reasons.push(`Breadth ${breadthScore}% < required ${MI_MIN_BREADTH}%`);
+      }
     }
   }
 
@@ -652,5 +725,8 @@ export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbol
   let bullRequired = requiredBull4hCycles(btcRiskScore);
   if (!MI_DYNAMIC_BULL4H) bullRequired = null; // feature off — caller's own LB_BULL_CONF gate still applies
 
-  return { allowed, reasons, btcRiskScore, btcRiskBand: marketState.btcRiskBand, bullRequired, notReady };
+  return {
+    allowed, reasons, btcRiskScore, btcRiskBand: marketState.btcRiskBand, bullRequired, notReady,
+    breadthExceptionUsed, breadthExceptionChecks,
+  };
 }

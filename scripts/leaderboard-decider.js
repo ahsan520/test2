@@ -511,6 +511,9 @@ async function main() {
         console.log(`  🧠  ${pair} — Market Intelligence gate blocked (${miGate.reasons.join('; ')})`);
         continue;
       }
+      if (miGate.breadthExceptionUsed) {
+        console.log(`  🧠✅  ${pair} — breadth gate bypassed via strength exception (${miGate.breadthExceptionChecks.join(', ')})`);
+      }
       if (!miGate.notReady && miGate.bullRequired != null) {
         const persistence = checkBull4hPersistence(entry);
         if (persistence.count < miGate.bullRequired) {

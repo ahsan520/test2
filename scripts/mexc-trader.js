@@ -82,12 +82,22 @@ function isNoTradeSymbol(pair) {
 // traded. Especially important with LB_RECO_MIN_SIGNALS=1, where a single
 // mediocre-grade signal would otherwise be enough to rotate and buy.
 // Set via repo Variable EXEC_MIN_GRADE: 'A' (default — A or A+ both pass),
-// 'A+' (A+ only), or 'off' (no gate — every recommended pick is tradeable).
+// 'A+' (A+ only), 'B'/'C'/'D' (that grade or better), or 'off' (no gate —
+// every recommended pick is tradeable).
 const EXEC_MIN_GRADE = (process.env.EXEC_MIN_GRADE || 'A').toUpperCase();
+// Grade scale, per calcGrade() in leaderboard-scanner.js: A+ > A > B > C > D.
+// Ranked numerically so ANY of the five grades can be used as the floor —
+// previously only 'A+' and 'OFF' were handled explicitly and every other
+// value (including a correctly-set repo variable like EXEC_MIN_GRADE=B)
+// silently fell through to the same behavior as the 'A' default, since the
+// comparison was hardcoded to `grade === 'A' || grade === 'A+'` rather than
+// actually reading EXEC_MIN_GRADE's value.
+const GRADE_RANK = { 'A+': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0 };
 function meetsGradeGate(grade) {
   if (EXEC_MIN_GRADE === 'OFF') return true;
-  if (EXEC_MIN_GRADE === 'A+')  return grade === 'A+';
-  return grade === 'A' || grade === 'A+';
+  const minRank   = GRADE_RANK[EXEC_MIN_GRADE] ?? GRADE_RANK['A']; // unknown/typo'd value → safe default
+  const gradeRank = GRADE_RANK[grade] ?? -1;                        // missing/unrecognized grade → always fails
+  return gradeRank >= minRank;
 }
 
 // Never treat these as "open positions" to rotate out of — they're buying
