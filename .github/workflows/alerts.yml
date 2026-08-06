@@ -288,17 +288,17 @@ jobs:
           # this system's T1≈+3% / T2≈+6% ATR-based targets rather than the
           # design doc's generic 8/15/20 numbers.
           SELL_ENABLE_PROFIT_INTELLIGENCE: ${{ vars.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true' }}
-          SELL_PROFIT_MIN_PCT:             ${{ vars.SELL_PROFIT_MIN_PCT || '4' }}
+          SELL_PROFIT_MIN_PCT:             ${{ vars.SELL_PROFIT_MIN_PCT || '1' }}
           SELL_PROFIT_RSI_EXTENDED:        ${{ vars.SELL_PROFIT_RSI_EXTENDED || '70' }}
           SELL_PROFIT_RSI_ROLLOVER_DROP:   ${{ vars.SELL_PROFIT_RSI_ROLLOVER_DROP || '5' }}
-          SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '4' }}
-          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '2' }}
-          SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '7' }}
-          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '3.5' }}
-          SELL_PROFIT_TIER_A_PEAK:         ${{ vars.SELL_PROFIT_TIER_A_PEAK || '12' }}
-          SELL_PROFIT_TIER_A_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_A_GIVEBACK || '6' }}
-          SELL_PROFIT_TIER_APLUS_PEAK:     ${{ vars.SELL_PROFIT_TIER_APLUS_PEAK || '18' }}
-          SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '9' }}
+          SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '1' }}
+          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.5' }}
+          SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '1.5' }}
+          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '0.75' }}
+          SELL_PROFIT_TIER_A_PEAK:         ${{ vars.SELL_PROFIT_TIER_A_PEAK || '2.5' }}
+          SELL_PROFIT_TIER_A_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_A_GIVEBACK || '1.25' }}
+          SELL_PROFIT_TIER_APLUS_PEAK:     ${{ vars.SELL_PROFIT_TIER_APLUS_PEAK || '4' }}
+          SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '2' }}
           # Off by default on purpose — this executes real partial sells via
           # reduceLiveOrder() in position-monitor.js. Flip to 'true' as a
           # repo variable only after watching it fire correctly on test2 in
