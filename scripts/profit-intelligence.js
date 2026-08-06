@@ -17,7 +17,7 @@
 // Design (from the proposal doc):
 //   1. Track highest unrealized PnL seen since entry (highestPnLSeen).
 //   2. Ignore the position entirely until it has reached a minimum profit
-//      (PROFIT_MIN_PCT, default 8%) — never fires on a trade that was never
+//      (SELL_PROFIT_MIN_PCT, default 1%) — never fires on a trade that was never
 //      meaningfully in profit.
 //   3. Once above that floor, watch drawdown-from-peak
 //      (highestPnLSeen - currentPnL).
@@ -45,7 +45,7 @@ const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true'
 // trade has to clear a real move (not noise) before Profit Intelligence
 // starts watching it — the PDF's own default of 8% would leave most
 // T1/T2-sized winners completely unprotected.
-const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '4');
+const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '1');
 const RSI_ROLLOVER_DROP = parseFloat(process.env.SELL_PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
 const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      || '70');
 
@@ -53,14 +53,17 @@ const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      |
 // { minPeak: highestPnLSeen must be >= this to use this tier, giveBack: how
 // much drawdown-from-peak is tolerated before this tier is willing to exit }
 // Order matters — first (highest) match wins, so check A+ before A before
-// B before C. Rescaled to T1 (~3%) / T2 (~6%) rather than the PDF's generic
-// 8/15/20 numbers, which assume much bigger average moves than this system
-// targets. Overridable individually via env without touching the others.
+// B before C. Rescaled tight to this system's actual observed intraday
+// range on crypto majors (e.g. LINK's whole day ran ~2%, individual legs
+// 0.3-0.9%) rather than the PDF's generic 8/15/20 numbers — deliberately
+// "not greedy": lock in small wins early and let the leaderboard re-buy on
+// the next signal rather than risk giving a winner back. Overridable
+// individually via env without touching the others.
 const TIERS = [
-  { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '18'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '9') },
-  { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '12'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '6') },
-  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '7'),  giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '3.5') },
-  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '2') },
+  { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '4'),   giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '2') },
+  { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '2.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '1.25') },
+  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '1.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '0.75') },
+  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.5') },
 ];
 
 export function profitIntelligenceEnabled() { return ENABLED; }
