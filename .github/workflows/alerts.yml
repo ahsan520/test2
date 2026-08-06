@@ -59,7 +59,7 @@ concurrency:
   #
   # Splitting the group by mode means a queued decide can only ever be
   # superseded by another decide, never bumped by an unrelated fetch.
-  group: alert-runner-${{ github.event.schedule == '13,28,43,58 * * * *' && 'decide' || (github.event.schedule == '*/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
+  group: alert-runner-${{ github.event.schedule == '0,10,20,30,40,50 * * * *' && 'decide' || (github.event.schedule == '*/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
   cancel-in-progress: false
 
 permissions:
@@ -210,7 +210,7 @@ jobs:
           LB_HISTORY_MAX_ROWS: ${{ vars.LB_HISTORY_MAX_ROWS || '1500' }}
           EXEC_STRATEGY:      ${{ vars.EXEC_STRATEGY || 'topN' }}
           EXEC_TOP_N_COUNT:   ${{ vars.EXEC_TOP_N_COUNT || '3' }}
-          EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'B' }}
+          EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
           ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
           STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
