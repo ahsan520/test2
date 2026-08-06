@@ -47,26 +47,59 @@ async function fetchText(url, headers = {}, timeoutMs = 9000) {
   } finally { clearTimeout(tid); }
 }
 
-// ── Bybit fallback for futures data (funding rate) ──────────────────────
+// ── Funding rate: Bybit → OKX → proxy-wrapped Bybit → carry-forward ─────
 // fapi.binance.com (funding rate / OI) is confirmed geo-blocked (HTTP 451)
 // on GitHub-hosted runners, with no public spot-style mirror equivalent —
-// data-api.binance.vision only serves spot. This was already fixed in
-// alert-runner.js (see fetchBybitTicker there) but leaderboard-scanner.js
-// has its own separate copy of the fetch helpers and was never updated —
-// so fr has been landing on the `fr = 0` no-data fallback below every
-// single cycle, corrupting oiDiv classification, conviction scoring, and
-// (downstream) Profit Intelligence's oiMomentum, which is derived from
-// this file's fr history via market-intelligence.js. Bybit's v5 public
-// tickers endpoint is not subject to this geo-block, needs no auth, and
-// uses the same bare symbol format Binance does (BTCUSDT).
+// data-api.binance.vision only serves spot. Bybit was added as the first
+// fallback (same fix already working in alert-runner.js), but "carrying
+// forward last known fr: 0.000%" on every symbol every cycle means Bybit
+// is ALSO failing from this runner — likely the same class of datacenter
+// geo-block/rate-limit exchanges commonly apply to derivatives endpoints,
+// not just a Binance-specific issue. Rather than guess, this now logs the
+// REAL underlying error (previous version swallowed it down to a generic
+// "failed" message) and adds OKX as a second independent exchange, plus a
+// CORS-proxy-wrapped retry of Bybit, before finally carrying forward.
 const BYBIT_DIRECT = 'https://api.bybit.com';
+const OKX_DIRECT    = 'https://www.okx.com';
+const PROXY_PREFIX2 = 'https://corsproxy.io/?url=';
 
 async function fetchBybitFundingRate(pair) {
   const url = `${BYBIT_DIRECT}/v5/market/tickers?category=linear&symbol=${pair}`;
   const d = await fetchJSON(url);
+  if (d?.retCode !== undefined && d.retCode !== 0) throw new Error(`Bybit retCode ${d.retCode}: ${d.retMsg}`);
   const row = d?.result?.list?.[0];
   if (!row) throw new Error('Bybit: no ticker row returned');
-  return parseFloat(row.fundingRate || 0) * 100; // decimal → %, matches Binance's premiumIndex.lastFundingRate * 100 usage below
+  return parseFloat(row.fundingRate || 0) * 100;
+}
+
+// OKX uses instId format like "BTC-USDT-SWAP", not bare "BTCUSDT" —
+// derive it from the pair (strip the USDT suffix, re-join with dashes).
+async function fetchOkxFundingRate(pair) {
+  const base   = pair.replace(/USDT$/, '');
+  const instId = `${base}-USDT-SWAP`;
+  const url = `${OKX_DIRECT}/api/v5/public/funding-rate?instId=${instId}`;
+  const d = await fetchJSON(url);
+  const row = d?.data?.[0];
+  if (!row) throw new Error(`OKX: no data row for ${instId}`);
+  return parseFloat(row.fundingRate || 0) * 100;
+}
+
+async function fetchFundingRate(pair) {
+  const attempts = [
+    { name: 'Bybit',        fn: () => fetchBybitFundingRate(pair) },
+    { name: 'OKX',          fn: () => fetchOkxFundingRate(pair) },
+    { name: 'Bybit(proxy)', fn: () => fetchJSON(`${PROXY_PREFIX2}${encodeURIComponent(`${BYBIT_DIRECT}/v5/market/tickers?category=linear&symbol=${pair}`)}`).then(d => {
+        const row = d?.result?.list?.[0];
+        if (!row) throw new Error('Bybit(proxy): no ticker row returned');
+        return parseFloat(row.fundingRate || 0) * 100;
+      }) },
+  ];
+  const errors = [];
+  for (const a of attempts) {
+    try { return await a.fn(); }
+    catch (e) { errors.push(`${a.name}: ${e.message}`); }
+  }
+  throw new Error(errors.join(' | '));
 }
 
 // ── Binance fetch with mirror → direct → proxy fallback ──
@@ -532,14 +565,14 @@ export function calcBullConf(d, whaleScore) {
 // ════════════════════════════════════════════════════════
 export async function scoreSymbol(pair, prevFr = null) {
   try {
-    const [ticker, k15m, k1h, k4h, kDay, depth, bybitFr] = await Promise.allSettled([
+    const [ticker, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
       fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
       fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
-      fetchBybitFundingRate(pair), // fapi.binance.com is geo-blocked on GH runners — see note below
+      fetchFundingRate(pair), // Bybit → OKX → proxy-wrapped Bybit — fapi.binance.com is geo-blocked on GH runners, see note above
     ]);
 
     const val = r => r.status === 'fulfilled' ? r.value : null;
@@ -591,14 +624,14 @@ export async function scoreSymbol(pair, prevFr = null) {
     // classification below and (downstream) Profit Intelligence's
     // oiMomentum in market-intelligence.js.
     let fr;
-    if (bybitFr.status === 'fulfilled' && bybitFr.value != null && !isNaN(bybitFr.value)) {
-      fr = bybitFr.value;
+    if (fundingResult.status === 'fulfilled' && fundingResult.value != null && !isNaN(fundingResult.value)) {
+      fr = fundingResult.value;
     } else if (prevFr !== null && prevFr !== undefined) {
       fr = prevFr;
-      console.log(`  ⚠  ${pair} — Bybit funding-rate fetch failed, carrying forward last known fr: ${fr.toFixed(3)}%`);
+      console.log(`  ⚠  ${pair} — funding-rate fetch failed (${fundingResult.reason?.message || 'unknown error'}), carrying forward last known fr: ${fr.toFixed(3)}%`);
     } else {
       fr = 0;
-      console.log(`  ⚠  ${pair} — Bybit funding-rate fetch failed, no prior value to carry forward, defaulting to 0`);
+      console.log(`  ⚠  ${pair} — funding-rate fetch failed (${fundingResult.reason?.message || 'unknown error'}), no prior value to carry forward, defaulting to 0`);
     }
 
     let oiDiv = 'NEUTRAL';

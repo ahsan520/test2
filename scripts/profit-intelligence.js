@@ -17,7 +17,7 @@
 // Design (from the proposal doc):
 //   1. Track highest unrealized PnL seen since entry (highestPnLSeen).
 //   2. Ignore the position entirely until it has reached a minimum profit
-//      (SELL_PROFIT_MIN_PCT, default 1%) — never fires on a trade that was never
+//      (SELL_PROFIT_MIN_PCT, default 0.4%) — never fires on a trade that was never
 //      meaningfully in profit.
 //   3. Once above that floor, watch drawdown-from-peak
 //      (highestPnLSeen - currentPnL).
@@ -45,7 +45,7 @@ const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true'
 // trade has to clear a real move (not noise) before Profit Intelligence
 // starts watching it — the PDF's own default of 8% would leave most
 // T1/T2-sized winners completely unprotected.
-const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '1');
+const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '0.4');
 const RSI_ROLLOVER_DROP = parseFloat(process.env.SELL_PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
 const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      || '70');
 
@@ -60,10 +60,10 @@ const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      |
 // the next signal rather than risk giving a winner back. Overridable
 // individually via env without touching the others.
 const TIERS = [
-  { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '4'),   giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '2') },
-  { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '2.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '1.25') },
-  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '1.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '0.75') },
-  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.5') },
+  { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '1.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75') },
+  { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '1.0'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '0.5') },
+  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '0.6'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '0.3') },
+  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.2') },
 ];
 
 export function profitIntelligenceEnabled() { return ENABLED; }
