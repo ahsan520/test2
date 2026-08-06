@@ -67,9 +67,44 @@ function slope(values) {
   return meanY !== 0 ? parseFloat(((m / meanY) * 100).toFixed(4)) : 0;
 }
 
+// ── Raw (unnormalized) slope — same linear regression as slope() above,
+// but returns the actual per-cycle rate of change instead of dividing by
+// the series' mean. slope()'s mean-normalization works fine for prices
+// (always positive, never near zero) but is unsafe for values that
+// oscillate around and cross zero — funding rate is exactly that case.
+// A funding rate history like [0.0001, -0.0004] has a mean near zero, so
+// slope()'s (m / meanY) * 100 blows up into huge, unstable numbers purely
+// from the denominator being tiny — not from any real momentum change.
+// Used by calcOiMomentum below; slope() is left untouched for its other
+// callers (price, whale score, breadth), which don't have this problem. ──
+function rawSlope(values) {
+  const xs = values.map((_, i) => i);
+  const n  = values.length;
+  if (n < 2) return 0;
+  const meanX = xs.reduce((a, b) => a + b, 0) / n;
+  const meanY = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (xs[i] - meanX) * (values[i] - meanY);
+    den += (xs[i] - meanX) ** 2;
+  }
+  const m = den === 0 ? 0 : num / den;
+  return parseFloat(m.toFixed(5));
+}
+
 function trendLabel(m) {
   if (m > 0.05)  return 'ACCELERATING';
   if (m < -0.05) return 'FADING';
+  return 'FLAT';
+}
+
+// Funding rate moves in hundredths of a percent per cycle under normal
+// conditions (e.g. 0.008% → 0.0095%), nowhere near slope()'s 0.05
+// threshold (tuned for %-of-mean price/whale-score movement) — so this
+// needs its own, much smaller threshold on the RAW %-point change.
+function frTrendLabel(m) {
+  if (m > 0.002)  return 'ACCELERATING';
+  if (m < -0.002) return 'FADING';
   return 'FLAT';
 }
 
@@ -128,6 +163,13 @@ function calcBreadth(symbols = {}) {
 }
 
 // ── OI Momentum (proxy) ──
+// Uses funding-rate direction as a proxy for true OI momentum (see note
+// on calcOiMomentum below). Uses rawSlope/frTrendLabel, not slope()'s
+// %-of-mean normalization — funding rate oscillates around and crosses
+// zero, which makes a mean-relative slope wildly unstable (a symbol
+// whose fr history is [0.00008, -0.00036] has a near-zero mean, so
+// dividing by it produces huge, meaningless swings unrelated to the
+// actual size of the move).
 // NOTE: this codebase does not fetch raw open-interest anywhere today —
 // leaderboard-scanner.js only pulls funding rate (d.fr) from the futures
 // premiumIndex endpoint. Funding-rate direction is a reasonable proxy for
@@ -137,8 +179,8 @@ function calcBreadth(symbols = {}) {
 // can label it honestly rather than presenting it as real OI data.
 function calcOiMomentum(frHistory) {
   if (frHistory.length < 2) return { momentum: 0, trend: 'FLAT', proxy: true };
-  const m = slope(frHistory);
-  return { momentum: m, trend: trendLabel(m), proxy: true };
+  const m = rawSlope(frHistory);
+  return { momentum: m, trend: frTrendLabel(m), proxy: true };
 }
 
 // ── Per-symbol history push/roll ──
