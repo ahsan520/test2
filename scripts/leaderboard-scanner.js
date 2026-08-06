@@ -47,6 +47,28 @@ async function fetchText(url, headers = {}, timeoutMs = 9000) {
   } finally { clearTimeout(tid); }
 }
 
+// ── Bybit fallback for futures data (funding rate) ──────────────────────
+// fapi.binance.com (funding rate / OI) is confirmed geo-blocked (HTTP 451)
+// on GitHub-hosted runners, with no public spot-style mirror equivalent —
+// data-api.binance.vision only serves spot. This was already fixed in
+// alert-runner.js (see fetchBybitTicker there) but leaderboard-scanner.js
+// has its own separate copy of the fetch helpers and was never updated —
+// so fr has been landing on the `fr = 0` no-data fallback below every
+// single cycle, corrupting oiDiv classification, conviction scoring, and
+// (downstream) Profit Intelligence's oiMomentum, which is derived from
+// this file's fr history via market-intelligence.js. Bybit's v5 public
+// tickers endpoint is not subject to this geo-block, needs no auth, and
+// uses the same bare symbol format Binance does (BTCUSDT).
+const BYBIT_DIRECT = 'https://api.bybit.com';
+
+async function fetchBybitFundingRate(pair) {
+  const url = `${BYBIT_DIRECT}/v5/market/tickers?category=linear&symbol=${pair}`;
+  const d = await fetchJSON(url);
+  const row = d?.result?.list?.[0];
+  if (!row) throw new Error('Bybit: no ticker row returned');
+  return parseFloat(row.fundingRate || 0) * 100; // decimal → %, matches Binance's premiumIndex.lastFundingRate * 100 usage below
+}
+
 // ── Binance fetch with mirror → direct → proxy fallback ──
 const BINANCE_MIRROR = 'https://data-api.binance.vision';
 const BINANCE_DIRECT = 'https://api.binance.com';
@@ -510,14 +532,14 @@ export function calcBullConf(d, whaleScore) {
 // ════════════════════════════════════════════════════════
 export async function scoreSymbol(pair, prevFr = null) {
   try {
-    const [ticker, k15m, k1h, k4h, kDay, depth, prem] = await Promise.allSettled([
+    const [ticker, k15m, k1h, k4h, kDay, depth, bybitFr] = await Promise.allSettled([
       fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
       fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
       fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
-      fetchBinance(`/fapi/v1/premiumIndex?symbol=${pair}`, { useMirror: false }),
+      fetchBybitFundingRate(pair), // fapi.binance.com is geo-blocked on GH runners — see note below
     ]);
 
     const val = r => r.status === 'fulfilled' ? r.value : null;
@@ -528,7 +550,7 @@ export async function scoreSymbol(pair, prevFr = null) {
     }
 
     const k15 = val(k15m), k1 = val(k1h), k4 = val(k4h), kD = val(kDay);
-    const dep = val(depth), pData = val(prem);
+    const dep = val(depth);
 
     const price = parseFloat(t.lastPrice);
     const chg   = parseFloat(t.priceChangePercent);
@@ -557,21 +579,26 @@ export async function scoreSymbol(pair, prevFr = null) {
     const biasDay  = calcDailyBias(kD);
     const cvdTrend = calcCVD(k15);
     const obi      = calcOBI(dep);
-    // fapi.binance.com is confirmed geo-blocked (451) on GitHub runners
-    // as of 2026-07-23 — this fetch fails every cycle right now. Rather
-    // than silently reporting fr=0 (which reads as "neutral funding" and
-    // corrupts oiDiv/DIP-BUY/CONFIRM classification below), carry forward
-    // the last known-good fr for this symbol if we have one. Still stale,
-    // but stale-and-labeled beats a false "0.000% neutral" every time.
+    // fapi.binance.com (Binance's own funding-rate endpoint) is confirmed
+    // geo-blocked (451) on GitHub runners as of 2026-07-23, with no public
+    // spot-style mirror equivalent — so funding rate is sourced from Bybit
+    // instead (fetchBybitFundingRate above), which isn't subject to this
+    // block and returns the same rate (funding rates are near-identical
+    // across major exchanges due to arbitrage). If Bybit itself is ever
+    // unreachable too, carry forward the last known-good fr for this
+    // symbol — still stale, but stale-and-labeled beats a false "0.000%
+    // neutral" every time, which corrupts oiDiv/DIP-BUY/CONFIRM
+    // classification below and (downstream) Profit Intelligence's
+    // oiMomentum in market-intelligence.js.
     let fr;
-    if (pData) {
-      fr = parseFloat(pData.lastFundingRate) * 100;
+    if (bybitFr.status === 'fulfilled' && bybitFr.value != null && !isNaN(bybitFr.value)) {
+      fr = bybitFr.value;
     } else if (prevFr !== null && prevFr !== undefined) {
       fr = prevFr;
-      console.log(`  ⚠  ${pair} — funding-rate fetch failed, carrying forward last known fr: ${fr.toFixed(3)}%`);
+      console.log(`  ⚠  ${pair} — Bybit funding-rate fetch failed, carrying forward last known fr: ${fr.toFixed(3)}%`);
     } else {
       fr = 0;
-      console.log(`  ⚠  ${pair} — funding-rate fetch failed, no prior value to carry forward, defaulting to 0`);
+      console.log(`  ⚠  ${pair} — Bybit funding-rate fetch failed, no prior value to carry forward, defaulting to 0`);
     }
 
     let oiDiv = 'NEUTRAL';
