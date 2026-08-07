@@ -739,7 +739,7 @@ function renderGithubSyncCard() {
   const secretsPanel = `
     <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:12px;line-height:1.9;">
       <b style="color:var(--text);">Fully headless — no PAT in browser.</b>
-      GitHub Actions writes <code style="color:var(--accent);">positions.json</code> every 15 min.
+      GitHub Actions writes <code style="color:var(--accent);">positions.json</code> every ~5 min.
       The browser pulls it on load so you see live positions without syncing.<br><br>
       <b style="color:#8957e5;">Required — Settings → Secrets → Actions:</b><br>
       &nbsp;&nbsp;<code style="color:var(--accent);">TELEGRAM_BOT_TOKEN</code> + <code style="color:var(--accent);">TELEGRAM_CHAT_ID</code><br><br>
@@ -768,7 +768,7 @@ function renderGithubSyncCard() {
     </button>
     <div style="font-family:var(--mono);font-size:7.5px;color:var(--text-dim);line-height:1.7;padding:8px;background:rgba(137,87,229,.06);border-radius:4px;margin-bottom:14px;">
       ✓ Leaderboard buy alerts → GitHub Actions → <code>positions.json</code><br>
-      ✓ Stop/T1/T2/exit alerts → GitHub Actions every 15 min<br>
+      ✓ Stop/T1/T2/exit alerts → GitHub Actions every ~5 min<br>
       ✓ Browser pulls positions on load — close tab anytime
     </div>
     <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:10px;line-height:1.9;border-top:1px solid var(--border);padding-top:12px;">

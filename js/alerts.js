@@ -453,7 +453,7 @@ async function saveApiTradingCfg() {
       throw new Error(`GitHub PUT ${putRes.status}: ${e.message || ''}`);
     }
 
-    if (result) result.textContent = `✓ Saved — mode set to ${mode.toUpperCase()}. Job B picks this up within 15 min.`;
+    if (result) result.textContent = `✓ Saved — mode set to ${mode.toUpperCase()}. Job B picks this up within 5 min.`;
     logAlertItem('info', `⚡ API trade mode → ${mode.toUpperCase()} (USDT: $${usdSize}, max live: ${maxLive})`);
   } catch (e) {
     if (result) result.style.color = 'var(--bear)';
@@ -1010,7 +1010,7 @@ function renderAlertCfgPage() {
       </div>
       <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:12px;line-height:1.7;">
         Shows <code style="color:var(--accent);">scripts/positions.json</code> from your GitHub repo.<br>
-        Written by GitHub Actions every 15 min + by Option A sync when you save positions.<br>
+        Written by GitHub Actions every 5 min + by Option A sync when you save positions.<br>
         <span style="color:var(--text-dim);">Repo: <code style="color:var(--accent);">${_deriveRepo() || 'not detected — set in Sync tab'}</code></span>
       </div>
       <div id="headless-positions-panel">
@@ -1085,7 +1085,7 @@ function renderAlertCfgPage() {
       </div>
       <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:12px;line-height:1.7;">
         Live view of <code>scripts/audit.json</code> — rolling 1-hour window of runner activity.<br>
-        Updated every 5 min (Job A fetch) and every 15 min (Job B decide).<br>
+        Updated every 5 min (Job A fetch) and every ~5 min (Job B decide).<br>
         <span style="color:#29b6f6;">Most recent entries shown first.</span>
       </div>
       <div id="audit-log-panel">
@@ -1232,7 +1232,7 @@ function renderAlertCfgPage() {
 
       <!-- How mode is applied note -->
       <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
-        💾 Saving pushes a <code>trade-state.json</code> update to GitHub — picked up by the next Job B cycle (≤15 min).<br>
+        💾 Saving pushes a <code>trade-state.json</code> update to GitHub — picked up by the next Job B cycle (≤5 min).<br>
         The Telegram kill-switch (<code>/pause</code> / <code>/resume</code>) overrides this setting without a save.
       </div>
 
