@@ -10,8 +10,8 @@ on:
     # each decide cycle finishes, giving a fresh data refresh independent
     # of Cloudflare without ever landing on the same minute as either
     # Cloudflare fetch (:00/:05/:10…) or Cloudflare decide (:02/:07/:12…).
-    - cron: '4-59/5 * * * *'     # :04, :09, :14, :19 … (2 min after CF decide)
-
+    # - cron: '4-59/5 * * * *'     # :04, :09, :14, :19 … (2 min after CF decide)
+    # - cron: '0,10,20,30,40,50 * * * *'       # every ~10 minutes
     # NOTE: GitHub-side decide schedule has been removed. Cloudflare's
     # decide-checker is unconditional-primary now, so there's no gap for a
     # scheduled GH decide to usefully fill, and running both risked a
@@ -56,7 +56,8 @@ concurrency:
   # manually-dispatched decide run (mode=decide via workflow_dispatch)
   # still gets its own group here so it can never be bumped by a queued
   # scheduled fetch run.
-  group: alert-runner-${{ github.event.schedule == '4-59/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual')) }}
+  #group: alert-runner-${{ github.event.schedule == '13,28,43,58 * * * *' && 'decide' || (github.event.schedule == '*/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
+  group: alert-runner-${{ (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual')) }}
   cancel-in-progress: false
 
 permissions:
@@ -109,9 +110,9 @@ jobs:
         id: mode
         run: |
           SCHEDULE="${{ github.event.schedule }}"
-          if [ "$SCHEDULE" = "4-59/5 * * * *" ]; then
-            VALUE="fetch"
-          elif [ "$SCHEDULE" = "31 * * * *" ]; then
+          #if [ "$SCHEDULE" = "4-59/5 * * * *" ]; then
+           # VALUE="fetch"
+          if [ "$SCHEDULE" = "31 * * * *" ]; then
             VALUE="full"
           elif [ -n "${{ inputs.mode }}" ]; then
             VALUE="${{ inputs.mode }}"
