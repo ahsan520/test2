@@ -20,6 +20,7 @@ import {
   logAudit, loadCvdState, saveCvdState, TERMINAL_EVICT_MS, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeClose, recordTradePartialExit, pushTradeLogToGitHub,
   TRADE_SIZE_MODE, adjustPaperBalance, priceDecimals,
+  shouldAlertMexcAuthFailure, clearMexcAuthFailure,
 } from './job-state.js';
 import { calcConviction } from './leaderboard-scanner.js';
 import { evaluatePosition, positionIntelligenceEnabled } from './position-intelligence.js';
@@ -84,8 +85,15 @@ export async function reconcileTrackedLiveBalances(positions, effectiveTradeMode
   let balances = [];
   try {
     balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
+    clearMexcAuthFailure('reconcile_balances');
   } catch (e) {
     console.log(`  ⚠️  Balance reconcile: couldn't fetch MEXC balances (${e.message}) — skipping this cycle`);
+    if (shouldAlertMexcAuthFailure('reconcile_balances')) {
+      telegramAlerts.push(
+        `🚨 *MEXC API ERROR — Balance Reconcile* \n  Couldn't fetch account balances: ${e.message}\n` +
+        `  _Manual-sell detection is skipped this cycle (won't affect the price-based stop/T1/T2 checks, which use market price, not balance) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60'} min._`
+      );
+    }
     return { changed: false, telegramAlerts };
   }
   const freeByBase = new Map(balances.map(b => [b.asset, b.free]));

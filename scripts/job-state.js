@@ -28,6 +28,7 @@ const TRADE_LOG_PATH      = path.join(process.cwd(), 'trade-log.json');
 const PAPER_BALANCE_PATH  = path.join(process.cwd(), 'paper-balance.json');
 const LIVE_BALANCES_PATH  = path.join(process.cwd(), 'mexc-live-balances.json');
 const HEARTBEAT_PATH      = path.join(process.cwd(), 'heartbeat.json');
+const MEXC_AUTH_ALERT_PATH = path.join(process.cwd(), '.mexc-auth-alert-state.json');
 
 // ── Shared env constants ──
 export const DRY_RUN    = process.argv.includes('--dry-run');
@@ -131,6 +132,44 @@ export function adjustPaperBalance(delta) {
   state.updatedAt = Date.now();
   saveJSON(PAPER_BALANCE_PATH, state);
   return state.balance;
+}
+
+// ── MEXC balance-fetch failure alerting ──────────────────────────────────
+// mexc-trader.js's rotation and manual-holding-adoption balance checks
+// previously only console.log'd on failure (e.g. an expired/invalid API
+// key) — no Telegram alert at all, unlike the buy/sell paths which do
+// alert. That meant an expired key could go completely unnoticed for as
+// long as no buy/sell happened to be attempted in the same cycle — no
+// different from the earlier stale-run situation where a real problem
+// only surfaced by chance.
+//
+// shouldAlertMexcAuthFailure(source) decides whether THIS occurrence
+// should actually send a Telegram alert:
+//   - Always true the first time a given `source` starts failing.
+//   - Then suppressed (returns false) for REPEAT_ALERT_MIN while it keeps
+//     failing, so an expired key doesn't spam a message every 5-10 min —
+//     one immediate alert, then a periodic reminder rather than a flood.
+//   - Automatically resets once the call succeeds again (call
+//     clearMexcAuthFailure(source)), so recovery needs no manual cleanup
+//     and a NEW failure later starts a fresh "alert immediately" cycle.
+const MEXC_AUTH_REPEAT_ALERT_MIN = parseFloat(process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60');
+export function shouldAlertMexcAuthFailure(source) {
+  const state = loadJSON(MEXC_AUTH_ALERT_PATH, {});
+  const now = Date.now();
+  const last = state[source];
+  const shouldAlert = !last || (now - last) / 60000 >= MEXC_AUTH_REPEAT_ALERT_MIN;
+  if (shouldAlert) {
+    state[source] = now;
+    saveJSON(MEXC_AUTH_ALERT_PATH, state);
+  }
+  return shouldAlert;
+}
+export function clearMexcAuthFailure(source) {
+  const state = loadJSON(MEXC_AUTH_ALERT_PATH, {});
+  if (state[source]) {
+    delete state[source];
+    saveJSON(MEXC_AUTH_ALERT_PATH, state);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
