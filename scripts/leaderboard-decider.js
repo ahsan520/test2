@@ -33,6 +33,7 @@ import {
   loadAuditLog, pushAuditLogToGitHub, pushLiveBalancesToGitHub,
   checkHeartbeatStale, pushHeartbeatToGitHub,
 } from './job-state.js';
+import { priceDecimals } from './job-state.js';
 import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
@@ -81,7 +82,7 @@ function calcEntryLevels(price, shock) {
   const p = parseFloat(price) || 0;
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp    = p < 10 ? 4 : 2;
+  const dp    = priceDecimals(p);
   // Entry = current price, no chase markup. Every buy is a MEXC MARKET
   // order (fills near-instantly at whatever price is live) — the old
   // +0.4% markup never changed what got paid, it just inflated the

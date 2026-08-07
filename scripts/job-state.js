@@ -68,6 +68,26 @@ export const TERMINAL_EVICT_MS = {
 
 export const SKIP_SETUPS = new Set(['SHORT SETUP']);
 
+// ── Shared price-decimal-places helper ──────────────────────────────────
+// Previously duplicated independently in leaderboard-decider.js,
+// alert-runner.js, and position-monitor.js, each with its OWN tier
+// boundaries that drifted out of sync with each other over time.
+// leaderboard-decider.js's copy — the one that actually sets entryPrice/
+// stop/t1/t2 on the position at buy time — used only `p < 10 ? 4 : 2`,
+// which is far too coarse for sub-$1 tokens (GALA, SHIB-style prices):
+// entry and a 1.5%-away stop both round to the SAME 4-decimal value,
+// collapsing the intended stop distance to zero and causing an
+// essentially-instant stop-out on ordinary noise, not a real reversal.
+// One shared function, imported everywhere, so a coin's rounding
+// precision can't silently differ between the code that OPENS a
+// position and the code that MONITORS it.
+export function priceDecimals(p) {
+  if (p < 0.01) return 6;
+  if (p < 1)    return 4;
+  if (p < 100)  return 3;
+  return 2;
+}
+
 // ── Generic I/O helpers ──
 function loadJSON(p, fb) { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fb; } }
 function saveJSON(p, o)  { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }

@@ -7,6 +7,7 @@ import fetch from 'node-fetch';
 import fs    from 'fs';
 import path  from 'path';
 import { fileURLToPath } from 'url';
+import { priceDecimals } from './job-state.js';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const DRY_RUN    = process.argv.includes('--dry-run');
@@ -1374,7 +1375,7 @@ function calcEntryLevels(price, shock) {
   const p   = parseFloat(price) || 0;
   if (!p) return null;
   const atr = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp  = p < 0.01 ? 6 : p < 1 ? 4 : p < 100 ? 3 : 2;
+  const dp  = priceDecimals(p);
   const entry = (p * 1.004).toFixed(dp);
   const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1'); // fixed %, not volatility-scaled — kept in sync with leaderboard-decider.js
   const stop  = (p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp);

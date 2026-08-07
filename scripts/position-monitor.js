@@ -19,7 +19,7 @@ import { mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, getBaseSizePrecisi
 import {
   logAudit, loadCvdState, saveCvdState, TERMINAL_EVICT_MS, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeClose, recordTradePartialExit, pushTradeLogToGitHub,
-  TRADE_SIZE_MODE, adjustPaperBalance,
+  TRADE_SIZE_MODE, adjustPaperBalance, priceDecimals,
 } from './job-state.js';
 import { calcConviction } from './leaderboard-scanner.js';
 import { evaluatePosition, positionIntelligenceEnabled } from './position-intelligence.js';
@@ -546,7 +546,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       const recalculated = isBull
         ? entry * (1 - STOP_LOSS_PCT / 100)
         : entry * (1 + STOP_LOSS_PCT / 100);
-      const dp = entry < 1 ? 6 : entry < 10 ? 4 : 2;
+      const dp = priceDecimals(entry);
       const recalcRounded = parseFloat(recalculated.toFixed(dp));
       if (recalcRounded !== stop) {
         console.log(`  🔧  ${pos.base} stop recalculated: ${stop} → ${recalcRounded} (STOP_LOSS_PCT=${STOP_LOSS_PCT}%)`);
