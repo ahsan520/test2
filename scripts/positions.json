@@ -26,7 +26,7 @@
     "histSample": 9,
     "caution": true,
     "highestPnLSeen": 0.16,
-    "lastR15": 56.2,
+    "lastR15": 52.5,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.16% below 0.4% floor — not evaluated yet",
@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786114071822
+      "evaluatedAt": 1786114369609
     }
   },
   "BINANCE:ETHUSDT": {
@@ -64,7 +64,7 @@
     "histSample": 16,
     "caution": true,
     "highestPnLSeen": 0.03,
-    "lastR15": 51.1,
+    "lastR15": 46.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.03% below 0.4% floor — not evaluated yet",
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786114071822
+      "evaluatedAt": 1786114369609
     }
   },
   "BINANCE:GALAUSDT": {
@@ -102,7 +102,7 @@
     "histSample": 16,
     "caution": true,
     "highestPnLSeen": -0.22,
-    "lastR15": 37.5,
+    "lastR15": 28.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.22% below 0.4% floor — not evaluated yet",
@@ -110,7 +110,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786114071822
+      "evaluatedAt": 1786114369609
     }
   },
   "BINANCE:APTUSDT": {
@@ -129,9 +129,9 @@
     "t2": 0.6334,
     "score": 9,
     "spikeScore": 2.1982149667120514,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1786114369609,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -146,7 +146,10 @@
       "qty": 1694.98,
       "fillPrice": 0.5942250256640196,
       "buyOrderId": "C02__714389692149039104036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714424753275703296036",
+      "exitFillPrice": 0.5849622709412501,
+      "closedAt": 1786114371050
     },
     "entrySnapshot": {
       "at": 1786106011828,
@@ -174,18 +177,18 @@
       "marketRegime": "NEUTRAL"
     },
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 60 ≥ 50",
-      "fallingKnifeScore": 49,
-      "thesisDrop": 59,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 96 → current 28 (drop 68 > 60)",
+      "fallingKnifeScore": 37,
+      "thesisDrop": 68,
       "confidenceDecay": 44,
-      "exitProbability": 60,
-      "dynamicPositionRisk": 60,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1786114071822
+      "evaluatedAt": 1786114369609
     },
     "highestPnLSeen": -0.37,
     "lastR15": 38.8,
@@ -197,7 +200,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1786114071822
-    }
+    },
+    "exitPrice": 0.586,
+    "statusChangedAt": 1786114369609
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -215,9 +220,9 @@
     "t2": 544.44,
     "score": 9,
     "spikeScore": 2.21257321569394,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1786114369609,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -232,7 +237,10 @@
       "qty": 1.969268,
       "fillPrice": 510.55,
       "buyOrderId": "C02__714418489141436416036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714424761458827264036",
+      "exitFillPrice": 508.83942610462157,
+      "closedAt": 1786114373002
     },
     "entrySnapshot": {
       "at": 1786112877526,
@@ -258,6 +266,22 @@
       "btcRiskScore": 6,
       "breadthScore": 40,
       "marketRegime": "NEUTRAL"
-    }
+    },
+    "lastPI": {
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 95 → current 33 (drop 62 > 60)",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 62,
+      "confidenceDecay": 44,
+      "exitProbability": 54,
+      "dynamicPositionRisk": 54,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "evaluatedAt": 1786114369609
+    },
+    "exitPrice": 508.86,
+    "statusChangedAt": 1786114369609
   }
 }
