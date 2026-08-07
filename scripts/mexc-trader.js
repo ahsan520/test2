@@ -434,7 +434,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 // P&L on an adopted position is measured from the ADOPTION price, not the
 // real cost basis — the Telegram alert says so explicitly so it's never
 // mistaken for the real entry/PnL.
-export async function adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels }) {
+export async function adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels, marketState = {} }) {
   let changed = false;
   let balances = [];
   try {
@@ -512,6 +512,22 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
         qty: bal.free, fillPrice: entry.price, buyOrderId: `MANUAL_ADOPTED_${Date.now()}`,
         adopted: true,
       },
+      // Previously never set for adopted positions — meant Position
+      // Intelligence's evaluatePosition() unconditionally returned
+      // "no entry snapshot (pre-dates this feature)" for the ENTIRE
+      // lifetime of any manually-bought coin, not just its first
+      // SELL_MIN_POSITION_AGE_MIN minutes. Falling-knife detection,
+      // thesis invalidation, and confidence-decay based EXIT/
+      // EMERGENCY_EXIT/REDUCE_25/REDUCE_50 never ran at all — only the
+      // blunt price-based stop and profit-protection (which itself only
+      // engages once a peak profit is actually reached) were ever active.
+      // A manually-bought coin that declines steadily without ever
+      // going green rides all the way to the stop with no earlier
+      // pattern-based exit path available — same shape of data used for
+      // a normal bot-initiated buy is already sitting right here in
+      // `entry` + `marketState`, so there's no reason adoption should
+      // skip building it.
+      entrySnapshot: buildEntrySnapshot(entry, marketState),
     };
     logAudit('manual_position_adopted', { sym, base, qty: bal.free, entryPrice: entry.price, stop: levels.stop });
     changed = true;
@@ -526,7 +542,7 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
       `🔍 *MANUAL POSITION ADOPTED* — ${base}\n` +
       `  Found ${bal.free} ${base} on MEXC with no bot tracking — now under bot management.\n` +
       `  Adoption price $${entry.price}  Stop $${levels.stop}  T1 $${levels.t1}  T2 $${levels.t2}\n` +
-      `  🛡 Watched by the 15-min software stop check.\n` +
+      `  🛡 Watched by the 15-min software stop check, plus Position Intelligence (falling-knife / thesis / confidence) and Profit Protection once ${process.env.SELL_MIN_POSITION_AGE_MIN || '15'} min old.\n` +
       `  _P&L tracked from this adoption price, not your real buy price — the bot has no way to know your actual cost basis._`
     );
   }

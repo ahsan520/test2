@@ -328,7 +328,7 @@ async function main() {
   // newly-adopted symbol as already-tracked (no duplicate signal/buy).
   // ══════════════════════════════════════════════════════
   if (effectiveTradeMode === 'live') {
-    const adopted = await adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels });
+    const adopted = await adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels, marketState });
     positions = adopted.positions;
     if (adopted.changed) {
       savePositions(positions);
