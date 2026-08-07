@@ -28,7 +28,7 @@ import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeOpen, pushTradeLogToGitHub,
   loadPaperBalance, adjustPaperBalance,
-  shouldAlertMexcAuthFailure, clearMexcAuthFailure,
+  shouldAlertOnce, clearAlertCooldown,
 } from './job-state.js';
 
 // ── Post-fill level resync — anchors entryPrice/stop/t1/t2 to the price
@@ -242,13 +242,13 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
     let balances = [];
     try {
       balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
-      clearMexcAuthFailure('rotation_balances');
+      clearAlertCooldown('rotation_balances');
     } catch (e) {
       console.log(`  ⚠️  Rotation: couldn't fetch MEXC balances (${e.message}) — falling back to tracked positions only`);
-      if (shouldAlertMexcAuthFailure('rotation_balances')) {
+      if (shouldAlertOnce('rotation_balances')) {
         await sendTelegram(
           `🚨 *MEXC API ERROR — Rotation* \n  Couldn't fetch account balances: ${e.message}\n` +
-          `  _Rotation is falling back to tracked positions only (can't see manually-held/untracked coins) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60'} min._`
+          `  _Rotation is falling back to tracked positions only (can't see manually-held/untracked coins) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
         );
       }
     }
@@ -439,13 +439,13 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
   let balances = [];
   try {
     balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
-    clearMexcAuthFailure('adoption_balances');
+    clearAlertCooldown('adoption_balances');
   } catch (e) {
     console.log(`  ⚠️  Manual-holding adoption: couldn't fetch MEXC balances (${e.message})`);
-    if (shouldAlertMexcAuthFailure('adoption_balances')) {
+    if (shouldAlertOnce('adoption_balances')) {
       await sendTelegram(
         `🚨 *MEXC API ERROR — Manual Holding Adoption* \n  Couldn't fetch account balances: ${e.message}\n` +
-        `  _Any coins bought manually outside the bot won't be picked up for tracking until this resolves — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60'} min._`
+        `  _Any coins bought manually outside the bot won't be picked up for tracking until this resolves — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
       );
     }
     return { positions, changed };

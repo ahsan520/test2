@@ -20,7 +20,7 @@ import {
   logAudit, loadCvdState, saveCvdState, TERMINAL_EVICT_MS, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeClose, recordTradePartialExit, pushTradeLogToGitHub,
   TRADE_SIZE_MODE, adjustPaperBalance, priceDecimals,
-  shouldAlertMexcAuthFailure, clearMexcAuthFailure,
+  shouldAlertOnce, clearAlertCooldown,
 } from './job-state.js';
 import { calcConviction } from './leaderboard-scanner.js';
 import { evaluatePosition, positionIntelligenceEnabled } from './position-intelligence.js';
@@ -85,13 +85,13 @@ export async function reconcileTrackedLiveBalances(positions, effectiveTradeMode
   let balances = [];
   try {
     balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
-    clearMexcAuthFailure('reconcile_balances');
+    clearAlertCooldown('reconcile_balances');
   } catch (e) {
     console.log(`  ⚠️  Balance reconcile: couldn't fetch MEXC balances (${e.message}) — skipping this cycle`);
-    if (shouldAlertMexcAuthFailure('reconcile_balances')) {
+    if (shouldAlertOnce('reconcile_balances')) {
       telegramAlerts.push(
         `🚨 *MEXC API ERROR — Balance Reconcile* \n  Couldn't fetch account balances: ${e.message}\n` +
-        `  _Manual-sell detection is skipped this cycle (won't affect the price-based stop/T1/T2 checks, which use market price, not balance) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60'} min._`
+        `  _Manual-sell detection is skipped this cycle (won't affect the price-based stop/T1/T2 checks, which use market price, not balance) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
       );
     }
     return { changed: false, telegramAlerts };
@@ -188,8 +188,33 @@ export function countLiveOpenPositions(positions) {
 // Returns { closed, reason } so callers know whether the exchange position
 // was ACTUALLY closed before they mark the local position record terminal.
 // reason ∈ 'already_closed' | 'noncrypto' | 'paper' | 'sold' | 'zero_balance' | 'error'
-export async function closeLiveOrder(pos, reason, telegramAlerts) {
+export async function closeLiveOrder(pos, reason, telegramAlerts, effectiveTradeMode = 'live') {
   if (!pos.liveOrder || pos.liveOrder.closedAt) return { closed: false, reason: 'already_closed' };
+
+  // ── TRADE_MODE has moved off 'live' since this position was opened ──
+  // A position's liveOrder.mode is stamped once, at buy time, and never
+  // retroactively changes — correctly so, since it reflects a real coin
+  // balance that actually exists on the exchange. But TRADE_MODE switching
+  // to paper/off afterward is a deliberate signal to stop the BOT from
+  // acting with real money — it shouldn't keep placing real sell orders
+  // just because a stop/T1/T2/profit-protection condition fires. Leave the
+  // position completely untouched (no closedAt, still tracked) so a human
+  // can decide, or flip TRADE_MODE back to live to resume automatic exits.
+  // NOTE: this only applies to the periodic monitorPositions() checks —
+  // rotation and the BTC-panic emergency-close already only ever touch
+  // positions whose liveOrder.mode matches the CURRENT effectiveTradeMode
+  // (see their own filters), so they're unaffected by this.
+  if (pos.liveOrder.mode === 'live' && effectiveTradeMode !== 'live') {
+    if (shouldAlertOnce(`trade_mode_paused:${pos.base}`)) {
+      telegramAlerts.push(
+        `⏸️ *EXIT PAUSED — TRADE_MODE=${effectiveTradeMode}* — ${pos.base}\n` +
+        `  Exit condition hit (${reason}) but TRADE\\_MODE is no longer live — leaving your real ${pos.base} position open and unmanaged by the bot.\n` +
+        `  _Flip TRADE\\_MODE back to live to resume automatic exits, or close manually on MEXC. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
+      );
+    }
+    logAudit('mexc_sell_paused_trade_mode', { sym: pos.base + 'USDT', reason, effectiveTradeMode });
+    return { closed: false, reason: 'trade_mode_paused' };
+  }
 
   // MEXC is crypto-only — never attempt an exchange call for stocks/ETFs.
   // This shouldn't happen (buy-side already filters assetType === 'crypto')
@@ -372,11 +397,25 @@ export async function closeLiveOrder(pos, reason, telegramAlerts) {
 // to fall through to a normal closeLiveOrder() full close instead — a
 // partial that would leave an unsellable dust remainder open forever isn't
 // actually safer than just closing the whole thing.
-export async function closeLiveOrderPartial(pos, pct, reason, currentPrice, telegramAlerts) {
+export async function closeLiveOrderPartial(pos, pct, reason, currentPrice, telegramAlerts, effectiveTradeMode = 'live') {
   if (!pos.liveOrder || pos.liveOrder.closedAt) return { executed: false, reason: 'already_closed' };
   if (pos.assetType && pos.assetType !== 'crypto') {
     logAudit('mexc_partial_sell_skipped_noncrypto', { base: pos.base, assetType: pos.assetType, reason });
     return { executed: false, reason: 'noncrypto' };
+  }
+
+  // Same TRADE_MODE-paused guard as closeLiveOrder() above — see its
+  // comment for the full reasoning.
+  if (pos.liveOrder.mode === 'live' && effectiveTradeMode !== 'live') {
+    if (shouldAlertOnce(`trade_mode_paused:${pos.base}`)) {
+      telegramAlerts.push(
+        `⏸️ *EXIT PAUSED — TRADE_MODE=${effectiveTradeMode}* — ${pos.base}\n` +
+        `  Partial-exit condition hit (${reason}) but TRADE\\_MODE is no longer live — leaving your real ${pos.base} position open and unmanaged by the bot.\n` +
+        `  _Flip TRADE\\_MODE back to live to resume automatic exits, or manage manually on MEXC. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
+      );
+    }
+    logAudit('mexc_partial_sell_paused_trade_mode', { sym: pos.base + 'USDT', reason, effectiveTradeMode });
+    return { executed: false, reason: 'trade_mode_paused' };
   }
 
   // Paper: reduce tracked qty locally, credit partial proceeds, record a
@@ -460,6 +499,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
   const {
     LB_MIN_SCORE    = parseInt(process.env.LB_MIN_SCORE    || '9'),
     LB_BULL_CONF_MIN= parseInt(process.env.LB_BULL_CONF_MIN|| '5'),
+    effectiveTradeMode = 'live',
   } = cfg;
   const now           = Date.now();
   const staleMs       = LB_STALE_WATCH_HRS * 60 * 60 * 1000;
@@ -571,7 +611,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     if (isBull && stop > 0 && price <= stop) {
       console.log(`  🔴  STOP HIT — ${pos.base} price:${price} stop:${stop}`);
       pos.exitPrice = price; // tentative fill price, used by closeLiveOrder's paper branch
-      const closeResult  = await closeLiveOrder(pos, 'stop hit', telegramAlerts);
+      const closeResult  = await closeLiveOrder(pos, 'stop hit', telegramAlerts, effectiveTradeMode);
       const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
       if (isLiveCrypto && !closeResult.closed) {
         // Exchange sell didn't actually happen (zero balance / API error) —
@@ -610,7 +650,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     if (isBull && t2 > 0 && price >= t2 && pos.status === 'tp1_hit') {
       console.log(`  🏆  T2 HIT (legacy) — ${pos.base} price:${price} t2:${t2}`);
       pos.exitPrice = price;
-      const closeResult  = await closeLiveOrder(pos, 'T2 hit', telegramAlerts);
+      const closeResult  = await closeLiveOrder(pos, 'T2 hit', telegramAlerts, effectiveTradeMode);
       const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
       if (isLiveCrypto && !closeResult.closed) {
         delete pos.exitPrice;
@@ -668,7 +708,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       // Signal faded — sell now, take profit at T1
       console.log(`  ✅  T1 HIT — ${pos.base} price:${price} conv:${liveConv}(need ${LB_MIN_SCORE}) bullConf:${liveBullConf}(need ${LB_BULL_CONF_MIN})${isCrypto ? ' — selling (signal faded)' : ' — close manually'}`);
       pos.exitPrice = price;
-      const closeResult  = await closeLiveOrder(pos, 'T1 hit (signal faded)', telegramAlerts);
+      const closeResult  = await closeLiveOrder(pos, 'T1 hit (signal faded)', telegramAlerts, effectiveTradeMode);
       const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
       if (isLiveCrypto && !closeResult.closed) {
         delete pos.exitPrice;
@@ -741,7 +781,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
 
         if (pi.action === 'EXIT' || pi.action === 'EMERGENCY_EXIT') {
           pos.exitPrice = price;
-          const closeResult  = await closeLiveOrder(pos, `position intelligence: ${pi.reason}`, telegramAlerts);
+          const closeResult  = await closeLiveOrder(pos, `position intelligence: ${pi.reason}`, telegramAlerts, effectiveTradeMode);
           const isLiveCrypto = pos.liveOrder?.mode === 'live';
           if (isLiveCrypto && !closeResult.closed) {
             delete pos.exitPrice;
@@ -778,7 +818,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
 
         if (isCrypto && AUTO_PARTIAL_EXIT && !alreadyAtLevel) {
           const pct = pi.action === 'REDUCE_25' ? 0.25 : 0.5;
-          const partial = await closeLiveOrderPartial(pos, pct, `position intelligence: ${pi.reason}`, price, telegramAlerts);
+          const partial = await closeLiveOrderPartial(pos, pct, `position intelligence: ${pi.reason}`, price, telegramAlerts, effectiveTradeMode);
 
           if (partial.executed) {
             pos.piPartialLevel = levelNum;
@@ -788,7 +828,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
             // Remainder after the partial would be unsellable dust — do a
             // full close instead, same path as a normal EXIT.
             pos.exitPrice = price;
-            const closeResult = await closeLiveOrder(pos, `position intelligence: ${pi.reason} (partial would leave dust — full close instead)`, telegramAlerts);
+            const closeResult = await closeLiveOrder(pos, `position intelligence: ${pi.reason} (partial would leave dust — full close instead)`, telegramAlerts, effectiveTradeMode);
             if (!closeResult.closed) { delete pos.exitPrice; continue; }
             pos.status = 'exiting'; pos.statusChangedAt = now; pos.exitAlertedAt = now; changed = true;
             closedOutcomes.push({
@@ -853,7 +893,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       if (pp.action === 'EXIT') {
         console.log(`  💰  ${pos.base} — Profit Protection Triggered (${pp.reason})`);
         pos.exitPrice = price;
-        const closeResult  = await closeLiveOrder(pos, 'Profit Protection Triggered', telegramAlerts);
+        const closeResult  = await closeLiveOrder(pos, 'Profit Protection Triggered', telegramAlerts, effectiveTradeMode);
         const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
         if (isLiveCrypto && !closeResult.closed) {
           delete pos.exitPrice;
@@ -939,7 +979,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
 
       console.log(`  🟡  ${pos.base} — EXIT SIGNAL score:${exitScore}/6 [${signals}] — selling`);
       pos.exitPrice = price;
-      const closeResult  = await closeLiveOrder(pos, 'momentum exit', telegramAlerts);
+      const closeResult  = await closeLiveOrder(pos, 'momentum exit', telegramAlerts, effectiveTradeMode);
       const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
       if (isLiveCrypto && !closeResult.closed) {
         delete pos.exitPrice;

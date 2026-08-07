@@ -134,37 +134,36 @@ export function adjustPaperBalance(delta) {
   return state.balance;
 }
 
-// ── MEXC balance-fetch failure alerting ──────────────────────────────────
-// mexc-trader.js's rotation and manual-holding-adoption balance checks
-// previously only console.log'd on failure (e.g. an expired/invalid API
-// key) — no Telegram alert at all, unlike the buy/sell paths which do
-// alert. That meant an expired key could go completely unnoticed for as
-// long as no buy/sell happened to be attempted in the same cycle — no
-// different from the earlier stale-run situation where a real problem
-// only surfaced by chance.
+// ── Generic repeat-alert cooldown ─────────────────────────────────────────
+// Originally built for MEXC balance-fetch failures (an expired/invalid API
+// key silently degrading rotation/adoption with only a console.log — no
+// Telegram alert at all, unlike the buy/sell paths). Kept generic so it can
+// be reused for anything else that would otherwise re-alert every single
+// 5-10 min cycle while a condition persists (e.g. "exit signal hit but
+// TRADE_MODE isn't live" below) — one immediate alert, then a periodic
+// reminder rather than a flood.
 //
-// shouldAlertMexcAuthFailure(source) decides whether THIS occurrence
-// should actually send a Telegram alert:
-//   - Always true the first time a given `source` starts failing.
-//   - Then suppressed (returns false) for REPEAT_ALERT_MIN while it keeps
-//     failing, so an expired key doesn't spam a message every 5-10 min —
-//     one immediate alert, then a periodic reminder rather than a flood.
-//   - Automatically resets once the call succeeds again (call
-//     clearMexcAuthFailure(source)), so recovery needs no manual cleanup
-//     and a NEW failure later starts a fresh "alert immediately" cycle.
-const MEXC_AUTH_REPEAT_ALERT_MIN = parseFloat(process.env.MEXC_AUTH_REPEAT_ALERT_MIN || '60');
-export function shouldAlertMexcAuthFailure(source) {
+// shouldAlertOnce(source) decides whether THIS occurrence should actually
+// send a Telegram alert:
+//   - Always true the first time a given `source` starts firing.
+//   - Then suppressed (returns false) for ALERT_COOLDOWN_MIN while it keeps
+//     firing.
+//   - Automatically resets once the underlying condition clears (call
+//     clearAlertCooldown(source)), so recovery needs no manual cleanup and
+//     a NEW occurrence later starts a fresh "alert immediately" cycle.
+const ALERT_COOLDOWN_MIN = parseFloat(process.env.ALERT_COOLDOWN_MIN || '60');
+export function shouldAlertOnce(source) {
   const state = loadJSON(MEXC_AUTH_ALERT_PATH, {});
   const now = Date.now();
   const last = state[source];
-  const shouldAlert = !last || (now - last) / 60000 >= MEXC_AUTH_REPEAT_ALERT_MIN;
+  const shouldAlert = !last || (now - last) / 60000 >= ALERT_COOLDOWN_MIN;
   if (shouldAlert) {
     state[source] = now;
     saveJSON(MEXC_AUTH_ALERT_PATH, state);
   }
   return shouldAlert;
 }
-export function clearMexcAuthFailure(source) {
+export function clearAlertCooldown(source) {
   const state = loadJSON(MEXC_AUTH_ALERT_PATH, {});
   if (state[source]) {
     delete state[source];
