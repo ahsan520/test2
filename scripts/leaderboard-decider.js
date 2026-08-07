@@ -1,5 +1,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// leaderboard-decider.js — Job B (runs every 15 min)
+// leaderboard-decider.js — Job B (runs every ~5 min via Cloudflare Worker
+// dispatch, 2 min after each fetch — no native GitHub cron fallback)
 // v11.0 — split build
 //
 // This file is the ORCHESTRATOR: it loads state, runs the buy-signal scan and
@@ -44,6 +45,14 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 const LB_MIN_SCORE       = parseInt(process.env.LB_MIN_SCORE       || '9');
 const LB_BULL_CONF_MIN   = parseInt(process.env.LB_BULL_CONF_MIN   || '5');
 const LB_COOLDOWN_MIN    = parseInt(process.env.LB_COOLDOWN_MIN    || '60');
+// Expected decide cadence in minutes — feeds the heartbeat staleness check
+// below AND the log/Telegram copy that reports it. Keep this in sync with
+// whatever wrangler.toml's [triggers] cron actually fires at (that part
+// can't be env-driven — it's a Cloudflare platform config, always needs a
+// `wrangler deploy` to change). This variable just means the REST of the
+// pipeline (staleness detection, alert copy) follows along automatically
+// once you set it, instead of needing a matching code edit every time.
+const LB_DECIDE_INTERVAL_MIN = parseFloat(process.env.LB_DECIDE_INTERVAL_MIN || '5');
 const LB_HOLD_LOCK       = parseInt(process.env.LB_HOLD_LOCK       || '20');
 const ALLOW_PRE_MARKET   = (process.env.LB_ALLOW_PRE_MARKET || 'false') === 'true';
 const ALLOW_AH           = (process.env.LB_ALLOW_AH         || 'false') === 'true';
@@ -61,6 +70,16 @@ const RECO_TOP_N         = parseInt(process.env.LB_RECO_TOP_N          || '3'); 
 const RECO_LOOKBACK_DAYS = parseFloat(process.env.LB_RECO_LOOKBACK_DAYS|| '30');  // history window used for win-rate
 const HISTORY_RETENTION_DAYS = parseFloat(process.env.LB_HISTORY_RETENTION_DAYS || '45'); // how long symbol-history.json keeps rows
 const HISTORY_MAX_ROWS    = parseInt(process.env.LB_HISTORY_MAX_ROWS || '1500'); // hard cap regardless of days — safety net vs. size blowup
+
+// Overextension gate — SQUEEZE NOW/BREAKOUT fire off shock+chg, which means
+// price just moved, but "just moved" often means "already peaked". r15
+// overbought currently only costs -1 inside calcConviction() — not enough to
+// outvote the +6-8 the shock/momentum signals award for the same candle.
+// This makes it a hard block instead of a diluted vote. At the current
+// ~5-min decide cadence this reads r15 no more than ~2 min stale (see
+// heartbeat comment below), so the check is closer to real-time than it
+// was under the old 15/17-min cadence.
+const BUY_MAX_R15_OVEREXTENDED = parseFloat(process.env.BUY_MAX_R15_OVEREXTENDED || '72');
 
 // ── Cooldown helpers ──
 function isOnCooldown(state, cdKey, assetType) {
@@ -171,20 +190,21 @@ async function main() {
   });
 
   // ── Heartbeat staleness check ──
-  // The schedule expects this job every ~17 min (alerts.yml: minutes
-  // 2,19,36,53). GitHub Actions can silently delay or skip scheduled runs
-  // with no notification — this is how the bot notices a gap itself rather
-  // than someone finding out retroactively. Threshold is 2.5x the expected
-  // interval so normal jitter (a run taking a bit longer, GitHub's usual
-  // few-minutes cron slop) doesn't false-alarm.
-  const heartbeat = checkHeartbeatStale(17, 2.5);
+  // Driven entirely by a Cloudflare Worker now — no native GitHub cron
+  // fallback. The Worker fires fetch every LB_DECIDE_INTERVAL_MIN min and
+  // decide 2 min after each fetch. Cloudflare Workers and GitHub Actions
+  // dispatch can both silently delay or skip a firing with no notification
+  // — this is how the bot notices a gap itself rather than someone finding
+  // out retroactively. Threshold is 2.5x the expected interval so normal
+  // jitter (a run taking a bit longer, network hiccups) doesn't false-alarm.
+  const heartbeat = checkHeartbeatStale(LB_DECIDE_INTERVAL_MIN, 2.5);
   if (heartbeat.stale) {
-    console.log(`  ⚠️  STALE RUN — last successful run was ${heartbeat.gapMinutes} min ago (expected ~17min)`);
+    console.log(`  ⚠️  STALE RUN — last successful run was ${heartbeat.gapMinutes} min ago (expected ~${LB_DECIDE_INTERVAL_MIN}min)`);
     logAudit('heartbeat_stale', { gapMinutes: heartbeat.gapMinutes, lastRunAt: heartbeat.lastRunAt });
     await sendTelegram(
       `⚠️ *STALE RUN DETECTED*\n` +
-      `  Last successful run was ${heartbeat.gapMinutes.toFixed(0)} minutes ago (expected ~every 17 min).\n` +
-      `  _Check GitHub Actions run history for failed/skipped scheduled runs — positions.json and reconciliation may be out of date until this resolves._`
+      `  Last successful run was ${heartbeat.gapMinutes.toFixed(0)} minutes ago (expected ~every ${LB_DECIDE_INTERVAL_MIN} min).\n` +
+      `  _Check the Cloudflare Worker's dispatch logs (no native GitHub cron fallback anymore) — positions.json and reconciliation may be out of date until this resolves._`
     );
   }
 
@@ -487,6 +507,16 @@ async function main() {
     const evald = evaluateSymbol(entry);
     if (evald.conv < LB_MIN_SCORE)          continue;
     if (SKIP_SETUPS.has(evald.setup.label)) continue;
+
+    // Overextension gate — hard reject on stale/already-topped momentum.
+    // See BUY_MAX_R15_OVEREXTENDED comment above for rationale. Uses the
+    // CURRENT r15 (entry.d.r15), not a peak-sourced value, since the point
+    // is to catch where price/RSI actually sit right now — the same value
+    // calcEntryLevels() will build the market-order entry off of.
+    if (entry.assetType === 'crypto' && (entry.d?.r15 ?? 50) > BUY_MAX_R15_OVEREXTENDED) {
+      console.log(`  🔺  ${pair} — 15m RSI overextended (${entry.d.r15.toFixed(0)} > ${BUY_MAX_R15_OVEREXTENDED}) — likely already topped, skipping`);
+      continue;
+    }
 
     // 4H trend persistence gate — applies to EVERY buy candidate,
     // independent of BTC regime state. bull4hCount is maintained by
@@ -799,7 +829,7 @@ async function main() {
     `🔔 *Leaderboard BUY Alert* — ${utc}`,
     recoHeader,
     '', lines.join('\n\n'), '',
-    `_Stop/T1/T2/exit monitored headlessly every 15 min_`,
+    `_Stop/T1/T2/exit monitored headlessly every ${LB_DECIDE_INTERVAL_MIN} min_`,
   ].join('\n');
 
   await sendTelegram(msg);

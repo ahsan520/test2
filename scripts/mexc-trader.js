@@ -542,7 +542,7 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
       `🔍 *MANUAL POSITION ADOPTED* — ${base}\n` +
       `  Found ${bal.free} ${base} on MEXC with no bot tracking — now under bot management.\n` +
       `  Adoption price $${entry.price}  Stop $${levels.stop}  T1 $${levels.t1}  T2 $${levels.t2}\n` +
-      `  🛡 Watched by the 15-min software stop check, plus Position Intelligence (falling-knife / thesis / confidence) and Profit Protection once ${process.env.SELL_MIN_POSITION_AGE_MIN || '15'} min old.\n` +
+      `  🛡 Watched by the 5-min software stop check, plus Position Intelligence (falling-knife / thesis / confidence) and Profit Protection once ${process.env.SELL_MIN_POSITION_AGE_MIN || '15'} min old.\n` +
       `  _P&L tracked from this adoption price, not your real buy price — the bot has no way to know your actual cost basis._`
     );
   }
@@ -581,7 +581,7 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
 // API (confirmed against MEXC's own API docs). The previous STOP_LOSS_LIMIT
 // attempt here was Binance-endpoint naming that MEXC has never supported, so
 // it failed on every single live buy (HTTP 400 "invalid type"). Removed —
-// the 15-min software stop check in position-monitor.js is the only stop
+// the 5-min software stop check in position-monitor.js is the only stop
 // mechanism MEXC's API allows, and is now PRIMARY, not a fallback.
 
 async function executeAutoBuys({
@@ -770,7 +770,7 @@ async function executeAutoBuys({
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated — MEXC did not report a fill qty)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
           `  Size: $${perPickUsd} USDT  Order ID: \`${buy.orderId}\`\n` +
           (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length} split ($${effectiveUsdSize} ÷ ${picks.length})\n` : '') +
-          `  🛡 Watched by the 15-min software stop check.\n` +
+          `  🛡 Watched by the 5-min software stop check.\n` +
           `  Stop/T2 exits will close this position automatically.\n` +
           (buy.estimated ? `  ⚠️ _MEXC didn't confirm a fill quantity yet — verify the actual holding on MEXC matches before trusting auto-sells._\n` : '') +
           `  _Send /pause to halt further auto-buys_`

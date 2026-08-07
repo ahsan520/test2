@@ -23,7 +23,7 @@ export async function sendTelegram(msg) {
 // Only gates NEW buy execution. Existing live positions' stop/T2 sells keep
 // firing regardless of pause state — pausing is meant to stop taking on new
 // risk, not to strand an already-open position without its safety net.
-// Latency note: this is only checked once per Job B cycle (every ~15 min),
+// Latency note: this is only checked once per Job B cycle (every ~5 min),
 // same as everything else headless — not an instant kill switch.
 export async function pollTelegramCommands(state) {
   if (!TG_TOKEN || !TG_CHAT) return state;

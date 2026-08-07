@@ -494,10 +494,13 @@ export async function pushPositionsToGitHub(positions) {
 // persists across GitHub Actions runs, which otherwise have no memory of
 // their own between invocations.
 //
-// Purpose: the schedule expects this job to run roughly every ~17 minutes
-// (see alerts.yml). GitHub Actions scheduled (cron) workflows can silently
-// get delayed or skipped during high load, or if the workflow is paused —
-// there's no notification for that on GitHub's side. Checking "how long
+// Purpose: the decide job is now driven entirely by a Cloudflare Worker —
+// no native GitHub cron fallback — firing fetch every 5 min and decide 2
+// min after each fetch, so decide's own cadence is effectively every 5
+// min too. (Previously this was ~17 min under native cron with the Worker
+// as a safety net; that native path is now fully disabled.) Cloudflare
+// Workers and cron triggers can both silently stall or get skipped —
+// there's no notification for that on either side. Checking "how long
 // since the last successful run" at the START of every run is how the bot
 // notices a gap itself, rather than someone discovering it retroactively by
 // noticing stale prices or a position that should've rotated but didn't.
@@ -565,7 +568,7 @@ export async function pushHeartbeatToGitHub(lastRunAt) {
 // this run's own heartbeat gets written, so it reflects the gap since the
 // PREVIOUS successful completion. lastRunAt === 0 (first run ever, or file
 // missing) is never reported as stale — nothing to compare against yet.
-export function checkHeartbeatStale(expectedIntervalMin = 17, thresholdMultiplier = 2.5) {
+export function checkHeartbeatStale(expectedIntervalMin = 5, thresholdMultiplier = 2.5) {
   const { lastRunAt } = loadHeartbeat();
   if (!lastRunAt) return { stale: false, gapMinutes: 0, lastRunAt: 0 };
   const gapMinutes = (Date.now() - lastRunAt) / 60000;
