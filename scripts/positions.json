@@ -24,7 +24,18 @@
     "rankScore": 0.35,
     "histWinRate": 0,
     "histSample": 9,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": -0.16,
+    "lastR15": 69.9,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.16% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.16,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1786106004855
+    }
   },
   "BINANCE:ETHUSDT": {
     "sym": "BINANCE:ETHUSDT",
@@ -51,7 +62,18 @@
     "rankScore": 0.45,
     "histWinRate": 0,
     "histSample": 16,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": -0.28,
+    "lastR15": 69.3,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.28% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.28,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1786106004855
+    }
   },
   "BINANCE:GALAUSDT": {
     "sym": "BINANCE:GALAUSDT",
@@ -78,7 +100,18 @@
     "rankScore": 0.45,
     "histWinRate": 0,
     "histSample": 16,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": -0.67,
+    "lastR15": 28.5,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.67% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.67,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1786106004855
+    }
   },
   "BINANCE:LINKUSDT": {
     "sym": "BINANCE:LINKUSDT",
@@ -91,7 +124,7 @@
     "alertedAt": 1786104797582,
     "holdLockUntil": 1786105997582,
     "entryPrice": 8.27176353299827,
-    "stop": 8.1477,
+    "stop": 8.148,
     "t1": 8.6248,
     "t2": 8.9778,
     "score": 10,
@@ -139,6 +172,31 @@
       "btcRiskScore": 6,
       "breadthScore": 55,
       "marketRegime": "RISK_ON"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 8 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 15,
+      "confidenceDecay": 13,
+      "exitProbability": 8,
+      "dynamicPositionRisk": 8,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "evaluatedAt": 1786106004855
+    },
+    "highestPnLSeen": -0.29,
+    "lastR15": 58.1,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.29% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.29,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1786106004855
     }
   },
   "BINANCE:ZECUSDT": {
@@ -157,9 +215,9 @@
     "t2": 556.31,
     "score": 10,
     "spikeScore": 2.818068863976017,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1786106004855,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -174,7 +232,10 @@
       "qty": 1.957249,
       "fillPrice": 512.9443977388671,
       "buyOrderId": "C02__714384608581328896036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714389668828717057036",
+      "exitFillPrice": 510.25999999999993,
+      "closedAt": 1786106006519
     },
     "entrySnapshot": {
       "at": 1786104799814,
@@ -200,6 +261,22 @@
       "btcRiskScore": 6,
       "breadthScore": 55,
       "marketRegime": "RISK_ON"
-    }
+    },
+    "lastPI": {
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 100 → current 30 (drop 70 > 60)",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 70,
+      "confidenceDecay": 44,
+      "exitProbability": 49,
+      "dynamicPositionRisk": 49,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "evaluatedAt": 1786106004855
+    },
+    "exitPrice": 510.79,
+    "statusChangedAt": 1786106004855
   }
 }
