@@ -13,6 +13,7 @@ import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry.js';
+import { evaluateBuyReadiness } from './buy-intelligence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -436,7 +437,15 @@ export function calcConviction(d) {
   else if (obi < -20) score -= 2; else if (obi < -5) score -= 1;
   if (cvdUp) score += 2; else score -= 1;
   if (r15 < 30 && r4h < 35) score += 1;
-  if (r15 > 70 && r4h > 65) score -= 1;
+  // Independent per-timeframe extension penalty — the old version
+  // (`r15 > 70 && r4h > 65`) required BOTH timeframes hot simultaneously,
+  // so a symbol extended on the entry timeframe alone (e.g. r15=72,
+  // r4h=55) took zero penalty. See buy-intelligence.js's
+  // calcEntryExtension for the fuller independent per-timeframe version
+  // applied on top of this in scoreSymbol — this stays as calcConviction's
+  // own baseline so the function is still meaningful used standalone.
+  if (r15 > 70) score -= 1;
+  if (r4h > 65) score -= 1;
   if (ema === 'ABOVE') score += 1; else if (ema === 'BELOW') score -= 1;
   if (fr <= -0.03) score += 2; else if (fr <= -0.01) score += 1;
   else if (fr >= 0.05) score -= 2; else if (fr >= 0.025) score -= 1;
@@ -505,7 +514,7 @@ export function calcFlow(d, whaleScore) {
   return 'Mixed Flow';
 }
 
-export function calcGrade(bullConf, whaleScore, btcMult = 1) {
+export function calcGrade(bullConf, whaleScore, btcMult = 1, buyIntelPenalty = 0) {
   const stabilityProxy = Math.round(bullConf * 9 + 10);
   let gradeScore = bullConf * 10 + (whaleScore - 50) * 0.3 + (stabilityProxy - 50) * 0.2;
   // ── Market-wide BTC gate ──────────────────────────────────────────────
@@ -520,6 +529,16 @@ export function calcGrade(bullConf, whaleScore, btcMult = 1) {
   // BTC rather than short-term (15-30m) noise that typically converges
   // back to BTC's direction anyway.
   gradeScore *= btcMult;
+  // ── Buy Intelligence penalty (buy-intelligence.js) ──────────────────
+  // bullConf's own rsiNotOb check is a single lightly-weighted point out
+  // of 10 and has no candle-chasing signal at all — so a symbol flagged
+  // as "3 straight green candles, already extended" could still carry a
+  // clean B/A grade and pass EXEC_MIN_GRADE with no visibility into the
+  // exact thing buy-intelligence was built to catch. This applies the
+  // same penalty already subtracted from conv here too, so Grade/win%
+  // (and therefore EXEC_MIN_GRADE-based execution filtering) actually
+  // reflects a chasing/extended entry instead of being blind to it.
+  gradeScore -= buyIntelPenalty * 8;
   let grade;
   if      (gradeScore >= 85) grade = 'A+';
   else if (gradeScore >= 70) grade = 'A';
@@ -527,7 +546,7 @@ export function calcGrade(bullConf, whaleScore, btcMult = 1) {
   else if (gradeScore >= 30) grade = 'C';
   else                       grade = 'D';
   const successProb = Math.max(20, Math.min(92, Math.round(
-    (bullConf * 6 + (whaleScore - 50) * 0.25 + (stabilityProxy - 50) * 0.1 + 30) * btcMult
+    (bullConf * 6 + (whaleScore - 50) * 0.25 + (stabilityProxy - 50) * 0.1 + 30) * btcMult - buyIntelPenalty * 5
   )));
   return { grade, successProb, stabilityProxy };
 }
@@ -642,12 +661,23 @@ export async function scoreSymbol(pair, prevFr = null) {
     const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, obi, fr, oiDiv };
     d.conv = calcConviction(d);
 
+    // ── Buy Intelligence — entry-timing check (buy-intelligence.js) ──
+    // Independent of calcConviction's own scoring above; catches
+    // already-extended/already-chased entries that a broken thesis check
+    // (Position Intelligence) would otherwise only catch AFTER the buy,
+    // 30-90 min later at a small loss. Penalty subtracts from conv so it
+    // can push a marginal symbol below LB_MIN_SCORE without needing a
+    // separate hard gate.
+    const buyIntel = evaluateBuyReadiness({ r15, r1h, k15 });
+    if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
+    d.buyIntel = buyIntel;
+
     const setup     = getSetupMode(d);
     const whale     = calcWhaleScore(d);
     const capBuy    = calcCapBuy({ ...d, conv: d.conv });
     const bullConf  = calcBullConf(d, whale.score);
     const flow      = calcFlow(d, whale.score);
-    const gradeInfo = calcGrade(bullConf.count, whale.score);
+    const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
     const archetype = calcSetupArchetype(d, whale.score);
     const finalSetup = capBuy.isCapBuy ? { label: 'CAP BUY', emoji: '💥' } : setup;
 
