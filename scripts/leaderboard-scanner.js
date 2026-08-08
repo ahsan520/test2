@@ -285,10 +285,23 @@ function calcEMA(closes, period) {
   return ema;
 }
 
+// Proxy CVD (no real trade-level buy/sell volume feed — see note in
+// market-intelligence.js's calcOiMomentum for the same class of tradeoff).
+// Previously just a majority vote over the last 6 15m candles (4+ red =
+// 'down', otherwise 'up') — a 4-red/2-green count and a 6-red/0-green count
+// scored identically in calcConviction, same "binary flag with no
+// magnitude" problem calcOiMomentum had before the rawSlope fix. Now also
+// returns strength: the summed % net body move across those 6 candles, so
+// calcConviction can scale its reward/penalty instead of treating every
+// 'up'/'down' read as equally strong.
 function calcCVD(k15m) {
-  if (!k15m || k15m.length < 6) return 'up';
-  const bearCount = k15m.slice(-6).filter(c => parseFloat(c[4]) < parseFloat(c[1])).length;
-  return bearCount >= 4 ? 'down' : 'up';
+  if (!k15m || k15m.length < 6) return { trend: 'up', strength: 0 };
+  const last6 = k15m.slice(-6);
+  const netBias = last6.reduce((sum, c) => {
+    const open = parseFloat(c[1]), close = parseFloat(c[4]);
+    return sum + (open > 0 ? (close - open) / open : 0);
+  }, 0) * 100; // signed sum of %-returns across 6 candles, in percentage points
+  return { trend: netBias >= 0 ? 'up' : 'down', strength: parseFloat(Math.abs(netBias).toFixed(3)) };
 }
 
 function calcOBI(depth) {
@@ -423,6 +436,7 @@ export function calcConviction(d) {
   const shock   = d.shock    || 1;
   const obi     = d.obi      || 0;
   const cvdUp   = d.cvdTrend === 'up';
+  const cvdStrength = d.cvdStrength ?? 0; // % net body move across last 6 15m candles — 0 if unavailable (falls back to old flat scoring)
   const r15     = d.r15      || 50;
   const r4h     = d.r4h      || 50;
   const fr      = d.fr       || 0;
@@ -435,8 +449,24 @@ export function calcConviction(d) {
   if (shock > 1.6) score += 1;
   if (obi > 20) score += 2; else if (obi > 5) score += 1;
   else if (obi < -20) score -= 2; else if (obi < -5) score -= 1;
-  if (cvdUp) score += 2; else score -= 1;
-  if (r15 < 30 && r4h < 35) score += 1;
+  // Magnitude-scaled, not a flat +2/-1 flag — same fix already applied to
+  // oiMomentum's rawSlope/frTrendLabel (calcOiMomentum used to blow up on
+  // a near-zero mean; this one just had zero magnitude awareness at all,
+  // so a 4-red/2-green candle count scored identically to 6-red/0-green).
+  // cvdStrength is the summed %-move across the last 6 15m candles.
+  // Scaled to roughly the old range (was flat +2/-1) but now 0.1%
+  // strength gets barely more than the base, while a strong 1%+ net move
+  // gets close to double the old flat reward.
+  const cvdScore   = Math.min(3, 1 + cvdStrength * 0.4);   // reward when up
+  const cvdPenalty = Math.min(2, 0.5 + cvdStrength * 0.3); // penalty when down — capped lower than the reward (this is a bull-only system, so a down CVD read matters less than a strong up one)
+  if (cvdUp) score += cvdScore; else score -= cvdPenalty;
+  // Independent per-timeframe dip-buy reward — the old version required
+  // BOTH r15<30 AND r4h<35 simultaneously, the same all-or-nothing gating
+  // already fixed on the extension-penalty side below (r15>70 / r4h>65
+  // used to be AND-gated too, now independent). Keeping the reward side
+  // AND-gated while the penalty side was loosened was inconsistent.
+  if (r15 < 30) score += 1;
+  if (r4h < 35) score += 1;
   // Independent per-timeframe extension penalty — the old version
   // (`r15 > 70 && r4h > 65`) required BOTH timeframes hot simultaneously,
   // so a symbol extended on the entry timeframe alone (e.g. r15=72,
@@ -629,7 +659,8 @@ export async function scoreSymbol(pair, prevFr = null) {
 
     const bias4h   = calc4hBias(k4);
     const biasDay  = calcDailyBias(kD);
-    const cvdTrend = calcCVD(k15);
+    const cvdCalc  = calcCVD(k15);
+    const cvdTrend = cvdCalc.trend;      // unchanged string, existing consumers (bullConf.cvdRising etc.) untouched
     const obi      = calcOBI(dep);
     // fapi.binance.com (Binance's own funding-rate endpoint) is confirmed
     // geo-blocked (451) on GitHub runners as of 2026-07-23, with no public
@@ -658,7 +689,7 @@ export async function scoreSymbol(pair, prevFr = null) {
     else if (fr <= 0 && chg > 0.5)  oiDiv = 'CONFIRM';
     else if (fr > 0.05 && chg < 0)  oiDiv = 'OI DROP';
 
-    const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, obi, fr, oiDiv };
+    const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, cvdStrength: cvdCalc.strength, obi, fr, oiDiv };
     d.conv = calcConviction(d);
 
     const setup     = getSetupMode(d);
