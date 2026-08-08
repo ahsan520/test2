@@ -234,6 +234,22 @@ jobs:
           BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '70' }}
           BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '78' }}
           BUY_RSI_1H_HOT:                  ${{ vars.BUY_RSI_1H_HOT || '68' }}
+          # Signal-quality/data-confidence floor — catches thin, low-conf
+          # setups (e.g. IMX: bullConf 1/10, whale 35/100, still BUILDING)
+          # that aren't chasing or RSI-extended, just genuinely weak.
+          BUY_ENABLE_QUALITY_FLOOR:        ${{ vars.BUY_ENABLE_QUALITY_FLOOR || 'true' }}
+          BUY_QUALITY_MIN_BULLCONF:        ${{ vars.BUY_QUALITY_MIN_BULLCONF || '3' }}
+          BUY_QUALITY_MIN_WHALE:           ${{ vars.BUY_QUALITY_MIN_WHALE || '40' }}
+          # Bad-history buy gate (leaderboard-decider.js) — a symbol with a
+          # long consistent losing streak (e.g. AVAX bought twice in one
+          # day, both thesis-invalidated within 90 min) is a strong signal;
+          # this makes histWinRate/histSample actually affect the buy
+          # decision instead of being Telegram-alert-only.
+          BUY_HIST_GATE_HARD_MIN_SAMPLE:   ${{ vars.BUY_HIST_GATE_HARD_MIN_SAMPLE || '10' }}
+          BUY_HIST_GATE_HARD_MAX_WINRATE:  ${{ vars.BUY_HIST_GATE_HARD_MAX_WINRATE || '0.10' }}
+          BUY_HIST_GATE_SOFT_MIN_SAMPLE:   ${{ vars.BUY_HIST_GATE_SOFT_MIN_SAMPLE || '6' }}
+          BUY_HIST_GATE_SOFT_MAX_WINRATE:  ${{ vars.BUY_HIST_GATE_SOFT_MAX_WINRATE || '0.20' }}
+          BUY_HIST_GATE_SOFT_PENALTY:      ${{ vars.BUY_HIST_GATE_SOFT_PENALTY || '4' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
