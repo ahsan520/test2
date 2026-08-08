@@ -28,7 +28,6 @@ import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeOpen, pushTradeLogToGitHub,
   loadPaperBalance, adjustPaperBalance,
-  shouldAlertOnce, clearAlertCooldown,
 } from './job-state.js';
 
 // ── Post-fill level resync — anchors entryPrice/stop/t1/t2 to the price
@@ -83,22 +82,12 @@ function isNoTradeSymbol(pair) {
 // traded. Especially important with LB_RECO_MIN_SIGNALS=1, where a single
 // mediocre-grade signal would otherwise be enough to rotate and buy.
 // Set via repo Variable EXEC_MIN_GRADE: 'A' (default — A or A+ both pass),
-// 'A+' (A+ only), 'B'/'C'/'D' (that grade or better), or 'off' (no gate —
-// every recommended pick is tradeable).
+// 'A+' (A+ only), or 'off' (no gate — every recommended pick is tradeable).
 const EXEC_MIN_GRADE = (process.env.EXEC_MIN_GRADE || 'A').toUpperCase();
-// Grade scale, per calcGrade() in leaderboard-scanner.js: A+ > A > B > C > D.
-// Ranked numerically so ANY of the five grades can be used as the floor —
-// previously only 'A+' and 'OFF' were handled explicitly and every other
-// value (including a correctly-set repo variable like EXEC_MIN_GRADE=B)
-// silently fell through to the same behavior as the 'A' default, since the
-// comparison was hardcoded to `grade === 'A' || grade === 'A+'` rather than
-// actually reading EXEC_MIN_GRADE's value.
-const GRADE_RANK = { 'A+': 4, 'A': 3, 'B': 2, 'C': 1, 'D': 0 };
 function meetsGradeGate(grade) {
   if (EXEC_MIN_GRADE === 'OFF') return true;
-  const minRank   = GRADE_RANK[EXEC_MIN_GRADE] ?? GRADE_RANK['A']; // unknown/typo'd value → safe default
-  const gradeRank = GRADE_RANK[grade] ?? -1;                        // missing/unrecognized grade → always fails
-  return gradeRank >= minRank;
+  if (EXEC_MIN_GRADE === 'A+')  return grade === 'A+';
+  return grade === 'A' || grade === 'A+';
 }
 
 // Never treat these as "open positions" to rotate out of — they're buying
@@ -200,24 +189,22 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
     return parseFloat(cur) >= parseFloat(buyPrice) * (1 + ROTATION_MIN_PROFIT_PCT / 100);
   };
 
-  // ── Guard 3: holding for T2, and still shows up as A/A+ today ──
-  // A position that already hit T1 and is being held for T2 (status
-  // 'tp1_hit' with NO exitPrice — see position-monitor.js's dual-state
-  // handling; a tp1_hit WITH exitPrice is already closed and not a live
-  // position at all) is protected from rotation if it appears ANYWHERE on
-  // today's A/A+ starred list — NOT just the capacity-limited top-N slice
-  // (topBases/gradeStillTop, above). This is the meaningful difference
-  // from gradeStillTop: a T1-holding position that still reads A/A+ but
-  // ranked #3 when only the top 2 get bought (EXEC_TOP_N_COUNT) would
-  // otherwise lose protection purely due to a slot-count limit, not
-  // because today's signal actually stopped liking it. A T1-holding
-  // position that's dropped OUT of the A/A+ starred list entirely still
-  // falls through to Guard 2 (protected if at/above buy price — which,
-  // having passed T1, it almost certainly still is) or its own stop/T2
-  // exit upstream.
+  // ── Guard 3: still shows up as A/A+ today, even if outside the top-N
+  // slot count ──
+  // gradeStillTop (above) only protects a position if it's within THIS
+  // cycle's capacity-limited top-N slice (EXEC_TOP_N_COUNT). A position
+  // ranked #4 while only the top 3 slots get bought loses that protection
+  // purely due to the slot count — not because today's signal actually
+  // stopped liking it. Originally this broader check only applied to
+  // positions already holding for T2 (tp1_hit, no exitPrice) — but the
+  // same slot-count gap applies just as much to a pre-T1 position that's
+  // still genuinely recommended, just crowded out of the top-N window by
+  // this cycle's ranking. Protecting it here (rather than letting it fall
+  // through to Guard 1/2 alone) avoids rotating out a position the signal
+  // still likes, just to make room for a marginally higher-ranked one —
+  // real churn, not a real quality difference.
   const allStarredBases = new Set(allStarred.map(r => r.a.pair.replace(/[^A-Z]/g, '').replace(/USDT$/, '')));
-  const isHoldingT1AndStillStarred = (base, pos) =>
-    pos?.status === 'tp1_hit' && !pos?.exitPrice && allStarredBases.has(base);
+  const stillOnFullStarredList = (base) => allStarredBases.has(base);
 
   // Combined: protected if it's today's actual top pick, OR still within
   // the hold window, OR currently below its own buy price (Guard 2 returns
@@ -227,7 +214,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   const isProtected = (base, pos) => {
     if (gradeStillTop(base)) return true;
     if (withinMinHold(pos)) return true;
-    if (isHoldingT1AndStillStarred(base, pos)) return true;
+    if (stillOnFullStarredList(base)) return true;
     const atOrAboveBuy = currentlyAtOrAboveBuy(base, pos);
     if (atOrAboveBuy === false) return true; // below buy price — protected from rotation, only own stop/T1/T2 can close it
     return false;
@@ -242,15 +229,8 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
     let balances = [];
     try {
       balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
-      clearAlertCooldown('rotation_balances');
     } catch (e) {
       console.log(`  ⚠️  Rotation: couldn't fetch MEXC balances (${e.message}) — falling back to tracked positions only`);
-      if (shouldAlertOnce('rotation_balances')) {
-        await sendTelegram(
-          `🚨 *MEXC API ERROR — Rotation* \n  Couldn't fetch account balances: ${e.message}\n` +
-          `  _Rotation is falling back to tracked positions only (can't see manually-held/untracked coins) — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
-        );
-      }
     }
     const seenBases = new Set();
     for (const bal of balances) {
@@ -434,20 +414,13 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 // P&L on an adopted position is measured from the ADOPTION price, not the
 // real cost basis — the Telegram alert says so explicitly so it's never
 // mistaken for the real entry/PnL.
-export async function adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels, marketState = {} }) {
+export async function adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels }) {
   let changed = false;
   let balances = [];
   try {
     balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET);
-    clearAlertCooldown('adoption_balances');
   } catch (e) {
     console.log(`  ⚠️  Manual-holding adoption: couldn't fetch MEXC balances (${e.message})`);
-    if (shouldAlertOnce('adoption_balances')) {
-      await sendTelegram(
-        `🚨 *MEXC API ERROR — Manual Holding Adoption* \n  Couldn't fetch account balances: ${e.message}\n` +
-        `  _Any coins bought manually outside the bot won't be picked up for tracking until this resolves — check your MEXC API key hasn't expired or been revoked. Further repeats of this suppressed for ${process.env.ALERT_COOLDOWN_MIN || '60'} min._`
-      );
-    }
     return { positions, changed };
   }
 
@@ -512,22 +485,6 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
         qty: bal.free, fillPrice: entry.price, buyOrderId: `MANUAL_ADOPTED_${Date.now()}`,
         adopted: true,
       },
-      // Previously never set for adopted positions — meant Position
-      // Intelligence's evaluatePosition() unconditionally returned
-      // "no entry snapshot (pre-dates this feature)" for the ENTIRE
-      // lifetime of any manually-bought coin, not just its first
-      // SELL_MIN_POSITION_AGE_MIN minutes. Falling-knife detection,
-      // thesis invalidation, and confidence-decay based EXIT/
-      // EMERGENCY_EXIT/REDUCE_25/REDUCE_50 never ran at all — only the
-      // blunt price-based stop and profit-protection (which itself only
-      // engages once a peak profit is actually reached) were ever active.
-      // A manually-bought coin that declines steadily without ever
-      // going green rides all the way to the stop with no earlier
-      // pattern-based exit path available — same shape of data used for
-      // a normal bot-initiated buy is already sitting right here in
-      // `entry` + `marketState`, so there's no reason adoption should
-      // skip building it.
-      entrySnapshot: buildEntrySnapshot(entry, marketState),
     };
     logAudit('manual_position_adopted', { sym, base, qty: bal.free, entryPrice: entry.price, stop: levels.stop });
     changed = true;
@@ -542,7 +499,7 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
       `🔍 *MANUAL POSITION ADOPTED* — ${base}\n` +
       `  Found ${bal.free} ${base} on MEXC with no bot tracking — now under bot management.\n` +
       `  Adoption price $${entry.price}  Stop $${levels.stop}  T1 $${levels.t1}  T2 $${levels.t2}\n` +
-      `  🛡 Watched by the 5-min software stop check, plus Position Intelligence (falling-knife / thesis / confidence) and Profit Protection once ${process.env.SELL_MIN_POSITION_AGE_MIN || '15'} min old.\n` +
+      `  🛡 Watched by the 15-min software stop check.\n` +
       `  _P&L tracked from this adoption price, not your real buy price — the bot has no way to know your actual cost basis._`
     );
   }
@@ -581,7 +538,7 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
 // API (confirmed against MEXC's own API docs). The previous STOP_LOSS_LIMIT
 // attempt here was Binance-endpoint naming that MEXC has never supported, so
 // it failed on every single live buy (HTTP 400 "invalid type"). Removed —
-// the 5-min software stop check in position-monitor.js is the only stop
+// the 15-min software stop check in position-monitor.js is the only stop
 // mechanism MEXC's API allows, and is now PRIMARY, not a fallback.
 
 async function executeAutoBuys({
@@ -770,7 +727,7 @@ async function executeAutoBuys({
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated — MEXC did not report a fill qty)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
           `  Size: $${perPickUsd} USDT  Order ID: \`${buy.orderId}\`\n` +
           (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length} split ($${effectiveUsdSize} ÷ ${picks.length})\n` : '') +
-          `  🛡 Watched by the 5-min software stop check.\n` +
+          `  🛡 Watched by the 15-min software stop check.\n` +
           `  Stop/T2 exits will close this position automatically.\n` +
           (buy.estimated ? `  ⚠️ _MEXC didn't confirm a fill quantity yet — verify the actual holding on MEXC matches before trusting auto-sells._\n` : '') +
           `  _Send /pause to halt further auto-buys_`
