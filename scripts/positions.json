@@ -407,7 +407,7 @@
     "spikeScore": 0.2781670853875646,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -422,7 +422,10 @@
       "qty": 1609.09,
       "fillPrice": 0.6009917562100319,
       "buyOrderId": "C02__714739305607536640036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714744316718657536036",
+      "exitFillPrice": 0.6027596616721252,
+      "closedAt": 1786190560925
     },
     "entrySnapshot": {
       "at": 1786189366105,
@@ -448,7 +451,10 @@
       "btcRiskScore": 6,
       "breadthScore": 60,
       "marketRegime": "RISK_ON"
-    }
+    },
+    "exitPrice": 0.6027596616721252,
+    "statusChangedAt": 1786190561851,
+    "rotatedOut": true
   },
   "BINANCE:IMXUSDT": {
     "sym": "BINANCE:IMXUSDT",
@@ -529,14 +535,17 @@
     "spikeScore": 0.7937969413909598,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
     "rankScore": 0.38,
     "histWinRate": 0,
     "histSample": 49,
-    "caution": true
+    "caution": true,
+    "exitPrice": 0.07046,
+    "statusChangedAt": 1786190562226,
+    "rotatedOut": true
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -556,13 +565,77 @@
     "spikeScore": 0.4573962447996639,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
     "rankScore": 0.32,
     "histWinRate": 0,
     "histSample": 47,
-    "caution": true
+    "caution": true,
+    "exitPrice": 75.64,
+    "statusChangedAt": 1786190559979,
+    "rotatedOut": true
+  },
+  "BINANCE:SUIUSDT": {
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1786190559821,
+    "holdLockUntil": 1786191759821,
+    "entryPrice": 0.6898535727132309,
+    "stop": 0.6795,
+    "t1": 0.7105,
+    "t2": 0.7312,
+    "score": 6,
+    "spikeScore": 0.12719561670222077,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "latest",
+    "recommended": true,
+    "rankScore": 0.18,
+    "histWinRate": 0,
+    "histSample": 43,
+    "caution": true,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1786190564467,
+      "usdSize": 978.1,
+      "qty": 1417.83,
+      "fillPrice": 0.6898535727132309,
+      "buyOrderId": "C02__714744331629391873036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1786190564467,
+      "price": 0.6897,
+      "conv": 6,
+      "whaleScore": 54,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": false
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 64,
+      "btcRiskScore": 14,
+      "breadthScore": 60,
+      "marketRegime": "RISK_ON"
+    }
   }
 }
