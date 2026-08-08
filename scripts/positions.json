@@ -207,7 +207,7 @@
     "spikeScore": 0.6665241862954201,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -222,7 +222,10 @@
       "qty": 13671.11,
       "fillPrice": 0.07045,
       "buyOrderId": "C02__714756943125581824036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714789603466190849036",
+      "exitFillPrice": 0.07125000000000001,
+      "closedAt": 1786201358138
     },
     "entrySnapshot": {
       "at": 1786193571357,
@@ -273,7 +276,10 @@
       "tier": "A",
       "giveBack": 0.5,
       "evaluatedAt": 1786201355175
-    }
+    },
+    "exitPrice": 0.07125000000000001,
+    "statusChangedAt": 1786201358888,
+    "rotatedOut": true
   },
   "BINANCE:TAOUSDT": {
     "sym": "BINANCE:TAOUSDT",
@@ -675,6 +681,67 @@
       "tier": "B",
       "giveBack": 0.3,
       "evaluatedAt": 1786201355175
+    }
+  },
+  "BINANCE:ZECUSDT": {
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1786201356529,
+    "holdLockUntil": 1786202556529,
+    "entryPrice": 506.35042272633376,
+    "stop": 498.76,
+    "t1": 521.54,
+    "t2": 536.73,
+    "score": 6,
+    "spikeScore": 1.326767752657546,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "peak",
+    "recommended": true,
+    "rankScore": 0.21,
+    "histWinRate": 0,
+    "histSample": 39,
+    "caution": true,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1786201360938,
+      "usdSize": 973.17,
+      "qty": 1.921929,
+      "fillPrice": 506.35042272633376,
+      "buyOrderId": "C02__714789615243800576036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1786201360938,
+      "price": 506.26,
+      "conv": 4,
+      "whaleScore": 62,
+      "bullConfCount": 7,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "LEAN BULL",
+      "cvdTrend": "up",
+      "thesisScore": 62,
+      "btcRiskScore": 6,
+      "breadthScore": 80,
+      "marketRegime": "RISK_ON"
     }
   }
 }
