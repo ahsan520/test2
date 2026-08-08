@@ -245,7 +245,7 @@
     "spikeScore": 1.1384766815035965,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -260,7 +260,10 @@
       "qty": 12.939,
       "fillPrice": 74.8,
       "buyOrderId": "C02__714682673691262976036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__714705311180414976036",
+      "exitFillPrice": 74.94000000000001,
+      "closedAt": 1786181261279
     },
     "entrySnapshot": {
       "at": 1786175864105,
@@ -311,7 +314,10 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1786181258000
-    }
+    },
+    "exitPrice": 74.94000000000001,
+    "statusChangedAt": 1786181262125,
+    "rotatedOut": true
   },
   "BINANCE:TAOUSDT": {
     "sym": "BINANCE:TAOUSDT",
@@ -579,13 +585,77 @@
     "spikeScore": 2.238761975577341,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
     "rankScore": 0.31,
     "histWinRate": 0,
     "histSample": 47,
-    "caution": true
+    "caution": true,
+    "exitPrice": 0.0705,
+    "statusChangedAt": 1786181262598,
+    "rotatedOut": true
+  },
+  "BINANCE:ZECUSDT": {
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1786181260091,
+    "holdLockUntil": 1786182460091,
+    "entryPrice": 507.34999999999997,
+    "stop": 499.74,
+    "t1": 522.57,
+    "t2": 537.79,
+    "score": 8,
+    "spikeScore": 0.5935751144705284,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "peak",
+    "recommended": true,
+    "rankScore": 0.32,
+    "histWinRate": 0,
+    "histSample": 38,
+    "caution": true,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1786181264759,
+      "usdSize": 968.96,
+      "qty": 1.909845,
+      "fillPrice": 507.34999999999997,
+      "buyOrderId": "C02__714705325709533184036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1786181264759,
+      "price": 507.34,
+      "conv": 5,
+      "whaleScore": 54,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": false
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 60,
+      "btcRiskScore": 6,
+      "breadthScore": 60,
+      "marketRegime": "RISK_ON"
+    }
   }
 }
