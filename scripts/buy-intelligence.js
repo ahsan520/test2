@@ -47,6 +47,15 @@ const RSI_15M_HOT  = parseFloat(process.env.BUY_RSI_15M_HOT  || '70'); // matche
 const RSI_15M_VHOT = parseFloat(process.env.BUY_RSI_15M_VHOT || '78');
 const RSI_1H_HOT   = parseFloat(process.env.BUY_RSI_1H_HOT   || '68');
 
+const QUALITY_ENABLED = (process.env.BUY_ENABLE_QUALITY_FLOOR || 'true') !== 'false';
+// IMX's 5:22 PM buy: bullConf 1/10, whale 35/100, dashboard status still
+// "BUILDING" (OI div/CVD/dip-score all "—", not enough data yet). Not
+// chasing, not RSI-extended — just a genuinely thin, low-confidence setup
+// the chase/RSI checks have no way to see. This is a different failure
+// mode: weak signal, not bad timing.
+const QUALITY_MIN_BULLCONF = parseInt(process.env.BUY_QUALITY_MIN_BULLCONF || '3', 10); // out of 10
+const QUALITY_MIN_WHALE    = parseFloat(process.env.BUY_QUALITY_MIN_WHALE  || '40');    // out of 100
+
 // ── Candle-run "chasing" check ──────────────────────────────────────────
 // Counts the current unbroken streak of same-direction 15m candles ending
 // at the most recent one. A long green streak means price has already run
@@ -101,11 +110,34 @@ export function calcEntryExtension(r15, r1h) {
   return { penalty, reason: hits.length ? hits.join(' · ') : null };
 }
 
+// ── Signal-quality / data-confidence floor ─────────────────────────────
+// Independent of chasing/RSI — this catches a setup that's just thin,
+// regardless of timing. bullConf and whaleScore both come from the
+// same-cycle data (not a lagging average), so "low confidence" here means
+// genuinely weak right now, not stale.
+export function calcSignalQuality(bullConfCount, whaleScore) {
+  if (!QUALITY_ENABLED || bullConfCount == null || whaleScore == null) {
+    return { penalty: 0, reason: null };
+  }
+  const hits = [];
+  let penalty = 0;
+  if (bullConfCount < QUALITY_MIN_BULLCONF) {
+    penalty += 2;
+    hits.push(`bullConf ${bullConfCount}/10 < ${QUALITY_MIN_BULLCONF} (thin signal)`);
+  }
+  if (whaleScore < QUALITY_MIN_WHALE) {
+    penalty += 1;
+    hits.push(`whale ${whaleScore}/100 < ${QUALITY_MIN_WHALE} (low confidence)`);
+  }
+  return { penalty, reason: hits.length ? hits.join(' · ') : null };
+}
+
 // ── Combined entry check — called once per symbol from scoreSymbol() ──
-export function evaluateBuyReadiness({ r15, r1h, k15 }) {
+export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore }) {
   const freshness = calcEntryFreshness(k15);
   const extension = calcEntryExtension(r15, r1h);
-  const penalty = freshness.penalty + extension.penalty;
-  const reasons = [freshness.reason, extension.reason].filter(Boolean);
-  return { penalty, reasons, freshness, extension };
+  const quality    = calcSignalQuality(bullConfCount, whaleScore);
+  const penalty = freshness.penalty + extension.penalty + quality.penalty;
+  const reasons = [freshness.reason, extension.reason, quality.reason].filter(Boolean);
+  return { penalty, reasons, freshness, extension, quality };
 }

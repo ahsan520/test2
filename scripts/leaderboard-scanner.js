@@ -661,22 +661,27 @@ export async function scoreSymbol(pair, prevFr = null) {
     const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, obi, fr, oiDiv };
     d.conv = calcConviction(d);
 
-    // ── Buy Intelligence — entry-timing check (buy-intelligence.js) ──
-    // Independent of calcConviction's own scoring above; catches
-    // already-extended/already-chased entries that a broken thesis check
-    // (Position Intelligence) would otherwise only catch AFTER the buy,
-    // 30-90 min later at a small loss. Penalty subtracts from conv so it
-    // can push a marginal symbol below LB_MIN_SCORE without needing a
-    // separate hard gate.
-    const buyIntel = evaluateBuyReadiness({ r15, r1h, k15 });
-    if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
-    d.buyIntel = buyIntel;
-
     const setup     = getSetupMode(d);
     const whale     = calcWhaleScore(d);
     const capBuy    = calcCapBuy({ ...d, conv: d.conv });
     const bullConf  = calcBullConf(d, whale.score);
     const flow      = calcFlow(d, whale.score);
+
+    // ── Buy Intelligence — entry-timing + data-quality check (buy-intelligence.js) ──
+    // Independent of calcConviction's own scoring above; catches
+    // already-extended/already-chased entries that a broken thesis check
+    // (Position Intelligence) would otherwise only catch AFTER the buy,
+    // 30-90 min later at a small loss. Also catches thin-data/low-confidence
+    // setups (e.g. bullConf 1/10, still BUILDING) that aren't chasing or
+    // extended at all, just genuinely weak — a different failure mode the
+    // chase/RSI checks alone can't see. Needs bullConf/whale, so this runs
+    // after them, not before as in the original ordering. Penalty subtracts
+    // from conv so it can push a marginal symbol below LB_MIN_SCORE without
+    // needing a separate hard gate.
+    const buyIntel = evaluateBuyReadiness({ r15, r1h, k15, bullConfCount: bullConf.count, whaleScore: whale.score });
+    if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
+    d.buyIntel = buyIntel;
+
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
     const archetype = calcSetupArchetype(d, whale.score);
     const finalSetup = capBuy.isCapBuy ? { label: 'CAP BUY', emoji: '💥' } : setup;

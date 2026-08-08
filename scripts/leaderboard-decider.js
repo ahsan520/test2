@@ -1,6 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// leaderboard-decider.js — Job B (runs every ~5 min via Cloudflare Worker
-// dispatch, 2 min after each fetch — no native GitHub cron fallback)
+// leaderboard-decider.js — Job B (runs every 15 min)
 // v11.0 — split build
 //
 // This file is the ORCHESTRATOR: it loads state, runs the buy-signal scan and
@@ -34,7 +33,6 @@ import {
   loadAuditLog, pushAuditLogToGitHub, pushLiveBalancesToGitHub,
   checkHeartbeatStale, pushHeartbeatToGitHub,
 } from './job-state.js';
-import { priceDecimals } from './job-state.js';
 import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
@@ -45,18 +43,28 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 const LB_MIN_SCORE       = parseInt(process.env.LB_MIN_SCORE       || '9');
 const LB_BULL_CONF_MIN   = parseInt(process.env.LB_BULL_CONF_MIN   || '5');
 const LB_COOLDOWN_MIN    = parseInt(process.env.LB_COOLDOWN_MIN    || '60');
-// Expected decide cadence in minutes — feeds the heartbeat staleness check
-// below AND the log/Telegram copy that reports it. Keep this in sync with
-// whatever wrangler.toml's [triggers] cron actually fires at (that part
-// can't be env-driven — it's a Cloudflare platform config, always needs a
-// `wrangler deploy` to change). This variable just means the REST of the
-// pipeline (staleness detection, alert copy) follows along automatically
-// once you set it, instead of needing a matching code edit every time.
-const LB_DECIDE_INTERVAL_MIN = parseFloat(process.env.LB_DECIDE_INTERVAL_MIN || '5');
 const LB_HOLD_LOCK       = parseInt(process.env.LB_HOLD_LOCK       || '20');
 const ALLOW_PRE_MARKET   = (process.env.LB_ALLOW_PRE_MARKET || 'false') === 'true';
 const ALLOW_AH           = (process.env.LB_ALLOW_AH         || 'false') === 'true';
 const ALERT_STATE_TTL    = parseFloat(process.env.LB_ALERT_STATE_TTL_HOURS || '6');
+
+// ── Bad-history buy gate ─────────────────────────────────────────────────
+// A symbol with a long, consistent losing streak (e.g. AVAX bought twice in
+// one day, both closed via thesis-invalidated within 90 min; GALA at 0W-17L)
+// is one of the strongest signals this system produces — but until now
+// histWinRate/histSample were informational-only (shown in the Telegram
+// alert's "past 30d" line) and had zero effect on whether the buy actually
+// happened. Two tiers, both requiring a real sample size so a symbol with
+// only 2-3 closes never gets unfairly flagged:
+//   HARD: sample ≥10 AND winRate ≤10%  → skip entirely, no candidate created
+//   SOFT: sample ≥6  AND winRate ≤20%  → heavy conv penalty (very likely
+//         drops it below LB_MIN_SCORE on its own, without a hard block)
+const HIST_GATE_HARD_MIN_SAMPLE = parseInt(process.env.BUY_HIST_GATE_HARD_MIN_SAMPLE || '10');
+const HIST_GATE_HARD_MAX_WINRATE = parseFloat(process.env.BUY_HIST_GATE_HARD_MAX_WINRATE || '0.10');
+const HIST_GATE_SOFT_MIN_SAMPLE = parseInt(process.env.BUY_HIST_GATE_SOFT_MIN_SAMPLE || '6');
+const HIST_GATE_SOFT_MAX_WINRATE = parseFloat(process.env.BUY_HIST_GATE_SOFT_MAX_WINRATE || '0.20');
+const HIST_GATE_SOFT_PENALTY = parseInt(process.env.BUY_HIST_GATE_SOFT_PENALTY || '4');
+const HIST_GATE_LOOKBACK_DAYS = parseFloat(process.env.BUY_HIST_GATE_LOOKBACK_DAYS || process.env.RECO_LOOKBACK_DAYS || '30');
 
 // Only used for the startup banner/audit log — the actual gating logic for
 // these lives in position-monitor.js.
@@ -70,16 +78,6 @@ const RECO_TOP_N         = parseInt(process.env.LB_RECO_TOP_N          || '3'); 
 const RECO_LOOKBACK_DAYS = parseFloat(process.env.LB_RECO_LOOKBACK_DAYS|| '30');  // history window used for win-rate
 const HISTORY_RETENTION_DAYS = parseFloat(process.env.LB_HISTORY_RETENTION_DAYS || '45'); // how long symbol-history.json keeps rows
 const HISTORY_MAX_ROWS    = parseInt(process.env.LB_HISTORY_MAX_ROWS || '1500'); // hard cap regardless of days — safety net vs. size blowup
-
-// Overextension gate — SQUEEZE NOW/BREAKOUT fire off shock+chg, which means
-// price just moved, but "just moved" often means "already peaked". r15
-// overbought currently only costs -1 inside calcConviction() — not enough to
-// outvote the +6-8 the shock/momentum signals award for the same candle.
-// This makes it a hard block instead of a diluted vote. At the current
-// ~5-min decide cadence this reads r15 no more than ~2 min stale (see
-// heartbeat comment below), so the check is closer to real-time than it
-// was under the old 15/17-min cadence.
-const BUY_MAX_R15_OVEREXTENDED = parseFloat(process.env.BUY_MAX_R15_OVEREXTENDED || '72');
 
 // ── Cooldown helpers ──
 function isOnCooldown(state, cdKey, assetType) {
@@ -101,7 +99,7 @@ function calcEntryLevels(price, shock) {
   const p = parseFloat(price) || 0;
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp    = priceDecimals(p);
+  const dp    = p < 10 ? 4 : 2;
   // Entry = current price, no chase markup. Every buy is a MEXC MARKET
   // order (fills near-instantly at whatever price is live) — the old
   // +0.4% markup never changed what got paid, it just inflated the
@@ -137,7 +135,17 @@ function getHistoryStrength(history, base, lookbackDays) {
   const rows = history.filter(e => e.base === base && e.closedAt >= cutoff);
   if (!rows.length) return { winRate: null, sample: 0, avgPnl: null, strength: 0 };
 
-  const wins    = rows.filter(e => e.outcome === 'tp2_hit').length;
+  // A "win" is a profitable close, not a specific exit reason — the
+  // original `outcome === 'tp2_hit'` definition meant T1 partials,
+  // Profit Protection exits, rotation-freed slots, and any
+  // Position-Intelligence exit that still closed in the green all got
+  // counted as losses, even though the trade made money. With T1/Profit
+  // Protection/rotation all designed to close BEFORE T2 by intent, T2 is
+  // typically the least common way a good trade actually ends — so the
+  // old definition was silently near-zeroing out win rate for every
+  // symbol regardless of real performance. pnlPct > 0 reflects what
+  // actually happened to the money.
+  const wins    = rows.filter(e => (e.pnlPct || 0) > 0).length;
   const winRate = wins / rows.length;
   const avgPnl  = rows.reduce((s, e) => s + (e.pnlPct || 0), 0) / rows.length;
 
@@ -190,21 +198,20 @@ async function main() {
   });
 
   // ── Heartbeat staleness check ──
-  // Driven entirely by a Cloudflare Worker now — no native GitHub cron
-  // fallback. The Worker fires fetch every LB_DECIDE_INTERVAL_MIN min and
-  // decide 2 min after each fetch. Cloudflare Workers and GitHub Actions
-  // dispatch can both silently delay or skip a firing with no notification
-  // — this is how the bot notices a gap itself rather than someone finding
-  // out retroactively. Threshold is 2.5x the expected interval so normal
-  // jitter (a run taking a bit longer, network hiccups) doesn't false-alarm.
-  const heartbeat = checkHeartbeatStale(LB_DECIDE_INTERVAL_MIN, 2.5);
+  // The schedule expects this job every ~17 min (alerts.yml: minutes
+  // 2,19,36,53). GitHub Actions can silently delay or skip scheduled runs
+  // with no notification — this is how the bot notices a gap itself rather
+  // than someone finding out retroactively. Threshold is 2.5x the expected
+  // interval so normal jitter (a run taking a bit longer, GitHub's usual
+  // few-minutes cron slop) doesn't false-alarm.
+  const heartbeat = checkHeartbeatStale(17, 2.5);
   if (heartbeat.stale) {
-    console.log(`  ⚠️  STALE RUN — last successful run was ${heartbeat.gapMinutes} min ago (expected ~${LB_DECIDE_INTERVAL_MIN}min)`);
+    console.log(`  ⚠️  STALE RUN — last successful run was ${heartbeat.gapMinutes} min ago (expected ~17min)`);
     logAudit('heartbeat_stale', { gapMinutes: heartbeat.gapMinutes, lastRunAt: heartbeat.lastRunAt });
     await sendTelegram(
       `⚠️ *STALE RUN DETECTED*\n` +
-      `  Last successful run was ${heartbeat.gapMinutes.toFixed(0)} minutes ago (expected ~every ${LB_DECIDE_INTERVAL_MIN} min).\n` +
-      `  _Check the Cloudflare Worker's dispatch logs (no native GitHub cron fallback anymore) — positions.json and reconciliation may be out of date until this resolves._`
+      `  Last successful run was ${heartbeat.gapMinutes.toFixed(0)} minutes ago (expected ~every 17 min).\n` +
+      `  _Check GitHub Actions run history for failed/skipped scheduled runs — positions.json and reconciliation may be out of date until this resolves._`
     );
   }
 
@@ -308,7 +315,7 @@ async function main() {
   if (openCount > 0) {
     console.log(`\n📊  Monitoring ${openCount} open position(s)...`);
     const monitored = await monitorPositions(positions, market.symbols || {}, {
-      LB_MIN_SCORE, LB_BULL_CONF_MIN, effectiveTradeMode,
+      LB_MIN_SCORE, LB_BULL_CONF_MIN,
     }, marketState);
     positions = monitored.positions;
 
@@ -348,7 +355,7 @@ async function main() {
   // newly-adopted symbol as already-tracked (no duplicate signal/buy).
   // ══════════════════════════════════════════════════════
   if (effectiveTradeMode === 'live') {
-    const adopted = await adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels, marketState });
+    const adopted = await adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels });
     positions = adopted.positions;
     if (adopted.changed) {
       savePositions(positions);
@@ -496,6 +503,7 @@ async function main() {
   const cooldowns  = loadCooldowns();
   const alertState = pruneAlertState(loadAlertState());
   const candidates = [];
+  const buyHistory = loadHistory(); // for the bad-history gate below — separate load from the post-close save above, this file only reads it
 
   for (const [pair, entry] of entries) {
     // Session gate
@@ -505,18 +513,23 @@ async function main() {
 
     // Score gate
     const evald = evaluateSymbol(entry);
-    if (evald.conv < LB_MIN_SCORE)          continue;
-    if (SKIP_SETUPS.has(evald.setup.label)) continue;
 
-    // Overextension gate — hard reject on stale/already-topped momentum.
-    // See BUY_MAX_R15_OVEREXTENDED comment above for rationale. Uses the
-    // CURRENT r15 (entry.d.r15), not a peak-sourced value, since the point
-    // is to catch where price/RSI actually sit right now — the same value
-    // calcEntryLevels() will build the market-order entry off of.
-    if (entry.assetType === 'crypto' && (entry.d?.r15 ?? 50) > BUY_MAX_R15_OVEREXTENDED) {
-      console.log(`  🔺  ${pair} — 15m RSI overextended (${entry.d.r15.toFixed(0)} > ${BUY_MAX_R15_OVEREXTENDED}) — likely already topped, skipping`);
+    // ── Bad-history buy gate ──
+    // Runs before the LB_MIN_SCORE comparison so a hard-gated symbol never
+    // becomes a candidate at all, and a soft-penalized one has its penalty
+    // actually count toward whether it clears the bar (not just cosmetic).
+    const symBase  = pair.replace('USDT', '').replace(/\.\w+$/, '');
+    const symHist  = getHistoryStrength(buyHistory, symBase, HIST_GATE_LOOKBACK_DAYS);
+    if (symHist.sample >= HIST_GATE_HARD_MIN_SAMPLE && symHist.winRate !== null && symHist.winRate <= HIST_GATE_HARD_MAX_WINRATE) {
+      console.log(`  🚫  ${pair} — bad-history gate: ${Math.round(symHist.winRate*100)}% win rate over ${symHist.sample} closes (≥${HIST_GATE_HARD_MIN_SAMPLE} sample, ≤${Math.round(HIST_GATE_HARD_MAX_WINRATE*100)}%) — skipping entirely`);
       continue;
     }
+    if (symHist.sample >= HIST_GATE_SOFT_MIN_SAMPLE && symHist.winRate !== null && symHist.winRate <= HIST_GATE_SOFT_MAX_WINRATE) {
+      evald.conv -= HIST_GATE_SOFT_PENALTY;
+    }
+
+    if (evald.conv < LB_MIN_SCORE)          continue;
+    if (SKIP_SETUPS.has(evald.setup.label)) continue;
 
     // 4H trend persistence gate — applies to EVERY buy candidate,
     // independent of BTC regime state. bull4hCount is maintained by
@@ -541,9 +554,6 @@ async function main() {
       if (!miGate.notReady && !miGate.allowed) {
         console.log(`  🧠  ${pair} — Market Intelligence gate blocked (${miGate.reasons.join('; ')})`);
         continue;
-      }
-      if (miGate.breadthExceptionUsed) {
-        console.log(`  🧠✅  ${pair} — breadth gate bypassed via strength exception (${miGate.breadthExceptionChecks.join(', ')})`);
       }
       if (!miGate.notReady && miGate.bullRequired != null) {
         const persistence = checkBull4hPersistence(entry);
@@ -829,7 +839,7 @@ async function main() {
     `🔔 *Leaderboard BUY Alert* — ${utc}`,
     recoHeader,
     '', lines.join('\n\n'), '',
-    `_Stop/T1/T2/exit monitored headlessly every ${LB_DECIDE_INTERVAL_MIN} min_`,
+    `_Stop/T1/T2/exit monitored headlessly every 15 min_`,
   ].join('\n');
 
   await sendTelegram(msg);
