@@ -169,7 +169,7 @@
     "spikeScore": 4.469403936245945,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -184,7 +184,10 @@
       "qty": 2.29,
       "fillPrice": 4.029,
       "buyOrderId": "C02__715126890133610496036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__715162093287792640036",
+      "exitFillPrice": 4.044,
+      "closedAt": 1786290166647
     },
     "entrySnapshot": {
       "at": 1786281773485,
@@ -235,7 +238,10 @@
       "tier": "A",
       "giveBack": 0.5,
       "evaluatedAt": 1786290163552
-    }
+    },
+    "exitPrice": 4.044,
+    "statusChangedAt": 1786290167720,
+    "rotatedOut": true
   },
   "BINANCE:IMXUSDT": {
     "sym": "BINANCE:IMXUSDT",
@@ -417,7 +423,7 @@
     "spikeScore": 1.071431626626984,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -435,7 +441,10 @@
       "tier": "C",
       "giveBack": 0.2,
       "evaluatedAt": 1786290163552
-    }
+    },
+    "exitPrice": 77.29,
+    "statusChangedAt": 1786290168391,
+    "rotatedOut": true
   },
   "BINANCE:TAOUSDT": {
     "sym": "BINANCE:TAOUSDT",
@@ -455,13 +464,77 @@
     "spikeScore": 0.2932793569495624,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
     "rankScore": 0.282,
     "histWinRate": 1,
     "histSample": 1,
-    "caution": false
+    "caution": false,
+    "exitPrice": 208.7,
+    "statusChangedAt": 1786290168391,
+    "rotatedOut": true
+  },
+  "BINANCE:RENDERUSDT": {
+    "sym": "BINANCE:RENDERUSDT",
+    "base": "RENDER",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "BREAKOUT",
+    "dir": "bull",
+    "alertedAt": 1786290165452,
+    "holdLockUntil": 1786291365452,
+    "entryPrice": 1.331,
+    "stop": 1.311,
+    "t1": 1.3709,
+    "t2": 1.4109,
+    "score": 6,
+    "spikeScore": 1.8489616166074938,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "headless_v11.0",
+    "scoreSource": "latest",
+    "recommended": true,
+    "rankScore": 0.21,
+    "histWinRate": null,
+    "histSample": 0,
+    "caution": false,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1786290170239,
+      "usdSize": 9.17,
+      "qty": 6.88,
+      "fillPrice": 1.331,
+      "buyOrderId": "C02__715162108412473344036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1786290170239,
+      "price": 1.332,
+      "conv": 6,
+      "whaleScore": 88,
+      "bullConfCount": 7,
+      "bullChecks": {
+        "dailyBiasBull": false,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": true,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "LEAN BULL",
+      "cvdTrend": "up",
+      "thesisScore": 77,
+      "btcRiskScore": 0,
+      "breadthScore": 80,
+      "marketRegime": "RISK_ON"
+    }
   }
 }
