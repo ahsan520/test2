@@ -709,7 +709,7 @@ export async function scoreSymbol(pair, prevFr = null) {
     // after them, not before as in the original ordering. Penalty subtracts
     // from conv so it can push a marginal symbol below LB_MIN_SCORE without
     // needing a separate hard gate.
-    const buyIntel = evaluateBuyReadiness({ r15, r1h, k15, bullConfCount: bullConf.count, whaleScore: whale.score });
+    const buyIntel = evaluateBuyReadiness({ r15, r1h, k15, bullConfCount: bullConf.count, whaleScore: whale.score, currentPrice: price });
     if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
     d.buyIntel = buyIntel;
 

@@ -56,6 +56,18 @@ const QUALITY_ENABLED = (process.env.BUY_ENABLE_QUALITY_FLOOR || 'true') !== 'fa
 const QUALITY_MIN_BULLCONF = parseInt(process.env.BUY_QUALITY_MIN_BULLCONF || '3', 10); // out of 10
 const QUALITY_MIN_WHALE    = parseFloat(process.env.BUY_QUALITY_MIN_WHALE  || '40');    // out of 100
 
+const PULLBACK_ENABLED = (process.env.BUY_ENABLE_PULLBACK_CHECK || 'true') !== 'false';
+// DOGE bought at $0.070920 — chart shows that's already 1-2 candles into a
+// breakdown from a ~$0.0715 local high, not during the green run-up. The
+// chase check only watches for green streaks (a red candle resets it to 0
+// immediately), so it's structurally blind to "just topped and rolling
+// over" — a different pattern from chasing a breakout. This is the mirror
+// image: instead of penalizing buying too late into a pump, it penalizes
+// buying too early into a dump, right after a recent local high broke.
+const PULLBACK_LOOKBACK  = parseInt(process.env.BUY_PULLBACK_LOOKBACK  || '10', 10); // closed 15m candles to scan for the recent high
+const PULLBACK_WARN_PCT  = parseFloat(process.env.BUY_PULLBACK_WARN_PCT  || '0.5');
+const PULLBACK_BLOCK_PCT = parseFloat(process.env.BUY_PULLBACK_BLOCK_PCT || '1.0');
+
 // ── Candle-run "chasing" check ──────────────────────────────────────────
 // Counts the current unbroken streak of same-direction 15m candles ending
 // at the most recent one. A long green streak means price has already run
@@ -132,12 +144,40 @@ export function calcSignalQuality(bullConfCount, whaleScore) {
   return { penalty, reason: hits.length ? hits.join(' · ') : null };
 }
 
+// ── Pullback-from-recent-high check ─────────────────────────────────────
+// Drops the still-forming candle for the same reason calcEntryFreshness
+// does — an incomplete last candle would make the "recent high" flicker
+// within a single 15m window as that candle's own high keeps changing
+// while it builds.
+export function calcPullbackFromHigh(k15, currentPrice) {
+  if (!PULLBACK_ENABLED || !Array.isArray(k15) || k15.length < PULLBACK_LOOKBACK + 1 || currentPrice == null) {
+    return { penalty: 0, reason: null, pullbackPct: 0, recentHigh: null };
+  }
+  const closed = k15.slice(0, -1).slice(-PULLBACK_LOOKBACK);
+  const recentHigh = Math.max(...closed.map(c => parseFloat(c[2]))); // index 2 = candle high
+  if (!isFinite(recentHigh) || recentHigh <= 0) {
+    return { penalty: 0, reason: null, pullbackPct: 0, recentHigh: null };
+  }
+  const pullbackPct = ((recentHigh - currentPrice) / recentHigh) * 100;
+
+  let penalty = 0, reason = null;
+  if (pullbackPct >= PULLBACK_BLOCK_PCT) {
+    penalty = 2;
+    reason = `${pullbackPct.toFixed(2)}% below the ${PULLBACK_LOOKBACK}-candle high — buying into an active breakdown, not a dip`;
+  } else if (pullbackPct >= PULLBACK_WARN_PCT) {
+    penalty = 1;
+    reason = `${pullbackPct.toFixed(2)}% below the ${PULLBACK_LOOKBACK}-candle high — price already rolled over from a recent top`;
+  }
+  return { penalty, reason, pullbackPct: parseFloat(pullbackPct.toFixed(3)), recentHigh };
+}
+
 // ── Combined entry check — called once per symbol from scoreSymbol() ──
-export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore }) {
+export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore, currentPrice }) {
   const freshness = calcEntryFreshness(k15);
   const extension = calcEntryExtension(r15, r1h);
   const quality    = calcSignalQuality(bullConfCount, whaleScore);
-  const penalty = freshness.penalty + extension.penalty + quality.penalty;
-  const reasons = [freshness.reason, extension.reason, quality.reason].filter(Boolean);
-  return { penalty, reasons, freshness, extension, quality };
+  const pullback   = calcPullbackFromHigh(k15, currentPrice);
+  const penalty = freshness.penalty + extension.penalty + quality.penalty + pullback.penalty;
+  const reasons = [freshness.reason, extension.reason, quality.reason, pullback.reason].filter(Boolean);
+  return { penalty, reasons, freshness, extension, quality, pullback };
 }
