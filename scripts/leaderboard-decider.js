@@ -66,6 +66,23 @@ const HIST_GATE_SOFT_MAX_WINRATE = parseFloat(process.env.BUY_HIST_GATE_SOFT_MAX
 const HIST_GATE_SOFT_PENALTY = parseInt(process.env.BUY_HIST_GATE_SOFT_PENALTY || '4');
 const HIST_GATE_LOOKBACK_DAYS = parseFloat(process.env.BUY_HIST_GATE_LOOKBACK_DAYS || process.env.RECO_LOOKBACK_DAYS || '30');
 
+// ── Same-day repeat-failure pause ──────────────────────────────────────
+// The 30-day bad-history gate above needs 6-10 closes to arm — no help
+// against a symbol failing repeatedly TODAY (e.g. AVAX: 3 losses in one
+// day, each 30-90 min buy-to-close, thesis-invalidated each time). A
+// single loss should NOT pause a symbol — crypto alts mostly track BTC,
+// so one stop-out followed by a real BTC bounce dragging the alt back up
+// is a completely legitimate reason to re-buy quickly, and blocking that
+// would cost real opportunities for no good reason. This only pauses on a
+// genuine repeated pattern: 2+ LOSSES on the same symbol within a short
+// recent window — a much stronger "this isn't working today" signal than
+// any single stop-out, and short enough (a few hours) to not overlap with
+// the 30-day gate's job.
+const SAMEDAY_FAIL_ENABLED     = (process.env.BUY_SAMEDAY_FAIL_ENABLE || 'true') !== 'false';
+const SAMEDAY_FAIL_COUNT       = parseInt(process.env.BUY_SAMEDAY_FAIL_COUNT || '2', 10);
+const SAMEDAY_FAIL_WINDOW_HRS  = parseFloat(process.env.BUY_SAMEDAY_FAIL_WINDOW_HRS || '4');
+const SAMEDAY_FAIL_PAUSE_HRS   = parseFloat(process.env.BUY_SAMEDAY_FAIL_PAUSE_HRS  || '3');
+
 // Only used for the startup banner/audit log — the actual gating logic for
 // these lives in position-monitor.js.
 const LB_STALE_WATCH_HRS = parseFloat(process.env.LB_STALE_WATCH_HRS || '24');
@@ -86,6 +103,34 @@ function isOnCooldown(state, cdKey, assetType) {
   return ts > 0; // stocks: date-keyed, any truthy = fired today
 }
 function markCooldown(state, cdKey) { state[cdKey] = Date.now(); }
+
+// ── Same-day repeat-failure check ──────────────────────────────────────
+// See the constants block above for the reasoning. Deliberately looks at
+// LOSSES ONLY (pnlPct <= 0) — a symbol that closed profitably twice today
+// obviously shouldn't get paused, and mixing wins/losses into one count
+// would blur the exact signal this is meant to catch.
+function checkSamedayFailures(history, base) {
+  if (!SAMEDAY_FAIL_ENABLED) return { paused: false, reason: null, count: 0 };
+  const windowCutoff = Date.now() - SAMEDAY_FAIL_WINDOW_HRS * 3_600_000;
+  const recentLosses = history.filter(e =>
+    e.base === base && e.closedAt >= windowCutoff && (e.pnlPct ?? 0) <= 0
+  );
+  if (recentLosses.length < SAMEDAY_FAIL_COUNT) return { paused: false, reason: null, count: recentLosses.length };
+
+  // Pause window runs from the MOST RECENT of those losses, not the
+  // oldest — so the pause resets forward if it keeps failing, rather than
+  // expiring based on a stale first loss from hours ago.
+  const mostRecentLossAt = Math.max(...recentLosses.map(e => e.closedAt));
+  const pauseUntil = mostRecentLossAt + SAMEDAY_FAIL_PAUSE_HRS * 3_600_000;
+  if (Date.now() >= pauseUntil) return { paused: false, reason: null, count: recentLosses.length };
+
+  const minsLeft = Math.round((pauseUntil - Date.now()) / 60000);
+  return {
+    paused: true,
+    count: recentLosses.length,
+    reason: `${recentLosses.length} losses in the last ${SAMEDAY_FAIL_WINDOW_HRS}h — paused ${minsLeft} more min`,
+  };
+}
 
 function pruneAlertState(state) {
   const cutoff = Date.now() - ALERT_STATE_TTL * 3_600_000;
@@ -526,6 +571,21 @@ async function main() {
     }
     if (symHist.sample >= HIST_GATE_SOFT_MIN_SAMPLE && symHist.winRate !== null && symHist.winRate <= HIST_GATE_SOFT_MAX_WINRATE) {
       evald.conv -= HIST_GATE_SOFT_PENALTY;
+    }
+
+    // ── Same-day repeat-failure pause ──
+    // Separate from the 30-day gate above — catches a fast repeated
+    // failure pattern (2+ losses in a few hours) that the 30-day gate is
+    // too slow to react to. Hard skip, not a conv penalty — a genuine
+    // "this isn't working today" pattern shouldn't just be discounted,
+    // it should wait. Does NOT block a symbol after a single loss or a
+    // symbol simply re-qualifying on a real signal (e.g. a BTC bounce
+    // dragging an alt back up after one stop-out) — only 2+ losses within
+    // the short window trips this.
+    const samedayCheck = checkSamedayFailures(buyHistory, symBase);
+    if (samedayCheck.paused) {
+      console.log(`  ⏸  ${pair} — same-day failure pause: ${samedayCheck.reason}`);
+      continue;
     }
 
     if (evald.conv < LB_MIN_SCORE)          continue;
