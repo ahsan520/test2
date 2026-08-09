@@ -1,32 +1,5 @@
 [
   {
-    "timestamp": "2026-08-09T22:47:48.980Z",
-    "job": "leaderboard-decider",
-    "action": "position_evicted",
-    "sym": "BINANCE:IMXUSDT",
-    "status": "exiting"
-  },
-  {
-    "timestamp": "2026-08-09T22:47:48.982Z",
-    "job": "leaderboard-decider",
-    "action": "EXIT",
-    "sym": "BINANCE:AAVEUSDT",
-    "reason": "Thesis invalidated: entry score 66 → current 5 (drop 61 > 60)",
-    "fallingKnifeScore": 49,
-    "thesisDrop": 61,
-    "confidenceDecay": 43,
-    "exitProbability": 46,
-    "dynamicPositionRisk": 46
-  },
-  {
-    "timestamp": "2026-08-09T22:47:50.089Z",
-    "job": "leaderboard-decider",
-    "action": "mexc_sell_failed",
-    "sym": "AAVEUSDT",
-    "reason": "position intelligence: Thesis invalidated: entry score 66 → current 5 (drop 61 > 60)",
-    "error": "MEXC POST /api/v3/order failed (HTTP 400):  quantity scale is invalid"
-  },
-  {
     "timestamp": "2026-08-09T22:47:50.899Z",
     "job": "leaderboard-decider",
     "action": "positions_pushed",
@@ -4377,7 +4350,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-09T23:47:46.581Z",
+    "timestamp": "2026-08-09T23:47:44.006Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 20,
@@ -4389,7 +4362,7 @@
       {
         "pair": "AAVEUSDT",
         "status": "ok",
-        "conv": -9,
+        "conv": -8,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4403,14 +4376,14 @@
       {
         "pair": "AVAXUSDT",
         "status": "ok",
-        "conv": -8,
+        "conv": -9,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "BTCUSDT",
         "status": "ok",
-        "conv": -1,
+        "conv": -2,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4438,7 +4411,7 @@
       {
         "pair": "GALAUSDT",
         "status": "ok",
-        "conv": -12,
+        "conv": -11,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4480,7 +4453,7 @@
       {
         "pair": "SUIUSDT",
         "status": "ok",
-        "conv": -8,
+        "conv": -7,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4527,5 +4500,71 @@
         "assetType": "crypto"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-09T23:47:44.073Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-09T23:47:48.302Z",
+    "job": "leaderboard-decider",
+    "action": "positions_push_failed",
+    "error": "PUT 409 is at 9b1c0d5fef75357cfa9ba352722200e657c128b3 but expected daeb72d9883731a798f8c1ab2ccf2562e6f59bc1"
+  },
+  {
+    "timestamp": "2026-08-09T23:47:48.304Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 3,
+    "openAfter": 3,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-08-09T23:47:49.050Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.22908
+  },
+  {
+    "timestamp": "2026-08-09T23:47:49.051Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.015717,
+    "estNotional": 0.016194796799999998
+  },
+  {
+    "timestamp": "2026-08-09T23:47:49.581Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0
+  },
+  {
+    "timestamp": "2026-08-09T23:47:49.583Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-09T23:47:50.720Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 3,
+    "monitored": 3
   }
 ]
