@@ -10,35 +10,16 @@
 // that run BEFORE a buy, mirroring the same "own module, own reasons,
 // doesn't touch the existing score" pattern as profit-intelligence.js.
 //
-// Two checks, both aimed at the same trade-log pattern: repeat entries that
-// get caught by Position Intelligence's thesis-invalidated check within
-// 30-90 minutes — i.e. the thesis wasn't really broken by news or a real
-// reversal, the entry itself was already exhausted or already turning.
-//
-//   1. RSI extension — calcConviction()'s own penalty for this
-//      (`r15 > 70 && r4h > 65`) requires BOTH timeframes simultaneously
-//      extended, worth only -1. A symbol can be hot on the entry timeframe
-//      (r15=72) with a cool r4h and take zero penalty. calcEntryExtension
-//      below scores each timeframe independently.
-//   2. Candle-run chasing — 2-3+ consecutive green 15m candles before entry
-//      means the move is already well underway; buying into that is
-//      chasing, not catching a fresh spike. calcEntryFreshness below counts
-//      the current same-direction candle streak from the 15m klines
-//      leaderboard-scanner.js already fetches (no new API calls needed).
-//
-// Both return a small penalty (not a hard block) — folded into conv score
-// in leaderboard-scanner.js — plus the raw diagnostics, so the reasoning is
-// visible in market-data.json the same way bullChecks/entrySnapshot are.
+// Checks aimed at trade-log patterns:
+//   1. RSI extension — independent per-timeframe scoring (15m / 1h).
+//   2. Candle-run chasing — consecutive green 15m candles streak check.
+//   3. Signal quality floor — filters thin setups with low confidence.
+//   4. Pullback from high — prevents buying into active breakdowns.
+//   5. Time-of-Day (ToD) liquidity — penalizes low-volume / high-wick
+//      off-hours window (5 PM - 2 AM EST) and raises the quality floor.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CHASE_ENABLED = (process.env.BUY_ENABLE_CHASE_CHECK || 'true') !== 'false';
-// Crypto moves fast — the whole spike can play out in minutes, not the
-// 75-105 min a 5-7 candle streak would take to build. Decide runs every
-// 5 min specifically because crypto can turn that quickly, so a chase
-// check calibrated for a slower asset class (stocks) would mostly fire
-// AFTER the move already peaked and reversed — too late to matter.
-// Tightened to 2-3 closed 15m candles (30-45 min), matching the pace
-// this system already reacts on.
 const CHASE_WARN_STREAK  = parseInt(process.env.BUY_CHASE_WARN_STREAK  || '2', 10); // consecutive green 15m candles -> -1
 const CHASE_BLOCK_STREAK = parseInt(process.env.BUY_CHASE_BLOCK_STREAK || '3', 10); // -> -2
 
@@ -48,38 +29,23 @@ const RSI_15M_VHOT = parseFloat(process.env.BUY_RSI_15M_VHOT || '78');
 const RSI_1H_HOT   = parseFloat(process.env.BUY_RSI_1H_HOT   || '68');
 
 const QUALITY_ENABLED = (process.env.BUY_ENABLE_QUALITY_FLOOR || 'true') !== 'false';
-// IMX's 5:22 PM buy: bullConf 1/10, whale 35/100, dashboard status still
-// "BUILDING" (OI div/CVD/dip-score all "—", not enough data yet). Not
-// chasing, not RSI-extended — just a genuinely thin, low-confidence setup
-// the chase/RSI checks have no way to see. This is a different failure
-// mode: weak signal, not bad timing.
 const QUALITY_MIN_BULLCONF = parseInt(process.env.BUY_QUALITY_MIN_BULLCONF || '3', 10); // out of 10
 const QUALITY_MIN_WHALE    = parseFloat(process.env.BUY_QUALITY_MIN_WHALE  || '40');    // out of 100
 
+// Dynamic off-hours quality floor overrides (5 PM - 2 AM EST)
+const QUALITY_OFFHOURS_MIN_BULLCONF = parseInt(process.env.BUY_QUALITY_OFFHOURS_MIN_BULLCONF || '5', 10);
+const QUALITY_OFFHOURS_MIN_WHALE    = parseFloat(process.env.BUY_QUALITY_OFFHOURS_MIN_WHALE  || '60');
+
 const PULLBACK_ENABLED = (process.env.BUY_ENABLE_PULLBACK_CHECK || 'true') !== 'false';
-// DOGE bought at $0.070920 — chart shows that's already 1-2 candles into a
-// breakdown from a ~$0.0715 local high, not during the green run-up. The
-// chase check only watches for green streaks (a red candle resets it to 0
-// immediately), so it's structurally blind to "just topped and rolling
-// over" — a different pattern from chasing a breakout. This is the mirror
-// image: instead of penalizing buying too late into a pump, it penalizes
-// buying too early into a dump, right after a recent local high broke.
 const PULLBACK_LOOKBACK  = parseInt(process.env.BUY_PULLBACK_LOOKBACK  || '10', 10); // closed 15m candles to scan for the recent high
 const PULLBACK_WARN_PCT  = parseFloat(process.env.BUY_PULLBACK_WARN_PCT  || '0.5');
 const PULLBACK_BLOCK_PCT = parseFloat(process.env.BUY_PULLBACK_BLOCK_PCT || '1.0');
 
+// Time-of-day settings
+const TOD_ENABLED = (process.env.BUY_ENABLE_TOD_CHECK || 'true') !== 'false';
+const TOD_PENALTY = parseInt(process.env.BUY_TOD_PENALTY || '1', 10);
+
 // ── Candle-run "chasing" check ──────────────────────────────────────────
-// Counts the current unbroken streak of same-direction 15m candles ending
-// at the most recent one. A long green streak means price has already run
-// — the earlier, higher-conviction part of the move already happened.
-//
-// IMPORTANT: fetch runs every 5 min but a 15m candle takes 15 min to
-// close, so Binance's klines response always has the CURRENT, still-
-// forming candle as the last element — 2 of every 3 fetch cycles see an
-// incomplete candle. Counting it would make the streak (and its penalty)
-// flicker within a single 15m window as that candle's own color changes
-// while it's still building — noise, not a real signal. So this drops
-// the last candle and starts the streak from the last CLOSED one.
 export function calcEntryFreshness(k15) {
   if (!CHASE_ENABLED || !Array.isArray(k15) || k15.length < 4) {
     return { consecutiveUp: 0, consecutiveDown: 0, chasing: false, penalty: 0, reason: null };
@@ -106,9 +72,6 @@ export function calcEntryFreshness(k15) {
 }
 
 // ── RSI extension check ─────────────────────────────────────────────────
-// Independent per-timeframe scoring (not calcConviction's AND-gated
-// r15>70 && r4h>65), so a symbol hot on ONE timeframe still takes a
-// penalty instead of needing both simultaneously to trip anything.
 export function calcEntryExtension(r15, r1h) {
   if (!RSI_ENABLED) return { penalty: 0, reason: null };
   const r15v = r15 ?? 50, r1hv = r1h ?? 50;
@@ -123,32 +86,30 @@ export function calcEntryExtension(r15, r1h) {
 }
 
 // ── Signal-quality / data-confidence floor ─────────────────────────────
-// Independent of chasing/RSI — this catches a setup that's just thin,
-// regardless of timing. bullConf and whaleScore both come from the
-// same-cycle data (not a lagging average), so "low confidence" here means
-// genuinely weak right now, not stale.
-export function calcSignalQuality(bullConfCount, whaleScore) {
+// Supports optional isOffHours flag to enforce higher signal thresholds
+// during thin order-book windows (5 PM - 2 AM EST).
+export function calcSignalQuality(bullConfCount, whaleScore, isOffHours = false) {
   if (!QUALITY_ENABLED || bullConfCount == null || whaleScore == null) {
     return { penalty: 0, reason: null };
   }
+
+  const minBull = isOffHours ? QUALITY_OFFHOURS_MIN_BULLCONF : QUALITY_MIN_BULLCONF;
+  const minWhale = isOffHours ? QUALITY_OFFHOURS_MIN_WHALE : QUALITY_MIN_WHALE;
+
   const hits = [];
   let penalty = 0;
-  if (bullConfCount < QUALITY_MIN_BULLCONF) {
+  if (bullConfCount < minBull) {
     penalty += 2;
-    hits.push(`bullConf ${bullConfCount}/10 < ${QUALITY_MIN_BULLCONF} (thin signal)`);
+    hits.push(`bullConf ${bullConfCount}/10 < ${minBull} (${isOffHours ? 'off-hours strict' : 'thin signal'})`);
   }
-  if (whaleScore < QUALITY_MIN_WHALE) {
+  if (whaleScore < minWhale) {
     penalty += 1;
-    hits.push(`whale ${whaleScore}/100 < ${QUALITY_MIN_WHALE} (low confidence)`);
+    hits.push(`whale ${whaleScore}/100 < ${minWhale} (${isOffHours ? 'off-hours strict' : 'low confidence'})`);
   }
   return { penalty, reason: hits.length ? hits.join(' · ') : null };
 }
 
 // ── Pullback-from-recent-high check ─────────────────────────────────────
-// Drops the still-forming candle for the same reason calcEntryFreshness
-// does — an incomplete last candle would make the "recent high" flicker
-// within a single 15m window as that candle's own high keeps changing
-// while it builds.
 export function calcPullbackFromHigh(k15, currentPrice) {
   if (!PULLBACK_ENABLED || !Array.isArray(k15) || k15.length < PULLBACK_LOOKBACK + 1 || currentPrice == null) {
     return { penalty: 0, reason: null, pullbackPct: 0, recentHigh: null };
@@ -171,13 +132,40 @@ export function calcPullbackFromHigh(k15, currentPrice) {
   return { penalty, reason, pullbackPct: parseFloat(pullbackPct.toFixed(3)), recentHigh };
 }
 
+// ── Time-of-Day / Off-Hours Liquidity Check ─────────────────────────────
+// Evaluates if the trigger falls in the low-liquidity / wick-heavy transition
+// window between 5:00 PM EST (17:00) and 2:00 AM EST (02:00).
+export function calcTimeOfDayPenalty(date = new Date()) {
+  if (!TOD_ENABLED) return { penalty: 0, reason: null, isOffHours: false };
+
+  const estHour = parseInt(
+    date.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit' }),
+    10
+  );
+
+  const isOffHours = estHour >= 17 || estHour < 2;
+
+  if (isOffHours) {
+    return {
+      penalty: TOD_PENALTY,
+      reason: `Triggered during off-hours window (5 PM - 2 AM EST) — elevated low-liquidity / wick risk`,
+      isOffHours: true
+    };
+  }
+
+  return { penalty: 0, reason: null, isOffHours: false };
+}
+
 // ── Combined entry check — called once per symbol from scoreSymbol() ──
-export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore, currentPrice }) {
+export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore, currentPrice, timestamp }) {
+  const tod       = calcTimeOfDayPenalty(timestamp ? new Date(timestamp) : new Date());
   const freshness = calcEntryFreshness(k15);
   const extension = calcEntryExtension(r15, r1h);
-  const quality    = calcSignalQuality(bullConfCount, whaleScore);
-  const pullback   = calcPullbackFromHigh(k15, currentPrice);
-  const penalty = freshness.penalty + extension.penalty + quality.penalty + pullback.penalty;
-  const reasons = [freshness.reason, extension.reason, quality.reason, pullback.reason].filter(Boolean);
-  return { penalty, reasons, freshness, extension, quality, pullback };
+  const quality   = calcSignalQuality(bullConfCount, whaleScore, tod.isOffHours);
+  const pullback  = calcPullbackFromHigh(k15, currentPrice);
+
+  const penalty = freshness.penalty + extension.penalty + quality.penalty + pullback.penalty + tod.penalty;
+  const reasons = [freshness.reason, extension.reason, quality.reason, pullback.reason, tod.reason].filter(Boolean);
+
+  return { penalty, reasons, freshness, extension, quality, pullback, tod };
 }
