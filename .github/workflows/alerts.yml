@@ -1,30 +1,13 @@
 name: Alpha Terminal Alert Runner
 
 on:
-  schedule:
-    # Job A — market data fetch only. No alerts, no Telegram, no position
-    # writes. Just refreshes market-data.json (with peak shock/obi tracking)
-    # so Job B always has fresh-ish data without needing to call Binance
-    # itself on its own 15-min cycle.
-    # - cron: '*/5 * * * *'        # every 5 minutes
-
-    # Job B — leaderboard buy decision + position tracker sell-side check
-    # (stop/T1/T2 on open positions). Runs on GitHub's own schedule as the
-    # primary path. A Cloudflare Worker safety net (see DEPLOY.md) polls
-    # heartbeat.json every ~17 min (:04,:21,:38,:55) and fires
-    # workflow_dispatch mode=decide if THIS schedule failed to land
-    # recently — a safety net, not a replacement, so this stays as the
-    # normal path most of the time. The same Worker tick ALSO
-    # unconditionally fires mode=fetch every time (see concurrency group
-    # below for why that no longer starves a queued decide run).
-    # - cron: '0,10,20,30,40,50 * * * *'       # every ~10 minutes
-
-    # Full scan — watchlist signal/overnight rules. Hourly matches the
-    # 4h/daily timeframes that logic operates on. The OLD leaderboard buy
-    # scanner inside alert-runner.js is disabled by default here (see
-    # LB_LEGACY_SCAN) since Job B now owns the buy side on a faster cycle.
-    # - cron: '31 * * * *'         # :13 past every hour
-
+  # Cron fully disabled — Cloudflare Worker is the unconditional primary
+  # scheduler now (fetch every 5 min, decide 2 min after each fetch, see
+  # DEPLOY.md). This workflow is triggered entirely via workflow_dispatch
+  # calls from that Worker, plus manual runs from the Actions tab (pick
+  # any mode below) to test fetch/decide/full independently of Cloudflare's
+  # own timing. No GitHub-side schedule left to race, double-fire, or
+  # drift out of sync with the Worker's cadence.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -33,7 +16,7 @@ on:
         default: 'false'
         type: boolean
       mode:
-        description: 'Run mode (manual runs only — scheduled runs pick this automatically)'
+        description: 'Run mode'
         required: false
         default: 'full'
         type: choice
@@ -44,22 +27,25 @@ on:
           - decide
 
 concurrency:
-  # Keyed by mode/schedule rather than one shared "alert-runner" group.
+  # Keyed by mode rather than one shared "alert-runner" group.
   #
   # Why this matters: with a single shared group, GitHub Actions cancels
   # older *queued* (not yet started) runs whenever a newer run queues
   # behind the same group — cancel-in-progress:false only protects a run
   # that's already EXECUTING, not ones waiting in line. Since the
-  # Cloudflare Worker safety net (see DEPLOY.md) unconditionally fires
-  # mode=fetch every ~17 min AND conditionally fires mode=decide on the
-  # same tick, a queued decide run could get superseded by the next
-  # fetch dispatch before it ever ran — decide silently never executes,
-  # no error, market-data.json just keeps aging past the point decide
-  # needed it. (Observed: fetch data >30min stale, decide hadn't run.)
+  # Cloudflare Worker unconditionally fires mode=fetch every ~5 min AND
+  # fires mode=decide 2 min after each fetch, a queued decide run could
+  # get superseded by the next fetch dispatch before it ever ran — decide
+  # silently never executes, no error, market-data.json just keeps aging
+  # past the point decide needed it. (Observed: fetch data >30min stale,
+  # decide hadn't run.)
   #
   # Splitting the group by mode means a queued decide can only ever be
   # superseded by another decide, never bumped by an unrelated fetch.
-  group: alert-runner-${{ github.event.schedule == '2-59/5 * * * *' && 'decide' || (github.event.schedule == '*/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
+  # No cron trigger exists anymore (see `on:` above), so this only ever
+  # needs to key off inputs.mode now — the old github.event.schedule
+  # string-matching branches are dead code from when cron still ran.
+  group: alert-runner-${{ inputs.mode || 'manual' }}
   cancel-in-progress: false
 
 permissions:
@@ -87,31 +73,18 @@ jobs:
         run: npm install
 
       # ── Determine run mode ──────────────────────────────────────────────
-      # */5        → fetch   (market-fetcher.js — Job A, data only)
-      # 2,19,36,53 → decide  (leaderboard-decider.js + positions check — Job B)
-      # :15 hourly → full    (alert-runner.js full watchlist/overnight scan)
-      # workflow_dispatch    → whatever the "mode" input says (default: full)
-      #
-      # NOTE: github.event.schedule tells us exactly which cron string
-      # triggered this run, so there's no ambiguity even when two schedules
-      # coincide.
+      # Cron is fully disabled (see `on:` above) — every run is now either
+      # a manual dispatch (Actions tab → Run workflow → pick a mode) or a
+      # workflow_dispatch call from the Cloudflare Worker, which always
+      # passes mode=fetch or mode=decide explicitly. So this just reads
+      # inputs.mode directly now, defaulting to 'full' only for the
+      # unlikely case it's somehow missing.
       - name: Determine run mode
         id: mode
         run: |
-          SCHEDULE="${{ github.event.schedule }}"
-          if [ "$SCHEDULE" = "*/5 * * * *" ]; then
-            VALUE="fetch"
-          elif [ "$SCHEDULE" = "2-59/5 * * * *" ]; then
-            VALUE="decide"
-          elif [ "$SCHEDULE" = "31 * * * *" ]; then
-            VALUE="full"
-          elif [ -n "${{ inputs.mode }}" ]; then
-            VALUE="${{ inputs.mode }}"
-          else
-            VALUE="full"
-          fi
+          VALUE="${{ inputs.mode || 'full' }}"
           echo "value=$VALUE" >> "$GITHUB_OUTPUT"
-          echo "Resolved mode: $VALUE (schedule: '${SCHEDULE:-manual}')"
+          echo "Resolved mode: $VALUE"
 
       # ── Write env.js with real credentials (runtime only — never committed) ──
       # This file is written to disk for GitHub Pages to serve to the browser.
