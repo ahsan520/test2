@@ -6,7 +6,7 @@ on:
     # writes. Just refreshes market-data.json (with peak shock/obi tracking)
     # so Job B always has fresh-ish data without needing to call Binance
     # itself on its own 15-min cycle.
-    - cron: '*/5 * * * *'        # every 5 minutes
+    # - cron: '*/5 * * * *'        # every 5 minutes
 
     # Job B — leaderboard buy decision + position tracker sell-side check
     # (stop/T1/T2 on open positions). Runs on GitHub's own schedule as the
@@ -17,13 +17,13 @@ on:
     # normal path most of the time. The same Worker tick ALSO
     # unconditionally fires mode=fetch every time (see concurrency group
     # below for why that no longer starves a queued decide run).
-    - cron: '0,10,20,30,40,50 * * * *'       # every ~10 minutes
+    # - cron: '0,10,20,30,40,50 * * * *'       # every ~10 minutes
 
     # Full scan — watchlist signal/overnight rules. Hourly matches the
     # 4h/daily timeframes that logic operates on. The OLD leaderboard buy
     # scanner inside alert-runner.js is disabled by default here (see
     # LB_LEGACY_SCAN) since Job B now owns the buy side on a faster cycle.
-    - cron: '31 * * * *'         # :13 past every hour
+    # - cron: '31 * * * *'         # :13 past every hour
 
   workflow_dispatch:
     inputs:
