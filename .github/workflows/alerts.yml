@@ -223,6 +223,15 @@ jobs:
           BUY_HIST_GATE_SOFT_MIN_SAMPLE:   ${{ vars.BUY_HIST_GATE_SOFT_MIN_SAMPLE || '6' }}
           BUY_HIST_GATE_SOFT_MAX_WINRATE:  ${{ vars.BUY_HIST_GATE_SOFT_MAX_WINRATE || '0.20' }}
           BUY_HIST_GATE_SOFT_PENALTY:      ${{ vars.BUY_HIST_GATE_SOFT_PENALTY || '4' }}
+          # Same-day repeat-failure pause — catches a fast repeated
+          # failure pattern (e.g. AVAX: 3 losses in one day) the 30-day
+          # gate above is too slow to react to. Losses only, needs 2+
+          # within the window — a single loss never pauses, so a
+          # legitimate re-buy after a BTC-driven bounce stays unblocked.
+          BUY_SAMEDAY_FAIL_ENABLE:      ${{ vars.BUY_SAMEDAY_FAIL_ENABLE || 'true' }}
+          BUY_SAMEDAY_FAIL_COUNT:       ${{ vars.BUY_SAMEDAY_FAIL_COUNT || '2' }}
+          BUY_SAMEDAY_FAIL_WINDOW_HRS:  ${{ vars.BUY_SAMEDAY_FAIL_WINDOW_HRS || '4' }}
+          BUY_SAMEDAY_FAIL_PAUSE_HRS:   ${{ vars.BUY_SAMEDAY_FAIL_PAUSE_HRS || '3' }}
           BUY_ENABLE_PULLBACK_CHECK:   ${{ vars.BUY_ENABLE_PULLBACK_CHECK || 'true' }}
           BUY_PULLBACK_LOOKBACK:   ${{ vars.BUY_PULLBACK_LOOKBACK || '10' }}
           BUY_PULLBACK_WARN_PCT:  ${{ vars.BUY_PULLBACK_WARN_PCT || '0.5%' }}
