@@ -169,6 +169,13 @@ jobs:
           LB_EXIT_CVD_CYCLES: ${{ vars.LB_EXIT_CVD_CYCLES || vars.LB_CVD_CYCLES || '3' }}
           LB_EXIT_SCORE_MIN:  ${{ vars.LB_EXIT_SCORE_MIN || '3' }}
           LB_STALE_WATCH_HRS: ${{ vars.LB_STALE_WATCH_HRS || '24' }}
+          # Separate, much shorter threshold for LIVE positions specifically
+          # — the old 24h threshold also silently abandoned real MEXC
+          # positions without ever selling them (tracking got deleted, the
+          # exchange position stayed open, unmonitored). This closes that
+          # gap: a live position stale past this threshold gets a REAL
+          # sell order placed before its tracking is removed.
+          LB_STALE_LIVE_HRS: ${{ vars.LB_STALE_LIVE_HRS || '3' }}
           LB_ALLOW_PRE_MARKET: ${{ vars.LB_ALLOW_PRE_MARKET || 'false' }}
           LB_ALLOW_AH:        ${{ vars.LB_ALLOW_AH || 'false' }}
           LB_ALERT_STATE_TTL_HOURS: ${{ vars.LB_ALERT_STATE_TTL_HOURS || '6' }}
@@ -186,6 +193,14 @@ jobs:
           EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
           ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
+          # Stagnation override — waives rotation's own "flat = protected"
+          # guard for a position that's BOTH old enough to have had a real
+          # chance to move AND still sitting near its own fill price with
+          # no real movement. Only relevant if the position has also
+          # fallen off today's recommended list (Guard 3 still fully
+          # protects anything still genuinely liked, regardless of age).
+          ROTATION_STAGNATION_AGE_MIN:  ${{ vars.ROTATION_STAGNATION_AGE_MIN || '120' }}
+          ROTATION_STAGNATION_FLAT_PCT: ${{ vars.ROTATION_STAGNATION_FLAT_PCT || '0.3' }}
           STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
           T1_ATR_MULT:        ${{ vars.T1_ATR_MULT || '0.5' }}
           T2_ATR_MULT:        ${{ vars.T2_ATR_MULT || '2' }}
@@ -280,6 +295,14 @@ jobs:
           MI_HISTORY_LEN: ${{ vars.MI_HISTORY_LEN || '4' }}
           # ── v15 Buy-side gate (market-guard.js: checkMarketIntelligenceGate) ──
           BUY_BTC_RISK_MAX:             ${{ vars.BUY_BTC_RISK_MAX || '60' }}
+          # Relative-strength exception for the BTC risk-score block above
+          # — previously an unconditional hard block with no bypass at all
+          # (unlike the breadth check below, which already had one). A
+          # symbol proving real positive RS vs BTC (calcRelativeStrength)
+          # plus the same strength-exception quality bar used for breadth
+          # can now clear this block instead of being caught regardless of
+          # its own individual strength.
+          BUY_RISKSCORE_ALLOW_EXCEPTION: ${{ vars.BUY_RISKSCORE_ALLOW_EXCEPTION || 'true' }}
           BUY_DYNAMIC_BULL4H:           ${{ vars.BUY_DYNAMIC_BULL4H || 'true' }}
           BUY_REQUIRE_BREADTH:          ${{ vars.BUY_REQUIRE_BREADTH || 'true' }}
           BUY_MIN_BREADTH:              ${{ vars.BUY_MIN_BREADTH || '60' }}
@@ -288,6 +311,16 @@ jobs:
           SELL_ENABLE_INTELLIGENCE:    ${{ vars.SELL_ENABLE_INTELLIGENCE || 'true' }}
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
           SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
+          # Staleness nudge (position-intelligence.js) — neither Position
+          # Intelligence's own thesis checks nor Profit Intelligence (needs
+          # peak profit to ever engage) touch a position that's just
+          # sitting flat. This adds a modest exitProbability bump once a
+          # position is old enough and still genuinely flat, so pure
+          # stagnation eventually gets nudged toward an exit.
+          SELL_ENABLE_STALE_NUDGE:   ${{ vars.SELL_ENABLE_STALE_NUDGE || 'true' }}
+          SELL_STALE_NUDGE_AGE_MIN:  ${{ vars.SELL_STALE_NUDGE_AGE_MIN || '120' }}
+          SELL_STALE_NUDGE_FLAT_PCT: ${{ vars.SELL_STALE_NUDGE_FLAT_PCT || '0.3' }}
+          SELL_STALE_NUDGE_AMOUNT:   ${{ vars.SELL_STALE_NUDGE_AMOUNT || '15' }}
           SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
           SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '15' }}
           SELL_RECOVERY_WAIT_MIN:      ${{ vars.SELL_RECOVERY_WAIT_MIN || '10' }}
