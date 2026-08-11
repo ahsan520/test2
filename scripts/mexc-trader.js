@@ -21,6 +21,7 @@
 
 import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, getBaseSizePrecision, floorToStep } from './mexc-client.js';
 import { closeLiveOrder, countLiveOpenPositions } from './position-monitor.js';
+import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
@@ -119,7 +120,7 @@ const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USD
 // unaffected by any of this — but note the exchange-side stop for a
 // rotated-out position gets cancelled here via closeLiveOrder's own
 // reconciliation logic before the rotation sell executes.
-async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, effectiveTopNCount, positions, market, tradeState, effectiveTradeMode, closedOutcomes, utc }) {
+async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, effectiveTopNCount, positions, market, marketState = {}, tradeState, effectiveTradeMode, closedOutcomes, utc }) {
   let changed = false;
 
   const allStarred = (ranked || []).filter(r =>
@@ -189,6 +190,32 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
     return parseFloat(cur) >= parseFloat(buyPrice) * (1 + ROTATION_MIN_PROFIT_PCT / 100);
   };
 
+  // ── Stagnation override — waives Guard 2's flat-position protection ──
+  // Guard 2 above protects ANY position below its profit margin,
+  // including one that's simply sitting flat with no real momentum
+  // either way — which meant a stagnant position was permanently shielded
+  // from rotation, tying up a live slot indefinitely even after it fell
+  // off the recommended list entirely. This only waives that specific
+  // protection — Guard 3 (still genuinely recommended) and Guard 1 (min
+  // hold time) still fully apply, so a stagnant-but-still-liked position
+  // stays protected. This only affects a position that's BOTH old enough
+  // to have had a real chance to move AND still near its own fill price
+  // with no real movement — same threshold philosophy as Position
+  // Intelligence's stale+flat nudge (SELL_STALE_NUDGE_*), applied here to
+  // rotation eligibility instead of exit probability.
+  const STAGNATION_AGE_MIN  = parseFloat(process.env.ROTATION_STAGNATION_AGE_MIN  || '120'); // 2h
+  const STAGNATION_FLAT_PCT = parseFloat(process.env.ROTATION_STAGNATION_FLAT_PCT || '0.3');
+  const isStagnant = (base, pos) => {
+    if (!pos?.liveOrder?.buyAt) return false;
+    const ageMin = (Date.now() - pos.liveOrder.buyAt) / 60000;
+    if (ageMin < STAGNATION_AGE_MIN) return false;
+    const buyPrice = pos?.liveOrder?.fillPrice;
+    const cur = (market.symbols || {})[base + 'USDT']?.price;
+    if (!buyPrice || cur === undefined || cur === null) return false;
+    const pnlPct = ((parseFloat(cur) - parseFloat(buyPrice)) / parseFloat(buyPrice)) * 100;
+    return Math.abs(pnlPct) < STAGNATION_FLAT_PCT;
+  };
+
   // ── Guard 3: still shows up as A/A+ today, even if outside the top-N
   // slot count ──
   // gradeStillTop (above) only protects a position if it's within THIS
@@ -211,12 +238,41 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   // null = "no opinion" when it can't evaluate, which correctly does NOT
   // protect — falls through to selling, same as previous behavior when
   // price/buyPrice data is simply unavailable).
+  // ── Guard 4: profitable AND momentum still strong — protected even if
+  // it fell off today's recommended list entirely ──
+  // Guards 1-3 only ever ask "is this still today's recommended pick?" —
+  // none of them look at the position's OWN momentum. That means a
+  // profitable position whose momentum is genuinely still strong could
+  // get rotated out purely because its RANK slipped (fewer bullConf
+  // checks passing today, a slightly lower conv score, etc.) even though
+  // nothing about its actual price action has changed. Worse, Position
+  // Intelligence and Profit Intelligence BOTH already evaluated this
+  // exact position earlier the same cycle (monitorPositions runs before
+  // rotation) and may well have said "HOLD, momentum still good" — only
+  // for rotation to sell it moments later for an unrelated reason. This
+  // reuses isMomentumWeak from profit-intelligence.js directly (not a
+  // re-implementation) so both systems read momentum identically — if
+  // CVD/OI/breadth aren't fading and RSI hasn't rolled over, a profitable
+  // position is protected here regardless of its current rank.
+  const isMomentumStillStrong = (base, pos) => {
+    const buyPrice = pos?.liveOrder?.fillPrice;
+    const cur = (market.symbols || {})[base + 'USDT']?.price;
+    if (!buyPrice || cur === undefined || cur === null) return false; // no data — no opinion, don't protect
+    const pnlPct = ((parseFloat(cur) - parseFloat(buyPrice)) / parseFloat(buyPrice)) * 100;
+    if (pnlPct < ROTATION_MIN_PROFIT_PCT) return false; // only relevant for a genuinely profitable position — Guard 2 already handles flat/losing
+    const symbolState = marketState?.symbols?.[base + 'USDT'];
+    const r15 = parseFloat((market.symbols || {})[base + 'USDT']?.d?.r15);
+    const momentum = isMomentumWeak({ symbolState, marketState, r15, lastR15: pos.lastR15 ?? null });
+    return !momentum.weak;
+  };
+
   const isProtected = (base, pos) => {
     if (gradeStillTop(base)) return true;
     if (withinMinHold(pos)) return true;
     if (stillOnFullStarredList(base)) return true;
+    if (isMomentumStillStrong(base, pos)) return true;
     const atOrAboveBuy = currentlyAtOrAboveBuy(base, pos);
-    if (atOrAboveBuy === false) return true; // below buy price — protected from rotation, only own stop/T1/T2 can close it
+    if (atOrAboveBuy === false && !isStagnant(base, pos)) return true; // below buy price — protected UNLESS also stale+flat (waived above)
     return false;
   };
 

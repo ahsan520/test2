@@ -80,7 +80,7 @@ function pickTier(highestPnLSeen) {
 // oiMomentum come from market-state.json's symbolState, breadthMomentum
 // from the top-level marketState) so this stays consistent with the rest
 // of the sell-side stack instead of inventing a second momentum source. ──
-function isMomentumWeak({ symbolState, marketState, r15, lastR15 }) {
+export function isMomentumWeak({ symbolState, marketState, r15, lastR15 }) {
   const cvdFading     = symbolState?.cvdMomentum?.trend === 'FADING';
   const oiFading      = symbolState?.oiMomentum?.trend === 'FADING';
   const breadthFading = marketState?.breadthMomentum?.trend === 'FADING';

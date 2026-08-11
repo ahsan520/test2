@@ -27,6 +27,16 @@ import { evaluatePosition, positionIntelligenceEnabled } from './position-intell
 import { evaluateProfitProtection, profitIntelligenceEnabled } from './profit-intelligence.js';
 
 const LB_STALE_WATCH_HRS = parseFloat(process.env.LB_STALE_WATCH_HRS || '24');
+// Separate, much shorter threshold for LIVE positions specifically — the
+// old single 24h threshold applied to everything ('watching' status
+// covers both watchlist-only signals AND live MEXC positions, since
+// status doesn't change on fill). For a watchlist-only signal that's
+// fine — nothing real to sell, just stop tracking. For a LIVE position,
+// 24h is far too long to leave real capital sitting stagnant, AND —
+// separately, this was the actual bug — the eviction below never sold
+// the position, just deleted the tracking record, silently abandoning a
+// real open MEXC position with no further stop-loss protection at all.
+const LB_STALE_LIVE_HRS  = parseFloat(process.env.LB_STALE_LIVE_HRS  || '3');
 const LB_HOLD_LOCK       = parseInt(process.env.LB_HOLD_LOCK       || '20');
 const LB_EXIT_CVD_CYCLES = parseInt(process.env.LB_EXIT_CVD_CYCLES || '3');
 const LB_EXIT_SCORE_MIN  = parseInt(process.env.LB_EXIT_SCORE_MIN  || '3');
@@ -530,7 +540,11 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     }
 
     // ── 2. Remove stale watching positions (never hit stop or target) ──
-    if (pos.status === 'watching') {
+    // Live positions are handled separately below (step 3b), AFTER market
+    // price is looked up — a live position needs a real sell order placed,
+    // not just tracking deleted, so it needs price data to close properly.
+    const isLiveHeld = pos.status === 'watching' && pos.liveOrder?.mode === 'live' && !pos.liveOrder?.closedAt;
+    if (pos.status === 'watching' && !isLiveHeld) {
       const openedAt = pos.alertedAt || 0;
       if (now - openedAt >= staleMs) {
         const ageHrs = Math.round((now - openedAt) / 3600000);
@@ -559,6 +573,51 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     const d      = mData.d;
     const price  = parseFloat(d.p || 0);
     if (!price) { console.log(`  ⚠  ${pos.base} — price is 0, skipping`); continue; }
+
+    // ── 3b. Stale LIVE position — actually close it, don't just abandon
+    // tracking ──
+    // This is the fix for the bug the old step-2 eviction had: a live
+    // position that's been open past LB_STALE_LIVE_HRS with no stop/
+    // target hit gets a REAL sell order placed here before its tracking
+    // is removed, instead of just deleting the record and leaving a real
+    // MEXC position open with zero further monitoring. Independent of
+    // Position Intelligence (which needs actual thesis deterioration to
+    // fire) and Profit Intelligence (which needs peak profit to ever
+    // engage) — this is specifically for a position that's neither
+    // winning nor losing, just tying up a live slot doing nothing.
+    if (isLiveHeld) {
+      const openedAt = pos.alertedAt || 0;
+      const liveStaleMs = LB_STALE_LIVE_HRS * 3600000;
+      if (now - openedAt >= liveStaleMs) {
+        const ageHrs = ((now - openedAt) / 3600000).toFixed(1);
+        const pnlPct = ((price - pos.entryPrice) / pos.entryPrice) * 100;
+        console.log(`  🗑💰  ${pos.base} — live position stale ${ageHrs}h (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%), closing for real`);
+        pos.exitPrice = price;
+        const closeResult = await closeLiveOrder(pos, `Stale — ${ageHrs}h with no stop/target hit`, telegramAlerts);
+        if (!closeResult.closed) {
+          delete pos.exitPrice;
+          continue; // sell didn't complete — retry next cycle, don't evict an unresolved live position
+        }
+        pos.status = 'exiting';
+        pos.statusChangedAt = now;
+        changed = true;
+
+        closedOutcomes.push({
+          base: pos.base, pair: pos.base + (pos.assetType === 'crypto' ? 'USDT' : ''),
+          outcome: 'stale_live_closed', score: pos.score, spikeScore: pos.spikeScore,
+          pnlPct: parseFloat(pnlPct.toFixed(2)) || 0, closedAt: now,
+        });
+
+        logAudit('live_position_stale_closed', { sym, ageHrs, pnlPct, closeReason: closeResult.reason });
+
+        telegramAlerts.push(
+          `🗑💰 *STALE LIVE POSITION CLOSED* — ${pos.base} — ${utc}\n` +
+          `  Open ${ageHrs}h with no stop/target hit — closed to free the slot\n` +
+          `  Entry $${pos.entryPrice}  Current $${price}  P&L ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%`
+        );
+        continue;
+      }
+    }
 
     const entry  = parseFloat(pos.entryPrice || 0);
     const t1     = parseFloat(pos.t1    || 0);

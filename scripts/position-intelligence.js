@@ -38,6 +38,23 @@ const EMERGENCY_EXIT_LEVEL    = parseFloat(process.env.SELL_EMERGENCY_EXIT_LEVEL
 const USE_MARKET_REGIME       = (process.env.SELL_USE_MARKET_REGIME    || 'true') !== 'false';
 const REQUIRE_BTC_RECOVERY    = (process.env.SELL_REQUIRE_BTC_RECOVERY || 'true') !== 'false';
 
+// ── Staleness nudge ──────────────────────────────────────────────────
+// Everything above requires real thesis deterioration or falling-knife
+// momentum to move exitProbability. A position that's neither winning
+// (Profit Intelligence never engages — needs peak profit to fire) nor
+// actively deteriorating (nothing above fires either) can sit forever,
+// tying up a live slot doing nothing. This adds a modest exitProbability
+// bump once a position is old enough AND still genuinely flat, so a truly
+// stagnant position eventually gets nudged toward an exit instead of
+// being invisible to every existing check. Small and additive — a
+// position with any real momentum (up or down) is essentially unaffected
+// since |pnlPct| won't be inside the flat band; this only meaningfully
+// moves the needle for genuine stagnation.
+const STALE_NUDGE_ENABLED  = (process.env.SELL_ENABLE_STALE_NUDGE || 'true') !== 'false';
+const STALE_NUDGE_AGE_MIN  = parseFloat(process.env.SELL_STALE_NUDGE_AGE_MIN  || '120'); // 2h
+const STALE_NUDGE_FLAT_PCT = parseFloat(process.env.SELL_STALE_NUDGE_FLAT_PCT || '0.3');
+const STALE_NUDGE_AMOUNT   = parseFloat(process.env.SELL_STALE_NUDGE_AMOUNT   || '15');
+
 export function positionIntelligenceEnabled() { return ENABLED; }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -193,6 +210,10 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   if (USE_MARKET_REGIME && marketState?.marketRegime === 'RISK_OFF') exitProbability += 8;
   if (USE_MARKET_REGIME && marketState?.marketRegime === 'RISK_ON')  exitProbability -= 6;
 
+  // ── Staleness nudge — see constants block above ──
+  const isStaleAndFlat = STALE_NUDGE_ENABLED && ageMin >= STALE_NUDGE_AGE_MIN && Math.abs(pnlPct ?? 0) < STALE_NUDGE_FLAT_PCT;
+  if (isStaleAndFlat) exitProbability += STALE_NUDGE_AMOUNT;
+
   exitProbability = Math.round(clamp(exitProbability, 0, 100));
 
   // ── Dynamic Position Risk — Exit Probability, softened if a sustained
@@ -211,7 +232,7 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
       action: 'EXIT',
       reason: `Thesis invalidated: entry score ${snap.thesisScore} → current ${currentThesisScore} (drop ${thesisDrop.toFixed(0)} > ${THESIS_INVALIDATE_SCORE})`,
       fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk,
-      positionAgeMin: ageMin, recovery,
+      positionAgeMin: ageMin, recovery, isStaleAndFlat,
     };
   }
 
@@ -221,7 +242,7 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
       action: 'REDUCE_50',
       reason: `Confidence decay ${confidenceDecay}% > ${CONFIDENCE_DECAY_MAX}% with falling-knife ${fallingKnifeScore}`,
       fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk,
-      positionAgeMin: ageMin, recovery,
+      positionAgeMin: ageMin, recovery, isStaleAndFlat,
     };
   }
 
@@ -232,12 +253,12 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   else if (dynamicPositionRisk >= PARTIAL_EXIT_LEVEL1)  action = 'REDUCE_25';
 
   const reason = action === 'HOLD'
-    ? `dynamicPositionRisk ${dynamicPositionRisk} below ${PARTIAL_EXIT_LEVEL1} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}`
-    : `dynamicPositionRisk ${dynamicPositionRisk} ≥ ${action === 'EMERGENCY_EXIT' ? EMERGENCY_EXIT_LEVEL : action === 'REDUCE_50' ? PARTIAL_EXIT_LEVEL2 : PARTIAL_EXIT_LEVEL1}${recoveryConfirmed ? ' (recovery softened but not enough)' : ''}`;
+    ? `dynamicPositionRisk ${dynamicPositionRisk} below ${PARTIAL_EXIT_LEVEL1} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}`
+    : `dynamicPositionRisk ${dynamicPositionRisk} ≥ ${action === 'EMERGENCY_EXIT' ? EMERGENCY_EXIT_LEVEL : action === 'REDUCE_50' ? PARTIAL_EXIT_LEVEL2 : PARTIAL_EXIT_LEVEL1}${recoveryConfirmed ? ' (recovery softened but not enough)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}`;
 
   return {
     action, reason,
     fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay,
-    exitProbability, dynamicPositionRisk, positionAgeMin: ageMin, recovery,
+    exitProbability, dynamicPositionRisk, positionAgeMin: ageMin, recovery, isStaleAndFlat,
   };
 }
