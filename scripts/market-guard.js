@@ -681,18 +681,59 @@ export function requiredBull4hCycles(btcRiskScore) {
   return 3;
 }
 
-export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbolState = {}) {
+// ── Risk-score exception — relative-strength bypass ──────────────────
+// The breadth check above already has an exception path (checkBreadthException);
+// this BTC-risk-score check never did — it's an unconditional hard block,
+// which is why DOGE (+2.59% while BTC was -0.35%) and LINK (+4.63% same
+// day) both got blocked purely on "BTC risk score > 60", with no chance
+// to prove they were genuinely diverging. Reuses the same strength-
+// exception quality bar as the breadth exception (whale/volume/score/
+// bullConf), PLUS requires REAL positive relative strength vs BTC
+// (calcRelativeStrength, 24h-change-based — already built, previously
+// only used for logging at leaderboard-decider.js's older Alpha Exception
+// path, never for gating). RS is the most direct answer to what this
+// specific check is worried about ("is BTC-driven risk too high right
+// now") — a coin proven to be moving opposite BTC is exactly the
+// exception case this gate should allow through.
+const MI_RISKSCORE_ALLOW_EXCEPTION = (process.env.BUY_RISKSCORE_ALLOW_EXCEPTION || 'true') !== 'false';
+
+export function checkRiskScoreException(entry, global = {}) {
+  if (!MI_RISKSCORE_ALLOW_EXCEPTION) return { allowed: false, passedChecks: [], failedChecks: ['exception disabled'], rs: null };
+  const strength = checkBreadthException(entry); // same quality bar already trusted for the breadth exception
+  if (!strength.allowed) {
+    return { allowed: false, passedChecks: strength.passedChecks, failedChecks: strength.failedChecks, rs: null };
+  }
+  const rsResult = calcRelativeStrength(entry, global);
+  if (!rsResult.strong) {
+    return {
+      allowed: false, passedChecks: strength.passedChecks,
+      failedChecks: [...strength.failedChecks, `relative strength vs BTC (${rsResult.rs ?? 'no data'})`], rs: rsResult.rs,
+    };
+  }
+  return { allowed: true, passedChecks: [...strength.passedChecks, `RS ${rsResult.rs > 0 ? '+' : ''}${rsResult.rs}% vs BTC`], failedChecks: [], rs: rsResult.rs };
+}
+
+export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbolState = {}, global = {}) {
   const reasons = [];
   let allowed = true;
   let breadthExceptionUsed = false;
   let breadthExceptionChecks = [];
+  let riskScoreExceptionUsed = false;
+  let riskScoreExceptionChecks = [];
 
   const btcRiskScore = marketState.btcRiskScore;
   const notReady = btcRiskScore == null; // market-state.json not populated yet (first run) — don't gate on nothing
 
   if (!notReady && btcRiskScore > MI_BTC_RISK_MAX) {
-    allowed = false;
-    reasons.push(`BTC risk score ${btcRiskScore} > ${MI_BTC_RISK_MAX} (${marketState.btcRiskBand})`);
+    const exception = checkRiskScoreException(entry, global);
+    if (exception.allowed) {
+      riskScoreExceptionUsed = true;
+      riskScoreExceptionChecks = exception.passedChecks;
+      reasons.push(`BTC risk score ${btcRiskScore} > ${MI_BTC_RISK_MAX} (${marketState.btcRiskBand}) — bypassed via relative-strength exception (${exception.passedChecks.join(', ')})`);
+    } else {
+      allowed = false;
+      reasons.push(`BTC risk score ${btcRiskScore} > ${MI_BTC_RISK_MAX} (${marketState.btcRiskBand})`);
+    }
   }
 
   if (!notReady && MI_REQUIRE_BREADTH) {
@@ -727,6 +768,6 @@ export function checkMarketIntelligenceGate(marketState = {}, entry = {}, symbol
 
   return {
     allowed, reasons, btcRiskScore, btcRiskBand: marketState.btcRiskBand, bullRequired, notReady,
-    breadthExceptionUsed, breadthExceptionChecks,
+    breadthExceptionUsed, breadthExceptionChecks, riskScoreExceptionUsed, riskScoreExceptionChecks,
   };
 }

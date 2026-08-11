@@ -610,10 +610,13 @@ async function main() {
     // Additive to, and runs before, the existing bias4h-label Layer 6 gate
     // below. Skips silently (notReady) until market-state.json exists.
     if (entry.assetType === 'crypto') {
-      const miGate = checkMarketIntelligenceGate(marketState, { ...entry, symbol: pair }, marketState.symbols?.[pair]);
+      const miGate = checkMarketIntelligenceGate(marketState, { ...entry, symbol: pair }, marketState.symbols?.[pair], market.global || {});
       if (!miGate.notReady && !miGate.allowed) {
         console.log(`  🧠  ${pair} — Market Intelligence gate blocked (${miGate.reasons.join('; ')})`);
         continue;
+      }
+      if (!miGate.notReady && miGate.riskScoreExceptionUsed) {
+        console.log(`  ✅  ${pair} — BTC risk-score block bypassed via relative-strength exception (${miGate.riskScoreExceptionChecks.join(', ')})`);
       }
       if (!miGate.notReady && miGate.bullRequired != null) {
         const persistence = checkBull4hPersistence(entry);
