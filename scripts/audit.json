@@ -1,12 +1,5 @@
 [
   {
-    "timestamp": "2026-08-12T13:02:46.700Z",
-    "job": "alert-runner",
-    "action": "positions_check",
-    "total": 1,
-    "monitored": 1
-  },
-  {
     "timestamp": "2026-08-12T13:06:18.773Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
@@ -4447,7 +4440,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-12T14:02:46.583Z",
+    "timestamp": "2026-08-12T14:02:50.503Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 20,
@@ -4473,7 +4466,7 @@
       {
         "pair": "AVAXUSDT",
         "status": "ok",
-        "conv": -6,
+        "conv": -8,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4487,14 +4480,14 @@
       {
         "pair": "DOGEUSDT",
         "status": "ok",
-        "conv": -6,
+        "conv": -5,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "ETHUSDT",
         "status": "ok",
-        "conv": -8,
+        "conv": -7,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4529,7 +4522,7 @@
       {
         "pair": "NEARUSDT",
         "status": "ok",
-        "conv": 0,
+        "conv": -1,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4550,7 +4543,7 @@
       {
         "pair": "SUIUSDT",
         "status": "ok",
-        "conv": -5,
+        "conv": -4,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4592,10 +4585,138 @@
       {
         "pair": "ZECUSDT",
         "status": "ok",
-        "conv": -3,
+        "conv": -5,
         "session": "24/7",
         "assetType": "crypto"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-12T14:02:50.575Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-12T14:02:51.024Z",
+    "job": "leaderboard-decider",
+    "action": "EXIT",
+    "sym": "BINANCE:NEARUSDT",
+    "reason": "Thesis invalidated: entry score 90 → current 21 (drop 69 > 60)",
+    "fallingKnifeScore": 71,
+    "thesisDrop": 69,
+    "confidenceDecay": 56,
+    "exitProbability": 75,
+    "dynamicPositionRisk": 75
+  },
+  {
+    "timestamp": "2026-08-12T14:02:52.521Z",
+    "job": "leaderboard-decider",
+    "action": "mexc_sell",
+    "sym": "NEARUSDT",
+    "reason": "position intelligence: Thesis invalidated: entry score 90 → current 21 (drop 69 > 60)",
+    "qty": 571.67,
+    "fillPrice": 1.6355000000000002,
+    "orderId": "C02__716224115672817664036"
+  },
+  {
+    "timestamp": "2026-08-12T14:02:53.866Z",
+    "job": "leaderboard-decider",
+    "action": "trade_log_pushed",
+    "count": 6
+  },
+  {
+    "timestamp": "2026-08-12T14:02:55.037Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 1
+  },
+  {
+    "timestamp": "2026-08-12T14:02:55.039Z",
+    "job": "leaderboard-decider",
+    "action": "history_recorded",
+    "rows": 1,
+    "totalKept": 3
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.126Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 1,
+    "openAfter": 1,
+    "alerts": 2
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.299Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:UNIUSDT",
+    "base": "UNI",
+    "free": 0.16,
+    "estNotional": 0.5654399999999999
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.301Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.228
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.302Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.085717,
+    "estNotional": 0.0868484644
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.303Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.001,
+    "estNotional": 0.2006
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.305Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.000378,
+    "estNotional": 0.18430146
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.307Z",
+    "job": "leaderboard-decider",
+    "action": "no_candidates",
+    "bestConv": 2
+  },
+  {
+    "timestamp": "2026-08-12T14:02:56.309Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-12T14:02:58.079Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 1,
+    "monitored": 1
   }
 ]
