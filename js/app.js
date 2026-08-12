@@ -484,6 +484,7 @@ function switchTab(tab, btn) {
     renderWatchlistManager();
   }
   if (tab === 'journal')       renderApiTrades();  // always refresh on open
+  if (tab === 'market-data')   refreshMarketData(); // always refresh on open
   if (tab === 'api-audit')     refreshApiAudit();  // always refresh on open
 }
 
@@ -741,6 +742,121 @@ function renderApiAudit(entries) {
       <td style="font-size:9px;white-space:nowrap;color:var(--text-dim)">${time}</td>
       <td style="font-size:9px;font-weight:700;color:${isFail ? 'var(--bear)' : 'var(--text-bright)'}">${e.action || '—'}</td>
       <td style="font-size:9px;color:var(--text-dim);white-space:normal;word-break:break-word;">${detailStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ══ MARKET DATA TAB ══════════════════════════════════════════════════
+// Same GitHub-fetch pattern as refreshApiAudit/refreshApiTrades above —
+// reads market-data.json straight from GitHub, renders a plain table so
+// the exact fields the bot's own gates use (conv, bullConf, whale, vol
+// shock, buyIntel penalties/reasons) are visible for a manual call,
+// without needing to read raw JSON by hand.
+let _marketDataState = { loading: false, symbols: [] };
+
+async function refreshMarketData() {
+  if (_marketDataState.loading) return;
+  _marketDataState.loading = true;
+  setMarketDataFooter('Loading…');
+  try {
+    const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
+    const repo   = cfg.repo   || window.__GH_REPO || '';
+    const branch = cfg.branch || 'main';
+    const fpath  = 'scripts/market-data.json';
+    if (!repo) { setMarketDataFooter('GitHub repo not configured — set GH_REPO in sync settings.'); return; }
+
+    const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.status === 404) {
+      _marketDataState.symbols = [];
+      renderMarketData();
+      setMarketDataFooter('No market-data.json found yet — it is created after the first fetch cycle.');
+      return;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const symbols = data.symbols || {};
+    _marketDataState.symbols = Object.entries(symbols).map(([pair, e]) => ({ pair, ...e }));
+    _marketDataState.fetchedAt = data.fetchedAt;
+    renderMarketData();
+
+    const age = data.fetchedAt ? Math.round((Date.now() - data.fetchedAt) / 60000) : null;
+    setMarketDataFooter(
+      `Last synced ${new Date().toLocaleTimeString()} from ${repo}` +
+      (age !== null ? ` · data is ${age}m old` : '') +
+      ` · ${_marketDataState.symbols.length} symbol${_marketDataState.symbols.length === 1 ? '' : 's'}`
+    );
+  } catch (e) {
+    setMarketDataFooter(`Error loading market data: ${e.message}`);
+  } finally {
+    _marketDataState.loading = false;
+  }
+}
+
+function setMarketDataFooter(msg) {
+  const el = document.getElementById('market-data-footer');
+  if (el) el.textContent = msg;
+}
+
+// Color thresholds match the actual gate values used across the bot's
+// buy-side checks (see leaderboard-scanner.js/market-guard.js) — not
+// arbitrary, so a color here means the same thing it means to the code.
+function _mdColorConv(v)     { if (v == null) return 'var(--text-dim)'; return v >= 8 ? 'var(--bull)' : v >= 6 ? 'var(--text-bright)' : 'var(--bear)'; }
+function _mdColorShock(v)    { if (v == null) return 'var(--text-dim)'; return v >= 1.3 ? 'var(--bull)' : v >= 0.5 ? 'var(--text-bright)' : 'var(--bear)'; }
+function _mdColorBullConf(v) { if (v == null) return 'var(--text-dim)'; return v >= 7 ? 'var(--bull)' : v >= 5 ? 'var(--text-bright)' : 'var(--bear)'; }
+function _mdColorWhale(v)    { if (v == null) return 'var(--text-dim)'; return v >= 70 ? 'var(--bull)' : v >= 40 ? 'var(--text-bright)' : 'var(--bear)'; }
+function _mdColorChg(v)      { if (v == null) return 'var(--text-dim)'; return v > 0 ? 'var(--bull)' : v < 0 ? 'var(--bear)' : 'var(--text-bright)'; }
+function _mdColorBias(b)     { if (!b) return 'var(--text-dim)'; return /BULL/i.test(b) ? 'var(--bull)' : /BEAR/i.test(b) ? 'var(--bear)' : 'var(--text-dim)'; }
+
+function renderMarketData() {
+  const tbody = document.getElementById('market-data-tbody');
+  const stats = document.getElementById('market-data-stats');
+  if (!tbody) return;
+
+  let rows = [...(_marketDataState.symbols || [])];
+  const sortKey = document.getElementById('market-data-sort')?.value || 'conv';
+  rows.sort((a, b) => {
+    if (sortKey === 'pair') return (a.pair || '').localeCompare(b.pair || '');
+    const av = sortKey === 'bullConf' ? a.bullConf : sortKey === 'whale' ? a.whale?.score : sortKey === 'shock' ? a.d?.shock : sortKey === 'chg' ? a.chg : a.conv;
+    const bv = sortKey === 'bullConf' ? b.bullConf : sortKey === 'whale' ? b.whale?.score : sortKey === 'shock' ? b.d?.shock : sortKey === 'chg' ? b.chg : b.conv;
+    return (bv ?? -Infinity) - (av ?? -Infinity);
+  });
+
+  if (stats) {
+    const clearing = rows.filter(r => (r.conv ?? -Infinity) >= 6).length;
+    stats.innerHTML = [
+      `<span>${rows.length}</span> symbols`,
+      `<span style="color:var(--bull)">${clearing}</span> clearing conv≥6`,
+    ].join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+  }
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(e => {
+    const d = e.d || {};
+    const whale = e.whale?.score;
+    const bi = e.buyIntel;
+    const biText = bi && bi.penalty > 0
+      ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
+      : bi ? '<span style="color:var(--bull)">clean</span>' : '<span style="color:var(--text-dim)">—</span>';
+    return `<tr>
+      <td style="font-weight:700;color:var(--text-bright)">${(e.pair || '').replace('USDT','')}</td>
+      <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
+      <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
+      <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}">${e.conv ?? '—'}</td>
+      <td style="font-size:9px;color:${_mdColorBullConf(e.bullConf)}">${e.bullConf != null ? e.bullConf + '/10' : '—'}</td>
+      <td style="font-size:9px;color:${_mdColorWhale(whale)}">${whale != null ? whale + '/100' : '—'}</td>
+      <td style="font-size:9px;color:${_mdColorShock(d.shock)}">${d.shock != null ? d.shock.toFixed(2) + 'x' : '—'}</td>
+      <td style="font-size:9px;color:var(--text-dim)">${d.r15 != null ? d.r15.toFixed(0) : '—'}</td>
+      <td style="font-size:9px;color:${_mdColorBias(d.bias4h)}">${d.bias4h || '—'}</td>
+      <td style="font-size:9px;color:${_mdColorBias(d.biasDay)}">${d.biasDay || '—'}</td>
+      <td style="font-size:9px;color:var(--text-dim)">${d.oiDiv || '—'}</td>
+      <td style="font-size:9px;color:${d.cvdTrend === 'up' ? 'var(--bull)' : d.cvdTrend === 'down' ? 'var(--bear)' : 'var(--text-dim)'}">${d.cvdTrend || '—'}</td>
+      <td style="font-size:9px">${biText}</td>
     </tr>`;
   }).join('');
 }
