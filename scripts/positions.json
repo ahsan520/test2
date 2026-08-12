@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786562576553
+      "evaluatedAt": 1786562870595
     }
   },
   "TSX:AGCC.TO": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786562576553
+      "evaluatedAt": 1786562870595
     }
   },
   "TSX:TXF.TO": {
@@ -110,7 +110,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1786562576553
+      "evaluatedAt": 1786562870595
     }
   },
   "BINANCE:ZECUSDT": {
@@ -129,9 +129,9 @@
     "t2": 707.56,
     "score": 8,
     "spikeScore": 14.104682671633649,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1786562870595,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -146,7 +146,10 @@
       "qty": 1.887848,
       "fillPrice": 497.17972752200967,
       "buyOrderId": "C02__716271966914326529036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__716305901689929728036",
+      "exitFillPrice": 491.7389348171701,
+      "closedAt": 1786562872001
     },
     "entrySnapshot": {
       "at": 1786554781056,
@@ -174,18 +177,18 @@
       "marketRegime": "RISK_OFF"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 33 below 50 threshold",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 92 → current 15 (drop 77 > 60)",
       "fallingKnifeScore": 35,
-      "thesisDrop": 20,
-      "confidenceDecay": 11,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "thesisDrop": 77,
+      "confidenceDecay": 67,
+      "exitProbability": 64,
+      "dynamicPositionRisk": 64,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1786562576553
+      "evaluatedAt": 1786562870595
     },
     "highestPnLSeen": 0.34,
     "lastR15": 52.6,
@@ -199,7 +202,9 @@
       "evaluatedAt": 1786562576553
     },
     "piPartialLevel": 2,
-    "piReduceAlertedAt": 1786561978866
+    "piReduceAlertedAt": 1786561978866,
+    "exitPrice": 491.75,
+    "statusChangedAt": 1786562870595
   },
   "TSX:NVDA.TO": {
     "sym": "TSX:NVDA.TO",
@@ -226,6 +231,17 @@
     "rankScore": 0.31,
     "histWinRate": null,
     "histSample": 0,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": -0.34,
+    "lastR15": 56.4,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.34% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.34,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1786562870595
+    }
   }
 }
