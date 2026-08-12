@@ -404,7 +404,13 @@
      blocked symbols had shock near 0 despite decent price change);
      bullConf≥7 and whale≥70 are the Alpha Exception's own bars. -->
 <div id="tab-market-data" class="tc" style="height:calc(100vh - 80px);overflow:hidden;">
-  <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;">
+  <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;display:flex;flex-direction:column;">
+    <!-- BTC regime banner — the context every gate decision is made
+         against. Without this, a strong-looking row below can appear to
+         be blocked for no visible reason. -->
+    <div id="market-data-regime" style="font-family:var(--mono);font-size:9px;padding:6px 10px;border-bottom:1px solid var(--text-dim);display:flex;gap:16px;flex-wrap:wrap;color:var(--text-dim);">
+      Loading BTC regime…
+    </div>
     <div class="api-trades-header">
       <span class="api-trades-title">📊 MARKET DATA</span>
       <div class="api-trades-stats" id="market-data-stats"></div>
@@ -414,6 +420,7 @@
         <option value="shock">Sort: Volume Shock</option>
         <option value="bullConf">Sort: BullConf</option>
         <option value="whale">Sort: Whale Score</option>
+        <option value="histWinRate">Sort: Win Rate</option>
         <option value="pair">Sort: A–Z</option>
       </select>
       <button class="bsm" onclick="refreshMarketData()" title="Reload from GitHub">↻ Refresh</button>
@@ -424,12 +431,12 @@
           <tr>
             <th>SYMBOL</th><th>PRICE</th><th>24H%</th><th>CONV</th><th>BULLCONF</th>
             <th>WHALE</th><th>SHOCK</th><th>RSI15</th><th>4H BIAS</th><th>DAILY BIAS</th>
-            <th>OI DIV</th><th>CVD</th><th>BUY INTEL</th>
+            <th>OI DIV</th><th>CVD</th><th>OI MOM</th><th>HIST (30D)</th><th>POSITION</th><th>BUY INTEL</th>
           </tr>
         </thead>
         <tbody id="market-data-tbody">
-          <tr><td colspan="13" style="text-align:center;color:var(--text-dim);padding:20px;">
-            Click ↻ Refresh to load market-data.json from GitHub
+          <tr><td colspan="16" style="text-align:center;color:var(--text-dim);padding:20px;">
+            Click ↻ Refresh to load market data from GitHub
           </td></tr>
         </tbody>
       </table>
