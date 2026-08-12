@@ -1,12 +1,5 @@
 [
   {
-    "timestamp": "2026-08-12T14:37:54.996Z",
-    "job": "alert-runner",
-    "action": "positions_check",
-    "total": 0,
-    "monitored": 0
-  },
-  {
     "timestamp": "2026-08-12T14:41:19.701Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
@@ -4548,7 +4541,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-12T15:37:54.032Z",
+    "timestamp": "2026-08-12T15:37:51.982Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 30,
@@ -4665,7 +4658,7 @@
       {
         "pair": "UNIUSDT",
         "status": "ok",
-        "conv": -11,
+        "conv": -12,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -4686,29 +4679,29 @@
       {
         "pair": "XRPUSDT",
         "status": "ok",
-        "conv": -3,
+        "conv": -7,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "ZECUSDT",
         "status": "ok",
-        "conv": -1,
+        "conv": -2,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "AGCC.TO",
         "status": "ok",
-        "conv": 5,
+        "conv": 6,
         "session": "open",
-        "setup": "WATCHING",
+        "setup": "BREAKOUT",
         "assetType": "stock"
       },
       {
         "pair": "ETHY.TO",
         "status": "ok",
-        "conv": -1,
+        "conv": -4,
         "session": "open",
         "setup": "WATCHING",
         "assetType": "stock"
@@ -4716,7 +4709,7 @@
       {
         "pair": "GE.TO",
         "status": "ok",
-        "conv": -3,
+        "conv": -2,
         "session": "open",
         "setup": "WATCHING",
         "assetType": "stock"
@@ -4740,7 +4733,7 @@
       {
         "pair": "GRGD.TO",
         "status": "ok",
-        "conv": 2,
+        "conv": 3,
         "session": "open",
         "setup": "WATCHING",
         "assetType": "stock"
@@ -4756,7 +4749,7 @@
       {
         "pair": "MSFT.TO",
         "status": "ok",
-        "conv": -3,
+        "conv": 2,
         "session": "open",
         "setup": "WATCHING",
         "assetType": "stock"
@@ -4764,7 +4757,7 @@
       {
         "pair": "TXF.TO",
         "status": "ok",
-        "conv": 4,
+        "conv": 5,
         "session": "open",
         "setup": "WATCHING",
         "assetType": "stock"
@@ -4778,5 +4771,135 @@
         "assetType": "stock"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-12T15:37:52.048Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-12T15:37:56.806Z",
+    "job": "leaderboard-decider",
+    "action": "positions_push_failed",
+    "error": "PUT 409 is at d44bc7ab547bfbcfdf9a3d0ba3f2b81d69cd7d7b but expected e149942937c20ee3a2e74fceba7b847e8651925b"
+  },
+  {
+    "timestamp": "2026-08-12T15:37:56.808Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 1,
+    "openAfter": 1,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.039Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:UNIUSDT",
+    "base": "UNI",
+    "free": 0.16,
+    "estNotional": 0.55984
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.041Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.22743000000000002
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.042Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.085717,
+    "estNotional": 0.0867284606
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.044Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.001,
+    "estNotional": 0.2
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.045Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.000378,
+    "estNotional": 0.18375714
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.049Z",
+    "job": "leaderboard-decider",
+    "action": "market_guard",
+    "canBuy": false,
+    "closeAll": false,
+    "sizeMult": 1,
+    "reasons": [
+      "BTC 4H bias is BEAR 4H — new buys paused (market-regime gate)"
+    ]
+  },
+  {
+    "timestamp": "2026-08-12T15:37:57.067Z",
+    "job": "leaderboard-decider",
+    "action": "position_opened",
+    "pair": "AGCC.TO",
+    "sym": "TSX:AGCC.TO",
+    "setup": "BREAKOUT",
+    "score": 6
+  },
+  {
+    "timestamp": "2026-08-12T15:37:58.606Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 2
+  },
+  {
+    "timestamp": "2026-08-12T15:37:58.922Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 1,
+    "positionsOpened": 1,
+    "recommended": [
+      "AGCC"
+    ],
+    "caution": []
+  },
+  {
+    "timestamp": "2026-08-12T15:38:00.325Z",
+    "job": "leaderboard-decider",
+    "action": "live_balances_pushed",
+    "count": 6
+  },
+  {
+    "timestamp": "2026-08-12T15:38:00.327Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-12T15:38:03.404Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 2,
+    "monitored": 2
   }
 ]
