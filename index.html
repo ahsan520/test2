@@ -29,6 +29,7 @@
   <button class="tab on"  onclick="switchTab('matrix',this)">◆ SIGNAL MATRIX</button>
   <button class="tab"     onclick="switchTab('news',this)">📰 NEWS</button>
   <button class="tab"     onclick="switchTab('journal',this)">◆ TRADE JOURNAL</button>
+  <button class="tab"     onclick="switchTab('market-data',this)">📊 MARKET DATA</button>
   <button class="tab"     onclick="switchTab('api-audit',this)">🛡 API AUDIT</button>
   <button class="tab"     onclick="switchTab('alerts',this)">⚙ CONFIG</button>
   <button class="tab"     onclick="switchTab('watchlist-mgr',this)">⚙ WATCHLIST</button>
@@ -392,6 +393,52 @@
 <!-- Fed by audit-log.json — every API/trade action the headless job takes -->
 <!-- (buys, sells, skips, failures, GitHub pushes, mode changes, etc). Read- -->
 <!-- only, most-recent-first; capped server-side at ~3000 rows. -->
+<!-- ══ MARKET DATA TAB ══ -->
+<!-- Raw market-data.json, rendered for manual review — the same fields
+     Buy Intelligence/conviction scoring use, so you can eyeball a symbol
+     the way the bot does before deciding to buy early yourself. Color
+     thresholds match the actual gate values discussed this session:
+     conv≥6 (LB_MIN_SCORE) clears a normal buy, ≥8 also clears the
+     stricter exception score bars; shock<0.5 means a move on very thin
+     volume (the single biggest red flag found in review — several real
+     blocked symbols had shock near 0 despite decent price change);
+     bullConf≥7 and whale≥70 are the Alpha Exception's own bars. -->
+<div id="tab-market-data" class="tc" style="height:calc(100vh - 80px);overflow:hidden;">
+  <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;">
+    <div class="api-trades-header">
+      <span class="api-trades-title">📊 MARKET DATA</span>
+      <div class="api-trades-stats" id="market-data-stats"></div>
+      <select id="market-data-sort" onchange="renderMarketData()" style="font-family:var(--mono);font-size:9px;background:var(--bg-panel,#111);color:var(--text-bright);border:1px solid var(--text-dim);padding:2px 6px;">
+        <option value="conv">Sort: Conviction</option>
+        <option value="chg">Sort: 24h Change</option>
+        <option value="shock">Sort: Volume Shock</option>
+        <option value="bullConf">Sort: BullConf</option>
+        <option value="whale">Sort: Whale Score</option>
+        <option value="pair">Sort: A–Z</option>
+      </select>
+      <button class="bsm" onclick="refreshMarketData()" title="Reload from GitHub">↻ Refresh</button>
+    </div>
+    <div class="api-tbl-wrap">
+      <table class="jtbl api-tbl">
+        <thead>
+          <tr>
+            <th>SYMBOL</th><th>PRICE</th><th>24H%</th><th>CONV</th><th>BULLCONF</th>
+            <th>WHALE</th><th>SHOCK</th><th>RSI15</th><th>4H BIAS</th><th>DAILY BIAS</th>
+            <th>OI DIV</th><th>CVD</th><th>BUY INTEL</th>
+          </tr>
+        </thead>
+        <tbody id="market-data-tbody">
+          <tr><td colspan="13" style="text-align:center;color:var(--text-dim);padding:20px;">
+            Click ↻ Refresh to load market-data.json from GitHub
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="api-trades-footer" id="market-data-footer"></div>
+  </div>
+</div>
+
+<!-- ══ API AUDIT TAB ══ -->
 <div id="tab-api-audit" class="tc" style="height:calc(100vh - 80px);overflow:hidden;">
   <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;">
     <div class="api-trades-header">
