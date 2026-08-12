@@ -747,51 +747,108 @@ function renderApiAudit(entries) {
 }
 
 // ══ MARKET DATA TAB ══════════════════════════════════════════════════
-// Same GitHub-fetch pattern as refreshApiAudit/refreshApiTrades above —
-// reads market-data.json straight from GitHub, renders a plain table so
-// the exact fields the bot's own gates use (conv, bullConf, whale, vol
-// shock, buyIntel penalties/reasons) are visible for a manual call,
-// without needing to read raw JSON by hand.
-let _marketDataState = { loading: false, symbols: [] };
+// Combines all four data sources a manual buy decision actually needs —
+// previously scattered across market-data.json (fresh signal), market-
+// state.json (BTC regime + momentum), symbol-history.json (real win
+// rate), and positions.json (live status) — into one page, so none of
+// them has to be cross-referenced by hand.
+let _marketDataState = { loading: false, symbols: [], regime: {}, positions: {} };
+
+// Generic GitHub raw-file fetch, shared by every "read X.json from repo"
+// path (this tab, API Audit, API Trades) — small enough not to be worth
+// a bigger refactor of the older call sites, but new fetches use it.
+async function _fetchGhJson(fpath, { optional = true } = {}) {
+  const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
+  const repo   = cfg.repo   || window.__GH_REPO || '';
+  const branch = cfg.branch || 'main';
+  if (!repo) throw new Error('GitHub repo not configured — set GH_REPO in sync settings.');
+  const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (res.status === 404) { if (optional) return null; throw new Error(`${fpath} not found`); }
+  if (!res.ok) throw new Error(`HTTP ${res.status} loading ${fpath}`);
+  return res.json();
+}
+
+// Client-side port of leaderboard-decider.js's getHistoryStrength() —
+// same "wins = pnlPct > 0" definition (a profitable close counts,
+// regardless of which exit reason fired), same 30-day lookback default,
+// so this tab's numbers always match what the bot itself would compute.
+function _historyStrength(history, base, lookbackDays = 30) {
+  const cutoff = Date.now() - lookbackDays * 86_400_000;
+  const rows = (history || []).filter(e => e.base === base && e.closedAt >= cutoff);
+  if (!rows.length) return { winRate: null, sample: 0 };
+  const wins = rows.filter(e => (e.pnlPct || 0) > 0).length;
+  return { winRate: wins / rows.length, sample: rows.length };
+}
 
 async function refreshMarketData() {
   if (_marketDataState.loading) return;
   _marketDataState.loading = true;
   setMarketDataFooter('Loading…');
   try {
-    const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-    const repo   = cfg.repo   || window.__GH_REPO || '';
-    const branch = cfg.branch || 'main';
-    const fpath  = 'scripts/market-data.json';
-    if (!repo) { setMarketDataFooter('GitHub repo not configured — set GH_REPO in sync settings.'); return; }
+    const [marketData, marketState, history, positions] = await Promise.all([
+      _fetchGhJson('scripts/market-data.json',   { optional: false }),
+      _fetchGhJson('scripts/market-state.json',  { optional: true }),
+      _fetchGhJson('scripts/symbol-history.json',{ optional: true }),
+      _fetchGhJson('scripts/positions.json',     { optional: true }),
+    ]);
 
-    const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (res.status === 404) {
-      _marketDataState.symbols = [];
-      renderMarketData();
-      setMarketDataFooter('No market-data.json found yet — it is created after the first fetch cycle.');
-      return;
-    }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const symbols = marketData.symbols || {};
+    const historyRows = Array.isArray(history) ? history : [];
+    _marketDataState.symbols = Object.entries(symbols).map(([pair, e]) => {
+      const base = pair.replace('USDT', '');
+      return { pair, base, ...e, hist: _historyStrength(historyRows, base) };
+    });
+    _marketDataState.fetchedAt = marketData.fetchedAt;
+    _marketDataState.regime = (marketState && marketState.symbols) ? marketState : { symbols: {} };
+    // positions.json is keyed like "BINANCE:BTCUSDT" — match by base symbol
+    _marketDataState.positions = {};
+    Object.values(positions || {}).forEach(p => { if (p?.base) _marketDataState.positions[p.base] = p; });
 
-    const symbols = data.symbols || {};
-    _marketDataState.symbols = Object.entries(symbols).map(([pair, e]) => ({ pair, ...e }));
-    _marketDataState.fetchedAt = data.fetchedAt;
+    renderMarketDataRegimeBanner(marketData);
     renderMarketData();
 
-    const age = data.fetchedAt ? Math.round((Date.now() - data.fetchedAt) / 60000) : null;
+    const age = marketData.fetchedAt ? Math.round((Date.now() - marketData.fetchedAt) / 60000) : null;
     setMarketDataFooter(
-      `Last synced ${new Date().toLocaleTimeString()} from ${repo}` +
+      `Last synced ${new Date().toLocaleTimeString()}` +
       (age !== null ? ` · data is ${age}m old` : '') +
-      ` · ${_marketDataState.symbols.length} symbol${_marketDataState.symbols.length === 1 ? '' : 's'}`
+      ` · ${_marketDataState.symbols.length} symbols` +
+      (marketState ? '' : ' · ⚠ market-state.json unavailable (regime/momentum blank)') +
+      (history ? '' : ' · ⚠ symbol-history.json unavailable (win rate blank)') +
+      (positions ? '' : ' · ⚠ positions.json unavailable (position status blank)')
     );
   } catch (e) {
     setMarketDataFooter(`Error loading market data: ${e.message}`);
   } finally {
     _marketDataState.loading = false;
   }
+}
+
+function renderMarketDataRegimeBanner(marketData) {
+  const el = document.getElementById('market-data-regime');
+  if (!el) return;
+  const g = marketData.global || {};
+  // btcRiskScore/regime/breadth live in market-state.json in the actual
+  // gate code (checkMarketIntelligenceGate) — market-data.json only
+  // carries the raw BTC 24h change. Show whichever fields are present;
+  // this banner degrades gracefully rather than failing outright if
+  // market-state.json didn't load.
+  const ms = _marketDataState.regime || {};
+  const riskScore = ms.btcRiskScore;
+  const riskBand  = ms.btcRiskBand;
+  const regime    = ms.marketRegime;
+  const breadth   = ms.breadth?.score;
+  const riskColor = riskScore == null ? 'var(--text-dim)' : riskScore > 60 ? 'var(--bear)' : 'var(--bull)';
+  const regimeColor = regime === 'RISK_OFF' ? 'var(--bear)' : regime === 'RISK_ON' ? 'var(--bull)' : 'var(--text-dim)';
+  const breadthColor = breadth == null ? 'var(--text-dim)' : breadth < 60 ? 'var(--bear)' : 'var(--bull)';
+  el.innerHTML = [
+    `BTC 24h: <b style="color:${_mdColorChg(g.btcChg24h)}">${g.btcChg24h != null ? (g.btcChg24h > 0 ? '+' : '') + g.btcChg24h.toFixed(2) + '%' : '—'}</b>`,
+    `BTC 4H bias: <b style="color:${_mdColorBias(g.btcBias4h)}">${g.btcBias4h || '—'}</b>`,
+    `Risk score: <b style="color:${riskColor}">${riskScore ?? '—'}${riskBand ? ' (' + riskBand + ')' : ''}</b>`,
+    `Regime: <b style="color:${regimeColor}">${regime || '—'}</b>`,
+    `Breadth: <b style="color:${breadthColor}">${breadth != null ? breadth + '%' : '—'}</b>`,
+    `Fear/Greed: <b>${g.fearGreed ?? '—'}</b>`,
+  ].join('&nbsp;&nbsp;·&nbsp;&nbsp;');
 }
 
 function setMarketDataFooter(msg) {
@@ -808,6 +865,8 @@ function _mdColorBullConf(v) { if (v == null) return 'var(--text-dim)'; return v
 function _mdColorWhale(v)    { if (v == null) return 'var(--text-dim)'; return v >= 70 ? 'var(--bull)' : v >= 40 ? 'var(--text-bright)' : 'var(--bear)'; }
 function _mdColorChg(v)      { if (v == null) return 'var(--text-dim)'; return v > 0 ? 'var(--bull)' : v < 0 ? 'var(--bear)' : 'var(--text-bright)'; }
 function _mdColorBias(b)     { if (!b) return 'var(--text-dim)'; return /BULL/i.test(b) ? 'var(--bull)' : /BEAR/i.test(b) ? 'var(--bear)' : 'var(--text-dim)'; }
+function _mdColorWinRate(v)  { if (v == null) return 'var(--text-dim)'; return v >= 0.5 ? 'var(--bull)' : v >= 0.3 ? 'var(--text-bright)' : 'var(--bear)'; }
+function _mdColorTrend(t)    { return t === 'ACCELERATING' ? 'var(--bull)' : t === 'FADING' ? 'var(--bear)' : 'var(--text-dim)'; }
 
 function renderMarketData() {
   const tbody = document.getElementById('market-data-tbody');
@@ -818,21 +877,27 @@ function renderMarketData() {
   const sortKey = document.getElementById('market-data-sort')?.value || 'conv';
   rows.sort((a, b) => {
     if (sortKey === 'pair') return (a.pair || '').localeCompare(b.pair || '');
-    const av = sortKey === 'bullConf' ? a.bullConf : sortKey === 'whale' ? a.whale?.score : sortKey === 'shock' ? a.d?.shock : sortKey === 'chg' ? a.chg : a.conv;
-    const bv = sortKey === 'bullConf' ? b.bullConf : sortKey === 'whale' ? b.whale?.score : sortKey === 'shock' ? b.d?.shock : sortKey === 'chg' ? b.chg : b.conv;
-    return (bv ?? -Infinity) - (av ?? -Infinity);
+    const pick = (r) => sortKey === 'bullConf' ? r.bullConf
+      : sortKey === 'whale' ? r.whale?.score
+      : sortKey === 'shock' ? r.d?.shock
+      : sortKey === 'chg' ? r.chg
+      : sortKey === 'histWinRate' ? r.hist?.winRate
+      : r.conv;
+    return (pick(b) ?? -Infinity) - (pick(a) ?? -Infinity);
   });
 
   if (stats) {
     const clearing = rows.filter(r => (r.conv ?? -Infinity) >= 6).length;
+    const held = rows.filter(r => _marketDataState.positions[r.base]).length;
     stats.innerHTML = [
       `<span>${rows.length}</span> symbols`,
       `<span style="color:var(--bull)">${clearing}</span> clearing conv≥6`,
-    ].join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+      held ? `<span style="color:var(--accent)">${held}</span> currently held` : null,
+    ].filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
   }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
     return;
   }
 
@@ -843,8 +908,23 @@ function renderMarketData() {
     const biText = bi && bi.penalty > 0
       ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
       : bi ? '<span style="color:var(--bull)">clean</span>' : '<span style="color:var(--text-dim)">—</span>';
+
+    const symState = _marketDataState.regime?.symbols?.[e.pair] || {};
+    const oiTrend = symState.oiMomentum?.trend;
+    const oiText = oiTrend ? `<span style="color:${_mdColorTrend(oiTrend)}">${oiTrend}</span>` : '<span style="color:var(--text-dim)">—</span>';
+
+    const hist = e.hist || {};
+    const histText = hist.sample
+      ? `<span style="color:${_mdColorWinRate(hist.winRate)}" title="${hist.sample} closes, 30d">${Math.round(hist.winRate * 100)}% (${hist.sample})</span>`
+      : '<span style="color:var(--text-dim)">no data</span>';
+
+    const pos = _marketDataState.positions[e.base];
+    const posText = pos
+      ? `<span style="color:${pos.liveOrder?.mode === 'live' ? 'var(--accent)' : 'var(--text-bright)'}" title="Entry $${pos.entryPrice} · Stop $${pos.stop}">${pos.liveOrder?.mode === 'live' ? '🔴 LIVE' : '👁 watch'} ${pos.highestPnLSeen != null ? (pos.highestPnLSeen >= 0 ? '+' : '') + pos.highestPnLSeen + '%' : ''}</span>`
+      : '<span style="color:var(--text-dim)">—</span>';
+
     return `<tr>
-      <td style="font-weight:700;color:var(--text-bright)">${(e.pair || '').replace('USDT','')}</td>
+      <td style="font-weight:700;color:var(--text-bright)">${e.base}</td>
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
       <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}">${e.conv ?? '—'}</td>
@@ -856,6 +936,9 @@ function renderMarketData() {
       <td style="font-size:9px;color:${_mdColorBias(d.biasDay)}">${d.biasDay || '—'}</td>
       <td style="font-size:9px;color:var(--text-dim)">${d.oiDiv || '—'}</td>
       <td style="font-size:9px;color:${d.cvdTrend === 'up' ? 'var(--bull)' : d.cvdTrend === 'down' ? 'var(--bear)' : 'var(--text-dim)'}">${d.cvdTrend || '—'}</td>
+      <td style="font-size:9px">${oiText}</td>
+      <td style="font-size:9px">${histText}</td>
+      <td style="font-size:9px">${posText}</td>
       <td style="font-size:9px">${biText}</td>
     </tr>`;
   }).join('');
