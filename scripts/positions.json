@@ -15,9 +15,9 @@
     "t2": 1.7992,
     "score": 8,
     "spikeScore": 2.86409643790787,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1786543371023,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -32,7 +32,10 @@
       "qty": 571.67,
       "fillPrice": 1.6567995906729407,
       "buyOrderId": "C02__716201483388825600036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__716224115672817664036",
+      "exitFillPrice": 1.6355000000000002,
+      "closedAt": 1786543372521
     },
     "entrySnapshot": {
       "at": 1786537976514,
@@ -60,18 +63,18 @@
       "marketRegime": "NEUTRAL"
     },
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 53 ≥ 50",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 58,
-      "confidenceDecay": 44,
-      "exitProbability": 53,
-      "dynamicPositionRisk": 53,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 90 → current 21 (drop 69 > 60)",
+      "fallingKnifeScore": 71,
+      "thesisDrop": 69,
+      "confidenceDecay": 56,
+      "exitProbability": 75,
+      "dynamicPositionRisk": 75,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "evaluatedAt": 1786543075097
+      "evaluatedAt": 1786543371023
     },
     "highestPnLSeen": 0.01,
     "lastR15": 44.2,
@@ -85,6 +88,8 @@
       "evaluatedAt": 1786543075097
     },
     "piPartialLevel": 2,
-    "piReduceAlertedAt": 1786542765985
+    "piReduceAlertedAt": 1786542765985,
+    "exitPrice": 1.636,
+    "statusChangedAt": 1786543371023
   }
 }
