@@ -176,6 +176,17 @@ const ALPHA_REQUIRE_DAILY_BULL  = (process.env.GUARD_BTC_ALPHA_REQUIRE_DAILY_BUL
 // "flexible" group below are affected.
 const ALPHA_FLEXIBLE_MIN_PASS   = parseInt(process.env.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '3', 10);
 
+// ── Buy-intel penalty ceiling — shared by all three exception paths
+// (BTC-bear, breadth, risk-score) since they all route through
+// evaluateStrengthException(). A candidate whose own chase/RSI-
+// extension/pullback/quality penalty (buy-intelligence.js) exceeds this
+// fails the exception outright, regardless of how strong its
+// whale/volume/bullConf numbers are. Default of 3 lets a single mild
+// flag through (e.g. off-hours penalty alone, or one RSI-hot hit) but
+// blocks real chase/extension combinations (e.g. RSI-VHOT + chase-block
+// = 4, or a failed quality floor = 2-3 stacked with anything else).
+const MAX_BUYINTEL_PENALTY      = parseFloat(process.env.GUARD_ALPHA_MAX_BUYINTEL_PENALTY || '3');
+
 // ── 4H trend persistence (reduces false signals from short-lived flips) ──
 // bull4hCount is maintained by market-fetcher.js (see buildEntry) — this
 // file only CONSUMES it, never recalculates or increments it, per spec:
@@ -226,6 +237,17 @@ function evaluateStrengthException(entry, opts) {
   const conv       = entry.conv ?? 0;
   const shock      = d.shock ?? 0;
   const bull4hCount = entry.bull4hCount ?? 0;
+  // Buy Intelligence penalty (buy-intelligence.js, via d.buyIntel) is
+  // already folded into `conv` above via a soft subtraction, which
+  // rarely drags a strong-whale/strong-volume candidate below minScore
+  // on its own. Previously NOTHING in this exception's own check list
+  // reflected chase/RSI-extension/pullback directly, so a candidate
+  // that was 3 candles deep into a chase or RSI-VHOT could clear every
+  // exception path untouched as long as whale/volume/bullConf were
+  // strong — exactly the "looks strong on paper, reverses immediately"
+  // pattern seen in the live trade log. This makes it a real,
+  // unconditionally-required core check instead of a soft dent.
+  const buyIntelPenalty = d.buyIntel?.penalty ?? 0;
 
   // ── Core checks — UNCONDITIONALLY required, no N-of-M leniency here.
   // These are the strongest, most predictive signals; loosening these
@@ -235,6 +257,7 @@ function evaluateStrengthException(entry, opts) {
     { name: `Whale ≥${opts.minWhale}`,          pass: whaleScore >= opts.minWhale },
     { name: `Score ≥${opts.minScore}`,          pass: conv >= opts.minScore },
     { name: `BullConf ≥${opts.minBullConf}`,    pass: bullConf >= opts.minBullConf },
+    { name: `Buy-intel penalty ≤${opts.maxBuyIntelPenalty}`, pass: buyIntelPenalty <= opts.maxBuyIntelPenalty },
     ...(opts.requireBull4hCount
       ? [{ name: `4H persistence ≥${opts.bull4hCountMin} cycles`, pass: bull4hCount >= opts.bull4hCountMin }]
       : []),
@@ -274,6 +297,7 @@ export function checkBtcAlphaException(entry) {
   return evaluateStrengthException(entry, {
     enabled: ALPHA_EXCEPTION_ENABLED,
     minVolume: ALPHA_MIN_VOLUME, minWhale: ALPHA_MIN_WHALE, minScore: ALPHA_SCORE_MIN, minBullConf: 7,
+    maxBuyIntelPenalty: MAX_BUYINTEL_PENALTY,
     requireBull4hCount: BTC_ALPHA_REQUIRE_BULL4H_COUNT, bull4hCountMin: BTC_ALPHA_BULL4H_COUNT_MIN,
     requireFlex4hBull: ALPHA_REQUIRE_4H_BULL, requireFlexDailyBull: ALPHA_REQUIRE_DAILY_BULL,
     requireFlexEmaAbove: ALPHA_REQUIRE_EMA_ABOVE, requireFlexOiConfirm: ALPHA_REQUIRE_OI_CONFIRM,
@@ -302,6 +326,7 @@ export function checkBreadthException(entry) {
     enabled: MI_BREADTH_ALLOW_EXCEPTION,
     minVolume: BREADTH_ALPHA_MIN_VOLUME, minWhale: BREADTH_ALPHA_MIN_WHALE,
     minScore: BREADTH_ALPHA_SCORE_MIN, minBullConf: BREADTH_ALPHA_MIN_BULLCONF,
+    maxBuyIntelPenalty: MAX_BUYINTEL_PENALTY,
     requireBull4hCount: BTC_ALPHA_REQUIRE_BULL4H_COUNT, bull4hCountMin: BREADTH_ALPHA_BULL4H_MIN,
     requireFlex4hBull: ALPHA_REQUIRE_4H_BULL, requireFlexDailyBull: ALPHA_REQUIRE_DAILY_BULL,
     requireFlexEmaAbove: ALPHA_REQUIRE_EMA_ABOVE, requireFlexOiConfirm: ALPHA_REQUIRE_OI_CONFIRM,
