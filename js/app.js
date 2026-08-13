@@ -516,7 +516,7 @@ async function refreshApiTrades() {
   setApiTradesFooter('Loading…');
   try {
     const cfg     = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-    const repo    = cfg.repo  || window.__GH_REPO || '';
+    const repo    = window.__GH_REPO || cfg.repo || ''; // server truth first — see _fetchGhJson comment
     const branch  = cfg.branch || 'main';
     const fpath   = (cfg.tradeLogPath || 'scripts/trade-log.json');
     const balPath = (cfg.liveBalancesPath || 'scripts/mexc-live-balances.json');
@@ -673,7 +673,7 @@ async function refreshApiAudit() {
   setApiAuditFooter('Loading…');
   try {
     const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-    const repo   = cfg.repo   || window.__GH_REPO || '';
+    const repo   = window.__GH_REPO || cfg.repo || ''; // server truth first — see _fetchGhJson comment
     const branch = cfg.branch || 'main';
     const fpath  = (cfg.auditLogPath || 'scripts/audit-log.json');
     if (!repo) { setApiAuditFooter('GitHub repo not configured — set GH_REPO in sync settings.'); return; }
@@ -759,7 +759,14 @@ let _marketDataState = { loading: false, symbols: [], regime: {}, positions: {} 
 // a bigger refactor of the older call sites, but new fetches use it.
 async function _fetchGhJson(fpath, { optional = true } = {}) {
   const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-  const repo   = cfg.repo   || window.__GH_REPO || '';
+  // window.__GH_REPO first, not last — it's auto-generated server-side by
+  // GitHub Actions from the real GH_REPO repo variable (env.js), whereas
+  // cfg.repo is a per-device localStorage value from the Sync settings
+  // form. A stale/wrong cfg.repo saved on one device (e.g. left over from
+  // testing a different repo) would otherwise silently override the
+  // correct value on every read-only tab, with no visible error unless
+  // the wrong repo happens to lack the file entirely.
+  const repo   = window.__GH_REPO || cfg.repo || '';
   const branch = cfg.branch || 'main';
   if (!repo) throw new Error('GitHub repo not configured — set GH_REPO in sync settings.');
   const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;
