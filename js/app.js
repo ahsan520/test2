@@ -759,14 +759,19 @@ let _marketDataState = { loading: false, symbols: [], regime: {}, positions: {} 
 // a bigger refactor of the older call sites, but new fetches use it.
 async function _fetchGhJson(fpath, { optional = true } = {}) {
   const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-  // window.__GH_REPO first, not last — it's auto-generated server-side by
-  // GitHub Actions from the real GH_REPO repo variable (env.js), whereas
-  // cfg.repo is a per-device localStorage value from the Sync settings
-  // form. A stale/wrong cfg.repo saved on one device (e.g. left over from
-  // testing a different repo) would otherwise silently override the
-  // correct value on every read-only tab, with no visible error unless
-  // the wrong repo happens to lack the file entirely.
-  const repo   = window.__GH_REPO || cfg.repo || '';
+  // Routed through the same _deriveRepo() (alerts.js) the Audit panel
+  // already uses, instead of this function's own narrower
+  // `window.__GH_REPO || cfg.repo || ''`. _deriveRepo() has the same two
+  // tiers PLUS a third: auto-detect from the GitHub Pages URL itself
+  // (<owner>.github.io/<repo>) when both window.__GH_REPO and the
+  // localStorage sync config are empty — which is exactly the state a
+  // fresh/incognito browser (or one where Sync was never configured) is
+  // in. Previously this function had no such fallback and threw "GitHub
+  // repo not configured" in that case, even though the page's own URL
+  // already contained everything needed to resolve it — same class of gap
+  // this whole Market Data tab is meant to avoid per its own design intent
+  // (read-only, no sync required).
+  const repo   = (typeof _deriveRepo === 'function' ? _deriveRepo() : '') || window.__GH_REPO || cfg.repo || '';
   const branch = cfg.branch || 'main';
   if (!repo) throw new Error('GitHub repo not configured — set GH_REPO in sync settings.');
   const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;

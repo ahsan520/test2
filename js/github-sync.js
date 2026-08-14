@@ -119,7 +119,15 @@ async function pullPositionsFromGitHub() {
   //
   // Simplest working approach: fetch the raw file from the public repo URL.
   // This works for public repos without any auth.
-  const repo   = cfg.repo || window.__GH_REPO || '';
+  //
+  // Repo resolution now goes through the same _deriveRepo() (alerts.js)
+  // that the Audit panel already uses — window.__GH_REPO, then localStorage
+  // cfg.repo, then (new) auto-detect from the GitHub Pages URL itself
+  // (<owner>.github.io/<repo>). That third tier is what actually closes the
+  // gap: a fresh/incognito browser, or one where cfg.repo was never saved
+  // (or was saved for a different repo during earlier testing), now still
+  // resolves correctly without the user having to type anything at all.
+  const repo   = (typeof _deriveRepo === 'function' ? _deriveRepo() : '') || cfg.repo || window.__GH_REPO || '';
   const branch = cfg.branch || 'main';
   const fpath  = cfg.path  || 'scripts/positions.json';
 
@@ -761,7 +769,7 @@ function renderGithubSyncCard() {
                  padding:7px 10px;border-radius:4px;font-size:9px;font-family:var(--mono);outline:none;box-sizing:border-box;">
       </div>
     </div>
-    <button onclick="pullPositionsFromGitHub()"
+    <button onclick="saveGithubSyncCfgFromUI(); pullPositionsFromGitHub();"
       style="width:100%;background:none;border:1px solid #8957e5;color:#8957e5;padding:8px;
              border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:9px;margin-bottom:10px;">
       🔄 PULL POSITIONS NOW
