@@ -1,13 +1,49 @@
 name: Alpha Terminal Alert Runner
 
 on:
-  # Cron fully disabled — Cloudflare Worker is the unconditional primary
-  # scheduler now (fetch every 5 min, decide 2 min after each fetch, see
-  # DEPLOY.md). This workflow is triggered entirely via workflow_dispatch
-  # calls from that Worker, plus manual runs from the Actions tab (pick
-  # any mode below) to test fetch/decide/full independently of Cloudflare's
-  # own timing. No GitHub-side schedule left to race, double-fire, or
-  # drift out of sync with the Worker's cadence.
+  # Restored as a safety net alongside the Cloudflare Worker (see
+  # DEPLOY.md). This used to be fully disabled because a single shared
+  # concurrency group let a queued `decide` run get silently superseded by
+  # the next `fetch` dispatch (see the concurrency block below) — decide
+  # would just never execute, no error. That's now fixed by keying the
+  # concurrency group off mode, so fetch/decide/full each get their own
+  # queue and can no longer bump each other. With that fix in place, native
+  # cron running alongside the Worker is redundant-safe rather than racy:
+  # worst case is a wasted extra run that queues behind/after the Worker's
+  # dispatch in the same mode's group, or gets caught by
+  # leaderboard-decider.js's own staleness gate.
+  #
+  # This restores the same effective cadence the Worker already runs so
+  # the two sources reinforce each other instead of one being a silent
+  # single point of failure (as happened when a Worker account went dark
+  # with nothing picking up the slack).
+  schedule:
+    # Job A — market data fetch only. Offset to :04/:09/:14… — 4 minutes
+    # after Cloudflare's fetch tick (:00/:05/:10…). This gap is what the
+    # staleness check (FETCH_STALE_THRESHOLD_MIN, default 4) relies on: if
+    # CF's fetch succeeded, market-data.json is <4min old by the time this
+    # lands, so this run skips as a no-op duplicate. If CF's fetch failed
+    # or didn't fire, data is stale and this actually runs — genuine
+    # backstop, not a race.
+    - cron: '4-59/5 * * * *'     # :04, :09, :14 …
+
+    # Job B — leaderboard buy decision + position tracker sell-side check.
+    # Offset to :01/:06/:11… — 4 minutes after Cloudflare's decide tick
+    # (:02/:07/:12…, i.e. :02 + 4 wraps to :01 next 5-min block). Same
+    # staleness logic as fetch above, checked against heartbeat.json.
+    - cron: '1-59/5 * * * *'     # :01, :06, :11 …
+
+    # Hourly full-scan — watchlist signal/overnight rules. DISABLED (see
+    # commented cron below) but left in place, not deleted, so it's a
+    # one-line uncomment to bring back rather than having to reconstruct
+    # it. While disabled, mode=full only runs via manual dispatch (Actions
+    # tab → Run workflow → mode: full).
+    # - cron: '31 * * * *'       # :31 past every hour
+
+  # Also triggered via workflow_dispatch — both by the Cloudflare Worker
+  # (which always passes mode=fetch or mode=decide explicitly) and by
+  # manual runs from the Actions tab (pick any mode below) to test
+  # fetch/decide/full independently of either scheduler's timing.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -27,25 +63,23 @@ on:
           - decide
 
 concurrency:
-  # Keyed by mode rather than one shared "alert-runner" group.
+  # Keyed by mode/schedule rather than one shared "alert-runner" group.
   #
   # Why this matters: with a single shared group, GitHub Actions cancels
   # older *queued* (not yet started) runs whenever a newer run queues
   # behind the same group — cancel-in-progress:false only protects a run
-  # that's already EXECUTING, not ones waiting in line. Since the
-  # Cloudflare Worker unconditionally fires mode=fetch every ~5 min AND
-  # fires mode=decide 2 min after each fetch, a queued decide run could
-  # get superseded by the next fetch dispatch before it ever ran — decide
+  # that's already EXECUTING, not ones waiting in line. Both native cron
+  # AND the Cloudflare Worker fire mode=fetch every ~5 min and mode=decide
+  # 2 min after — without separate groups, a queued decide run could get
+  # superseded by the next fetch dispatch before it ever ran — decide
   # silently never executes, no error, market-data.json just keeps aging
   # past the point decide needed it. (Observed: fetch data >30min stale,
   # decide hadn't run.)
   #
   # Splitting the group by mode means a queued decide can only ever be
-  # superseded by another decide, never bumped by an unrelated fetch.
-  # No cron trigger exists anymore (see `on:` above), so this only ever
-  # needs to key off inputs.mode now — the old github.event.schedule
-  # string-matching branches are dead code from when cron still ran.
-  group: alert-runner-${{ inputs.mode || 'manual' }}
+  # superseded by another decide, never bumped by an unrelated fetch —
+  # whether that fetch came from cron or from the Worker.
+  group: alert-runner-${{ github.event.schedule == '1-59/5 * * * *' && 'decide' || (github.event.schedule == '4-59/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
   cancel-in-progress: false
 
 permissions:
@@ -63,56 +97,44 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install dependencies
-        working-directory: scripts
-        run: npm install
-
       # ── Determine run mode ──────────────────────────────────────────────
-      # Cron is fully disabled (see `on:` above) — every run is now either
-      # a manual dispatch (Actions tab → Run workflow → pick a mode) or a
-      # workflow_dispatch call from the Cloudflare Worker, which always
-      # passes mode=fetch or mode=decide explicitly. So this just reads
-      # inputs.mode directly now, defaulting to 'full' only for the
-      # unlikely case it's somehow missing.
+      # 4-59/5     → fetch   (market-fetcher.js — Job A, data only; 4min after CF's fetch)
+      # 1-59/5     → decide  (leaderboard-decider.js + positions check — Job B; 4min after CF's decide)
+      # :31 hourly → full    (DISABLED — cron commented out above; this branch
+      #              is harmless dead code unless that cron gets re-enabled)
+      # workflow_dispatch    → whatever the "mode" input says (default: full)
+      #
+      # NOTE: github.event.schedule tells us exactly which cron string
+      # triggered this run, so there's no ambiguity even when two schedules
+      # coincide. A workflow_dispatch call (Worker or manual) has no
+      # github.event.schedule, so it falls through to inputs.mode.
+      #
+      # Moved ahead of Node setup/npm install deliberately — this and the
+      # staleness check below are both cheap (no deps needed, just bash +
+      # the system node binary already on the runner image), so a run
+      # that's about to skip never pays for `npm install` at all.
       - name: Determine run mode
         id: mode
         run: |
-          VALUE="${{ inputs.mode || 'full' }}"
+          SCHEDULE="${{ github.event.schedule }}"
+          if [ "$SCHEDULE" = "4-59/5 * * * *" ]; then
+            VALUE="fetch"
+          elif [ "$SCHEDULE" = "1-59/5 * * * *" ]; then
+            VALUE="decide"
+          elif [ "$SCHEDULE" = "31 * * * *" ]; then
+            VALUE="full"
+          elif [ -n "${{ inputs.mode }}" ]; then
+            VALUE="${{ inputs.mode }}"
+          else
+            VALUE="full"
+          fi
           echo "value=$VALUE" >> "$GITHUB_OUTPUT"
-          echo "Resolved mode: $VALUE"
-
-      # ── Write env.js with real credentials (runtime only — never committed) ──
-      # This file is written to disk for GitHub Pages to serve to the browser.
-      # It is reset to blanks BEFORE any git commit so secrets never enter git history.
-      - name: Write env.js (runtime credentials)
-        env:
-          GH_PAT:             ${{ secrets.GH_PAT }}
-          GH_REPO:            ${{ vars.GH_REPO || 'ahsan520/test2' }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          printf "// Auto-generated by GitHub Actions — DO NOT edit manually.\n" > scripts/env.js
-          printf "// Reset to blanks before every git commit — secrets never enter git history.\n" >> scripts/env.js
-          printf "// NOTE: AV_API_KEY / GNEWS_API_KEY are intentionally NOT written here.\n" >> scripts/env.js
-          printf "// Those are server-side-only secrets used by sentiment-fetcher.js /\n" >> scripts/env.js
-          printf "// general-news-fetcher.js, which write their results to committed JSON\n" >> scripts/env.js
-          printf "// files (sentiment-data.json / general-news-data.json) for the browser\n" >> scripts/env.js
-          printf "// to read. This file is wiped before every commit anyway, so a browser\n" >> scripts/env.js
-          printf "// key here would never actually reach GitHub Pages.\n" >> scripts/env.js
-          printf "window.__GH_PAT    = '%s';\n" "$GH_PAT"             >> scripts/env.js
-          printf "window.__GH_REPO   = '%s';\n" "$GH_REPO"            >> scripts/env.js
-          printf "window.__TG_TOKEN  = '%s';\n" "$TELEGRAM_BOT_TOKEN" >> scripts/env.js
-          printf "window.__TG_CHAT   = '%s';\n" "$TELEGRAM_CHAT_ID"   >> scripts/env.js
-          echo "✓ env.js written"
-          echo "  GH_PAT:  $([ -n "$GH_PAT"             ] && echo '✓' || echo '✗ MISSING')"
-          echo "  TG:      $([ -n "$TELEGRAM_BOT_TOKEN"  ] && echo '✓' || echo '✗ MISSING')"
+          echo "Resolved mode: $VALUE (schedule: '${SCHEDULE:-manual}')"
 
       # ── Ensure tracking files exist ──
+      # Moved ahead of npm install — the staleness check right after this
+      # needs market-data.json/heartbeat.json to exist, and this step is
+      # pure bash, no deps required.
       - name: Ensure tracking files exist
         run: |
           if [ ! -f scripts/positions.json ]; then
@@ -148,8 +170,104 @@ jobs:
             echo "Created empty general-news-data.json"
           fi
 
+          if [ ! -f scripts/heartbeat.json ]; then
+            echo '{"lastRunAt":0}' > scripts/heartbeat.json
+            echo "Created empty heartbeat.json"
+          fi
+
+      # ── Staleness check — skip fetch/decide if already fresh ────────────
+      # Same idea as the Cloudflare Worker's own staleness check, but done
+      # here once, so it applies uniformly no matter which trigger fired
+      # this run (native cron, the CF fetch Worker, the CF decide Worker,
+      # or a manual dispatch). Whichever source runs first for a given
+      # tick does the work and writes fresh data; whichever source's
+      # trigger lands after it sees fresh data and skips — same pattern
+      # the CF decide Worker already uses against heartbeat.json, just
+      # centralized instead of duplicated per-trigger-source.
+      #
+      # Only applies to mode=fetch and mode=decide. full/positions/manual
+      # runs always execute — they're not part of the fetch/decide race
+      # this exists to de-duplicate.
+      #
+      # Uses the runner image's pre-installed system `node` — deliberately
+      # BEFORE the "Set up Node.js" / "Install dependencies" steps, so a
+      # skip here means those two (the actually expensive ones — network
+      # install, package resolution) never run at all.
+      - name: Check staleness (skip if another trigger already covered this tick)
+        id: staleness
+        run: |
+          MODE="${{ steps.mode.outputs.value }}"
+          NOW_MS=$(( $(date +%s) * 1000 ))
+
+          if [ "$MODE" = "fetch" ]; then
+            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '4' }}"
+            LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/market-data.json')).fetchedAt||0)}catch(e){console.log(0)}")
+          elif [ "$MODE" = "decide" ]; then
+            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '4' }}"
+            LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/heartbeat.json')).lastRunAt||0)}catch(e){console.log(0)}")
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Mode '$MODE' is not fetch/decide — staleness check doesn't apply, running normally."
+            exit 0
+          fi
+
+          AGE_MIN=$(( (NOW_MS - LAST_MS) / 60000 ))
+          echo "mode=$MODE lastRecordedAt=${LAST_MS}ms age=${AGE_MIN}min threshold=${THRESHOLD_MIN}min"
+
+          if [ "$LAST_MS" != "0" ] && [ "$AGE_MIN" -le "$THRESHOLD_MIN" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "✓ Already fresh (${AGE_MIN}min old, threshold ${THRESHOLD_MIN}min) — another trigger covered this tick, skipping duplicate run. Node setup / npm install / pipeline all skip too."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Stale (${AGE_MIN}min old, threshold ${THRESHOLD_MIN}min) or no prior record — running."
+          fi
+
+      # ── Everything below only runs if we're NOT skipping ─────────────────
+      - name: Set up Node.js
+        if: steps.staleness.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        if: steps.staleness.outputs.skip != 'true'
+        working-directory: scripts
+        run: npm install
+
+      # ── Write env.js with real credentials (runtime only — never committed) ──
+      # This file is written to disk for GitHub Pages to serve to the browser.
+      # It is reset to blanks BEFORE any git commit so secrets never enter git history.
+      - name: Write env.js (runtime credentials)
+        if: steps.staleness.outputs.skip != 'true'
+        env:
+          GH_PAT:             ${{ secrets.GH_PAT }}
+          GH_REPO:            ${{ vars.GH_REPO || 'ahsan520/test2' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          printf "// Auto-generated by GitHub Actions — DO NOT edit manually.\n" > scripts/env.js
+          printf "// Reset to blanks before every git commit — secrets never enter git history.\n" >> scripts/env.js
+          printf "// NOTE: AV_API_KEY / GNEWS_API_KEY are intentionally NOT written here.\n" >> scripts/env.js
+          printf "// Those are server-side-only secrets used by sentiment-fetcher.js /\n" >> scripts/env.js
+          printf "// general-news-fetcher.js, which write their results to committed JSON\n" >> scripts/env.js
+          printf "// files (sentiment-data.json / general-news-data.json) for the browser\n" >> scripts/env.js
+          printf "// to read. This file is wiped before every commit anyway, so a browser\n" >> scripts/env.js
+          printf "// key here would never actually reach GitHub Pages.\n" >> scripts/env.js
+          printf "window.__GH_PAT    = '%s';\n" "$GH_PAT"             >> scripts/env.js
+          printf "window.__GH_REPO   = '%s';\n" "$GH_REPO"            >> scripts/env.js
+          printf "window.__TG_TOKEN  = '%s';\n" "$TELEGRAM_BOT_TOKEN" >> scripts/env.js
+          printf "window.__TG_CHAT   = '%s';\n" "$TELEGRAM_CHAT_ID"   >> scripts/env.js
+          echo "✓ env.js written"
+          echo "  GH_PAT:  $([ -n "$GH_PAT"             ] && echo '✓' || echo '✗ MISSING')"
+          echo "  TG:      $([ -n "$TELEGRAM_BOT_TOKEN"  ] && echo '✓' || echo '✗ MISSING')"
+
       # ── Run the resolved mode ──
+      # Skipped entirely if the staleness check above found this tick
+      # already covered by another trigger source. State files are
+      # untouched in that case, so the commit step below finds no diff
+      # and no-ops — nothing further needs to special-case a skip.
       - name: Run alert pipeline
+        if: steps.staleness.outputs.skip != 'true'
         working-directory: scripts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
