@@ -661,16 +661,71 @@ export function calcBullConf(d, whaleScore) {
 // ════════════════════════════════════════════════════════
 // CRYPTO SCORER  (Binance)
 // ════════════════════════════════════════════════════════
+// ── XMR price/OHLCV: Kraken, unconditionally — NOT a Binance-failure fallback ──
+// Binance delisted all XMR pairs globally on 2024-02-20. Its ticker endpoint
+// still resolves for "XMRUSDT" and returns a 200 with no error code — it just
+// silently serves the last-traded price from before delisting, forever. That
+// means the existing `if (!t || t.code) return null` failure check NEVER
+// catches this: no error is ever thrown, so market-data.json has been frozen
+// at a ~2024-era price (observed: $118.70) while XMR's real price is ~$400+.
+// Unlike the funding-rate fix above, this can't be "try Binance, fall back on
+// failure" — Binance isn't failing, it's silently wrong, which is worse.
+// So XMR routes to Kraken unconditionally (same source already used for XMR
+// on the GUI), never touching Binance for this one pair at all.
+//
+// Response shapes below are normalized to match exactly what scoreSymbol
+// already reads from Binance responses (t.lastPrice, t.priceChangePercent;
+// candle[1]=open, candle[4]=close, candle[5]=volume; depth.bids/asks as
+// [price, qty, ...] pairs) — so no other code in scoreSymbol needed to change.
+const KRAKEN_SPOT_DIRECT = 'https://api.kraken.com';
+const KRAKEN_INTERVAL_MIN = { '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
+
+async function fetchKrakenTicker(krakenPair) {
+  const d = await fetchJSON(`${KRAKEN_SPOT_DIRECT}/0/public/Ticker?pair=${krakenPair}`);
+  if (d?.error?.length) throw new Error(`Kraken ticker: ${d.error.join(', ')}`);
+  const row = Object.values(d?.result || {})[0]; // key is Kraken's canonical name (e.g. XXMRZUSD), not krakenPair — grab by position instead
+  if (!row) throw new Error(`Kraken: no ticker result for ${krakenPair}`);
+  const lastPrice = parseFloat(row.c?.[0]);
+  const openPrice  = parseFloat(row.o);
+  const priceChangePercent = openPrice > 0 ? ((lastPrice - openPrice) / openPrice) * 100 : 0;
+  return { lastPrice: String(lastPrice), priceChangePercent: String(priceChangePercent) };
+}
+
+async function fetchKrakenOHLC(krakenPair, interval, limit) {
+  const mins = KRAKEN_INTERVAL_MIN[interval];
+  const d = await fetchJSON(`${KRAKEN_SPOT_DIRECT}/0/public/OHLC?pair=${krakenPair}&interval=${mins}`);
+  if (d?.error?.length) throw new Error(`Kraken OHLC(${interval}): ${d.error.join(', ')}`);
+  const rows = Object.entries(d?.result || {}).find(([k]) => k !== 'last')?.[1];
+  if (!rows) throw new Error(`Kraken: no OHLC result for ${krakenPair} @ ${interval}`);
+  // Kraken candle: [time, open, high, low, close, vwap, volume, count]
+  // Normalized to: [time, open, high, low, close, volume] — the only
+  // indices (1=open, 4=close, 5=volume) anything downstream reads.
+  return rows.slice(-limit).map(c => [c[0], c[1], c[2], c[3], c[4], c[6]]);
+}
+
+async function fetchKrakenDepth(krakenPair, count) {
+  const d = await fetchJSON(`${KRAKEN_SPOT_DIRECT}/0/public/Depth?pair=${krakenPair}&count=${count}`);
+  if (d?.error?.length) throw new Error(`Kraken depth: ${d.error.join(', ')}`);
+  const row = Object.values(d?.result || {})[0];
+  if (!row) throw new Error(`Kraken: no depth result for ${krakenPair}`);
+  return { bids: row.bids || [], asks: row.asks || [] }; // already [price, qty, timestamp] — same shape calcOBI expects
+}
+
 export async function scoreSymbol(pair, prevFr = null) {
   try {
+    // XMR only — see fetchKrakenTicker/OHLC/Depth comment block above for why
+    // this is unconditional routing to Kraken, not a try-Binance-first fallback.
+    const useKraken = pair === 'XMRUSDT';
+    const krakenPair = 'XMRUSD';
+
     const [ticker, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
-      fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
-      fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
-      fetchFundingRate(pair), // Bybit → OKX → proxy-wrapped Bybit — fapi.binance.com is geo-blocked on GH runners, see note above
+      useKraken ? fetchKrakenTicker(krakenPair)                    : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
+      useKraken ? fetchKrakenOHLC(krakenPair, '15m', 60)           : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
+      useKraken ? fetchKrakenOHLC(krakenPair, '1h', 30)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
+      useKraken ? fetchKrakenOHLC(krakenPair, '4h', 50)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
+      useKraken ? fetchKrakenOHLC(krakenPair, '1d', 14)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
+      useKraken ? fetchKrakenDepth(krakenPair, 20)                 : fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
+      fetchFundingRate(pair), // Bybit → OKX → proxy-wrapped Bybit → Kraken — fapi.binance.com is geo-blocked on GH runners, see note above
     ]);
 
     const val = r => r.status === 'fulfilled' ? r.value : null;
