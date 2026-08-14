@@ -48,7 +48,7 @@ async function fetchText(url, headers = {}, timeoutMs = 9000) {
   } finally { clearTimeout(tid); }
 }
 
-// ── Funding rate: Bybit → OKX → proxy-wrapped Bybit → carry-forward ─────
+// ── Funding rate: Bybit → OKX → proxy-wrapped Bybit → Kraken → carry-forward ─────
 // fapi.binance.com (funding rate / OI) is confirmed geo-blocked (HTTP 451)
 // on GitHub-hosted runners, with no public spot-style mirror equivalent —
 // data-api.binance.vision only serves spot. Bybit was added as the first
@@ -60,6 +60,12 @@ async function fetchText(url, headers = {}, timeoutMs = 9000) {
 // REAL underlying error (previous version swallowed it down to a generic
 // "failed" message) and adds OKX as a second independent exchange, plus a
 // CORS-proxy-wrapped retry of Bybit, before finally carrying forward.
+//
+// Kraken was added as a fourth, last-resort attempt specifically for pairs
+// where Bybit/OKX/Bybit-proxy ALL consistently fail (observed: XMRUSDT and
+// FETUSDT returning HTTP 403 on Bybit, "no data row" on OKX — see
+// fetchKrakenFundingRate below for why this stays last-resort rather than
+// an equal-weight source, and why it includes its own sanity guard).
 const BYBIT_DIRECT = 'https://api.bybit.com';
 const OKX_DIRECT    = 'https://www.okx.com';
 const PROXY_PREFIX2 = 'https://corsproxy.io/?url=';
@@ -85,6 +91,48 @@ async function fetchOkxFundingRate(pair) {
   return parseFloat(row.fundingRate || 0) * 100;
 }
 
+// Kraken Futures — last-resort fallback, used for symbols where Bybit/OKX
+// (both geo-blocked from GH runners for some pairs, e.g. XMR/FET returning
+// HTTP 403) consistently fail. Same "we already use Kraken for XMR on the
+// GUI" data source, added server-side too.
+//
+// Two things make this a LAST resort rather than an equal-weight source,
+// not just an ordering preference:
+//   1. Kraken Futures perpetuals settle/fund roughly hourly, vs Bybit/OKX's
+//      8-hour cycle — so even a correct Kraken reading isn't strictly
+//      apples-to-apples with a Bybit/OKX-sourced `fr` on the same
+//      thresholds (fundingHealthy <= 0.01%, position-monitor exit scoring).
+//   2. Kraken's own feed shows real inconsistency between contract
+//      families for the SAME asset: at the time this was written,
+//      PF_XBTUSD read fundingRate 0.555 while PI_XBTUSD (also BTC) read
+//      -0.00000000027 — many orders of magnitude apart. That's Kraken's
+//      data, not a parsing bug on our end, so a bad PF_ reading for
+//      XMR/FET is a real possibility, not a hypothetical.
+// Given both of those, this includes a sanity guard: an implausible
+// reading (>±5% per period, ~500x a typical healthy rate) is rejected
+// outright rather than trusted, so it falls through to the existing
+// carry-forward-last-known behavior instead of poisoning fundingHealthy
+// or exit scoring with a garbage number.
+const KRAKEN_FUTURES_DIRECT = 'https://futures.kraken.com';
+const KRAKEN_SANITY_MAX_PCT = 5; // reject anything beyond ±5% per period
+
+async function fetchKrakenFundingRate(pair) {
+  const base   = pair.replace(/USDT$/, '');
+  const symbol = `PF_${base}USD`; // Kraken Futures perpetual naming: PF_<BASE>USD
+  const url = `${KRAKEN_FUTURES_DIRECT}/derivatives/api/v3/tickers`;
+  const d = await fetchJSON(url);
+  const row = d?.tickers?.find(t => t.symbol === symbol);
+  if (!row) throw new Error(`Kraken: no ticker for ${symbol}`);
+  if (row.fundingRate === undefined || row.fundingRate === null) {
+    throw new Error(`Kraken: ${symbol} has no fundingRate field`);
+  }
+  const pct = parseFloat(row.fundingRate) * 100;
+  if (!Number.isFinite(pct) || Math.abs(pct) > KRAKEN_SANITY_MAX_PCT) {
+    throw new Error(`Kraken: ${symbol} fundingRate ${pct}% failed sanity check (>±${KRAKEN_SANITY_MAX_PCT}%) — rejecting, not trusting`);
+  }
+  return pct;
+}
+
 async function fetchFundingRate(pair) {
   const attempts = [
     { name: 'Bybit',        fn: () => fetchBybitFundingRate(pair) },
@@ -94,6 +142,7 @@ async function fetchFundingRate(pair) {
         if (!row) throw new Error('Bybit(proxy): no ticker row returned');
         return parseFloat(row.fundingRate || 0) * 100;
       }) },
+    { name: 'Kraken',       fn: () => fetchKrakenFundingRate(pair) },
   ];
   const errors = [];
   for (const a of attempts) {
