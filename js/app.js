@@ -516,7 +516,10 @@ async function refreshApiTrades() {
   setApiTradesFooter('Loading…');
   try {
     const cfg     = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-    const repo    = window.__GH_REPO || cfg.repo || ''; // server truth first — see _fetchGhJson comment
+    // Same _deriveRepo() (alerts.js) used by Audit and Market Data now —
+    // adds the GitHub-Pages-URL auto-detect fallback on top of
+    // window.__GH_REPO/cfg.repo, so this tab works with zero Sync config too.
+    const repo    = (typeof _deriveRepo === 'function' ? _deriveRepo() : '') || window.__GH_REPO || cfg.repo || '';
     const branch  = cfg.branch || 'main';
     const fpath   = (cfg.tradeLogPath || 'scripts/trade-log.json');
     const balPath = (cfg.liveBalancesPath || 'scripts/mexc-live-balances.json');
@@ -673,7 +676,9 @@ async function refreshApiAudit() {
   setApiAuditFooter('Loading…');
   try {
     const cfg    = typeof loadGhSyncCfg === 'function' ? loadGhSyncCfg() : {};
-    const repo   = window.__GH_REPO || cfg.repo || ''; // server truth first — see _fetchGhJson comment
+    // Same _deriveRepo() (alerts.js) used by Audit's Runner Audit Log and
+    // Market Data now — adds the GitHub-Pages-URL auto-detect fallback.
+    const repo   = (typeof _deriveRepo === 'function' ? _deriveRepo() : '') || window.__GH_REPO || cfg.repo || '';
     const branch = cfg.branch || 'main';
     const fpath  = (cfg.auditLogPath || 'scripts/audit-log.json');
     if (!repo) { setApiAuditFooter('GitHub repo not configured — set GH_REPO in sync settings.'); return; }
