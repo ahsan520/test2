@@ -200,10 +200,10 @@ jobs:
           NOW_MS=$(( $(date +%s) * 1000 ))
 
           if [ "$MODE" = "fetch" ]; then
-            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '4' }}"
+            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '3' }}"
             LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/market-data.json')).fetchedAt||0)}catch(e){console.log(0)}")
           elif [ "$MODE" = "decide" ]; then
-            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '4' }}"
+            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '3' }}"
             LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/heartbeat.json')).lastRunAt||0)}catch(e){console.log(0)}")
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
