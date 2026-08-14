@@ -194,16 +194,23 @@ jobs:
       # skip here means those two (the actually expensive ones — network
       # install, package resolution) never run at all.
       - name: Check staleness (skip if another trigger already covered this tick)
+        # DISABLED — the Cloudflare Worker already handles this via its own
+        # threshold (DECIDE_THRESHOLD_MIN in wrangler.toml), so this yml-side
+        # check is redundant right now. Left fully intact below, not deleted
+        # — flip this back to `if: steps.mode.outputs.value == ...` (or just
+        # delete this line) to re-enable later if the Worker-side threshold
+        # ever gets removed or this ever needs to be the primary check again.
+        if: false
         id: staleness
         run: |
           MODE="${{ steps.mode.outputs.value }}"
           NOW_MS=$(( $(date +%s) * 1000 ))
 
           if [ "$MODE" = "fetch" ]; then
-            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '3' }}"
+            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '4' }}"
             LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/market-data.json')).fetchedAt||0)}catch(e){console.log(0)}")
           elif [ "$MODE" = "decide" ]; then
-            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '3' }}"
+            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '4' }}"
             LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/heartbeat.json')).lastRunAt||0)}catch(e){console.log(0)}")
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
