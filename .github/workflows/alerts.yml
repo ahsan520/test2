@@ -343,6 +343,18 @@ jobs:
           BUY_ENABLE_CHASE_CHECK:          ${{ vars.BUY_ENABLE_CHASE_CHECK || 'true' }}
           BUY_CHASE_WARN_STREAK:           ${{ vars.BUY_CHASE_WARN_STREAK || '1' }}
           BUY_CHASE_BLOCK_STREAK:          ${{ vars.BUY_CHASE_BLOCK_STREAK || '2' }}
+          # New — the chase check above is now RSI-aware (buy-intelligence.js):
+          # a green-candle streak only gets penalized once RSI confirms the
+          # move is actually overbought, so a fresh spike (RSI still has
+          # room) no longer eats the same penalty as an exhausted one with
+          # the same candle count. This falling-knife check is the natural
+          # counterpart on the downside — same streak mechanics, but on
+          # consecutive RED candles, catching a buy while price is still
+          # actively falling (not just "some % below a recent high", which
+          # the existing pullback check below already covers separately).
+          BUY_ENABLE_FALLING_KNIFE_CHECK:  ${{ vars.BUY_ENABLE_FALLING_KNIFE_CHECK || 'true' }}
+          BUY_FALLING_KNIFE_WARN_STREAK:   ${{ vars.BUY_FALLING_KNIFE_WARN_STREAK || '2' }}
+          BUY_FALLING_KNIFE_BLOCK_STREAK:  ${{ vars.BUY_FALLING_KNIFE_BLOCK_STREAK || '3' }}
           BUY_ENABLE_RSI_EXTENSION_CHECK:  ${{ vars.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true' }}
           BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '64' }}
           BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '72' }}
