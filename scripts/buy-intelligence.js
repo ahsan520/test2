@@ -12,16 +12,36 @@
 //
 // Checks aimed at trade-log patterns:
 //   1. RSI extension — independent per-timeframe scoring (15m / 1h).
-//   2. Candle-run chasing — consecutive green 15m candles streak check.
-//   3. Signal quality floor — filters thin setups with low confidence.
-//   4. Pullback from high — prevents buying into active breakdowns.
-//   5. Time-of-Day (ToD) liquidity — penalizes low-volume / high-wick
+//   2. Candle-run chasing — consecutive green 15m candles, but only
+//      penalized once RSI confirms the move is actually overbought, not
+//      just "underway" — a fresh spike (RSI still has room) and an
+//      exhausted one (RSI already hot) can share the same candle count.
+//   3. Falling-knife — consecutive RED 15m candles; buying while price is
+//      still actively falling, distinct from #4's magnitude-based check.
+//   4. Signal quality floor — filters thin setups with low confidence.
+//   5. Pullback from high — how far price has already fallen (magnitude,
+//      can be stale/stabilized), complements #3's momentum-based check.
+//   6. Time-of-Day (ToD) liquidity — penalizes low-volume / high-wick
 //      off-hours window (5 PM - 2 AM EST) and raises the quality floor.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CHASE_ENABLED = (process.env.BUY_ENABLE_CHASE_CHECK || 'true') !== 'false';
 const CHASE_WARN_STREAK  = parseInt(process.env.BUY_CHASE_WARN_STREAK  || '2', 10); // consecutive green 15m candles -> -1
 const CHASE_BLOCK_STREAK = parseInt(process.env.BUY_CHASE_BLOCK_STREAK || '3', 10); // -> -2
+
+// Falling-knife check — same candle-streak mechanics as the chase check,
+// but on consecutiveDown instead of consecutiveUp. consecutiveDown was
+// already being calculated below and simply never used for anything.
+// Distinct from calcPullbackFromHigh: pullback measures HOW FAR price has
+// already fallen from a recent high (magnitude, can be stale/stabilized);
+// this measures whether it's STILL actively falling RIGHT NOW (momentum).
+// A DIP BUY setup buying 1.2% below a recent high after price already
+// stabilized should pass pullback but this checks the live candle streak
+// regardless of setup type — buying while red candles are still stacking
+// is the literal definition of catching a falling knife.
+const KNIFE_ENABLED = (process.env.BUY_ENABLE_FALLING_KNIFE_CHECK || 'true') !== 'false';
+const KNIFE_WARN_STREAK  = parseInt(process.env.BUY_FALLING_KNIFE_WARN_STREAK  || '2', 10);
+const KNIFE_BLOCK_STREAK = parseInt(process.env.BUY_FALLING_KNIFE_BLOCK_STREAK || '3', 10);
 
 const RSI_ENABLED = (process.env.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true') !== 'false';
 const RSI_15M_HOT  = parseFloat(process.env.BUY_RSI_15M_HOT  || '70'); // matches bullConf's existing rsiNotOb line
@@ -46,9 +66,17 @@ const TOD_ENABLED = (process.env.BUY_ENABLE_TOD_CHECK || 'true') !== 'false';
 const TOD_PENALTY = parseInt(process.env.BUY_TOD_PENALTY || '1', 10);
 
 // ── Candle-run "chasing" check ──────────────────────────────────────────
-export function calcEntryFreshness(k15) {
+// r15 is now REQUIRED context, not optional — a streak alone can't tell a
+// fresh spike from an exhausted one. Same candle count, opposite meaning:
+// consecutiveUp=2 with RSI15=48 is a breakout just getting started, still
+// plenty of room to run. consecutiveUp=2 with RSI15=74 is the same streak
+// on a move that's already overbought — genuinely chasing. Gating the
+// penalty on RSI still being below RSI_15M_HOT means a fresh spike no
+// longer eats the same penalty as a stale one just for having the same
+// candle count.
+export function calcEntryFreshness(k15, r15 = null) {
   if (!CHASE_ENABLED || !Array.isArray(k15) || k15.length < 4) {
-    return { consecutiveUp: 0, consecutiveDown: 0, chasing: false, penalty: 0, reason: null };
+    return { consecutiveUp: 0, consecutiveDown: 0, chasing: false, penalty: 0, reason: null, knifePenalty: 0, knifeReason: null };
   }
   const closed  = k15.slice(0, -1); // drop the still-forming current candle
   const closes  = closed.map(c => parseFloat(c[4]));
@@ -59,16 +87,32 @@ export function calcEntryFreshness(k15) {
   let consecutiveDown = 0;
   for (let i = closes.length - 1; i >= 0 && closes[i] < opens[i]; i--) consecutiveDown++;
 
+  const r15v = r15 ?? 50;
+  const stillFresh = r15v < RSI_15M_HOT; // room left to run — not yet confirmed overbought
+
   let penalty = 0, reason = null;
-  if (consecutiveUp >= CHASE_BLOCK_STREAK) {
+  if (consecutiveUp >= CHASE_BLOCK_STREAK && !stillFresh) {
     penalty = 2;
-    reason = `${consecutiveUp} straight green 15m candles — buying deep into an already-extended move`;
-  } else if (consecutiveUp >= CHASE_WARN_STREAK) {
+    reason = `${consecutiveUp} straight green 15m candles with RSI ${r15v.toFixed(0)} already hot — buying deep into an already-extended move, not a fresh spike`;
+  } else if (consecutiveUp >= CHASE_WARN_STREAK && !stillFresh) {
     penalty = 1;
-    reason = `${consecutiveUp} straight green 15m candles — move is already underway, not fresh`;
+    reason = `${consecutiveUp} straight green 15m candles with RSI ${r15v.toFixed(0)} already hot — move is losing freshness`;
+  }
+  // else: streak exists but RSI still has room — treated as a fresh spike
+  // starting, not chasing. No penalty, deliberately.
+
+  let knifePenalty = 0, knifeReason = null;
+  if (KNIFE_ENABLED) {
+    if (consecutiveDown >= KNIFE_BLOCK_STREAK) {
+      knifePenalty = 2;
+      knifeReason = `${consecutiveDown} straight red 15m candles — still actively falling, not a stabilized dip`;
+    } else if (consecutiveDown >= KNIFE_WARN_STREAK) {
+      knifePenalty = 1;
+      knifeReason = `${consecutiveDown} straight red 15m candles — momentum still pointing down`;
+    }
   }
 
-  return { consecutiveUp, consecutiveDown, chasing: penalty > 0, penalty, reason };
+  return { consecutiveUp, consecutiveDown, chasing: penalty > 0, penalty, reason, knifePenalty, knifeReason };
 }
 
 // ── RSI extension check ─────────────────────────────────────────────────
@@ -159,13 +203,13 @@ export function calcTimeOfDayPenalty(date = new Date()) {
 // ── Combined entry check — called once per symbol from scoreSymbol() ──
 export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore, currentPrice, timestamp }) {
   const tod       = calcTimeOfDayPenalty(timestamp ? new Date(timestamp) : new Date());
-  const freshness = calcEntryFreshness(k15);
+  const freshness = calcEntryFreshness(k15, r15);
   const extension = calcEntryExtension(r15, r1h);
   const quality   = calcSignalQuality(bullConfCount, whaleScore, tod.isOffHours);
   const pullback  = calcPullbackFromHigh(k15, currentPrice);
 
-  const penalty = freshness.penalty + extension.penalty + quality.penalty + pullback.penalty + tod.penalty;
-  const reasons = [freshness.reason, extension.reason, quality.reason, pullback.reason, tod.reason].filter(Boolean);
+  const penalty = freshness.penalty + freshness.knifePenalty + extension.penalty + quality.penalty + pullback.penalty + tod.penalty;
+  const reasons = [freshness.reason, freshness.knifeReason, extension.reason, quality.reason, pullback.reason, tod.reason].filter(Boolean);
 
   return { penalty, reasons, freshness, extension, quality, pullback, tod };
 }
