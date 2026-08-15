@@ -5657,7 +5657,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-15T13:42:46.894Z",
+    "timestamp": "2026-08-15T13:42:48.749Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 23,
@@ -5669,7 +5669,7 @@
       {
         "pair": "AAVEUSDT",
         "status": "ok",
-        "conv": -2,
+        "conv": -4,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5711,7 +5711,7 @@
       {
         "pair": "FETUSDT",
         "status": "ok",
-        "conv": -10,
+        "conv": -9,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5825,5 +5825,148 @@
         "assetType": "stock"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-15T13:42:48.802Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-15T13:42:49.202Z",
+    "job": "leaderboard-decider",
+    "action": "REDUCE_50",
+    "sym": "BINANCE:AVAXUSDT",
+    "reason": "Confidence decay 44% > 35% with falling-knife 51",
+    "fallingKnifeScore": 51,
+    "thesisDrop": 51,
+    "confidenceDecay": 44,
+    "exitProbability": 58,
+    "dynamicPositionRisk": 58
+  },
+  {
+    "timestamp": "2026-08-15T13:42:50.306Z",
+    "job": "leaderboard-decider",
+    "action": "mexc_partial_sell",
+    "sym": "AVAXUSDT",
+    "reason": "position intelligence: Confidence decay 44% > 35% with falling-knife 51",
+    "pct": 0.5,
+    "qty": 138.01,
+    "fillPrice": 6.563000000000001,
+    "orderId": "C02__717306236906668032036",
+    "remainingQty": 138.01
+  },
+  {
+    "timestamp": "2026-08-15T13:42:51.326Z",
+    "job": "leaderboard-decider",
+    "action": "trade_log_pushed",
+    "count": 14
+  },
+  {
+    "timestamp": "2026-08-15T13:42:51.327Z",
+    "job": "leaderboard-decider",
+    "action": "REDUCE_50",
+    "sym": "BINANCE:AVAXUSDT",
+    "level": 2,
+    "qty": 138.01,
+    "fillPrice": 6.563000000000001
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.253Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 1
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.534Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 1,
+    "openAfter": 1,
+    "alerts": 1
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.712Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:UNIUSDT",
+    "base": "UNI",
+    "free": 0.16,
+    "estNotional": 0.5224
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.714Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.22671
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.715Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.085717,
+    "estNotional": 0.0859055774
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.716Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.002,
+    "estNotional": 0.39480000000000004
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.717Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.00015,
+    "estNotional": 0.0735975
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.896Z",
+    "job": "leaderboard-decider",
+    "action": "market_guard",
+    "canBuy": false,
+    "closeAll": false,
+    "sizeMult": 1,
+    "reasons": [
+      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
+    ]
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.899Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0
+  },
+  {
+    "timestamp": "2026-08-15T13:42:52.901Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-15T13:42:54.083Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 1,
+    "monitored": 1
   }
 ]
