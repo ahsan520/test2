@@ -13,7 +13,7 @@ import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry.js';
-import { evaluateBuyReadiness } from './buy-intelligence.js';
+import { evaluateBuyReadiness, evaluateStockBuyReadiness } from './buy-intelligence.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -947,7 +947,12 @@ export async function scoreStock(sym) {
     const whale     = calcWhaleScore(d);
     const bullConf  = calcBullConf(d, whale.score);
     const flow      = calcFlow(d, whale.score);
-    const gradeInfo = calcGrade(bullConf.count, whale.score);
+
+    const buyIntel = evaluateStockBuyReadiness({ r15, r1h, bars, bullConfCount: bullConf.count, whaleScore: whale.score, currentPrice: price });
+    if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
+    d.buyIntel = buyIntel;
+
+    const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
     const archetype = calcSetupArchetype(d, whale.score);
 
     return {

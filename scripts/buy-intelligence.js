@@ -74,7 +74,13 @@ const TOD_PENALTY = parseInt(process.env.BUY_TOD_PENALTY || '1', 10);
 // penalty on RSI still being below RSI_15M_HOT means a fresh spike no
 // longer eats the same penalty as a stale one just for having the same
 // candle count.
-export function calcEntryFreshness(k15, r15 = null) {
+export function calcEntryFreshness(k15, r15 = null, opts = {}) {
+  const chaseWarnStreak  = opts.chaseWarnStreak  ?? CHASE_WARN_STREAK;
+  const chaseBlockStreak = opts.chaseBlockStreak ?? CHASE_BLOCK_STREAK;
+  const knifeWarnStreak  = opts.knifeWarnStreak  ?? KNIFE_WARN_STREAK;
+  const knifeBlockStreak = opts.knifeBlockStreak ?? KNIFE_BLOCK_STREAK;
+  const rsiHot           = opts.rsiHot           ?? RSI_15M_HOT;
+
   if (!CHASE_ENABLED || !Array.isArray(k15) || k15.length < 4) {
     return { consecutiveUp: 0, consecutiveDown: 0, chasing: false, penalty: 0, reason: null, knifePenalty: 0, knifeReason: null };
   }
@@ -88,27 +94,27 @@ export function calcEntryFreshness(k15, r15 = null) {
   for (let i = closes.length - 1; i >= 0 && closes[i] < opens[i]; i--) consecutiveDown++;
 
   const r15v = r15 ?? 50;
-  const stillFresh = r15v < RSI_15M_HOT; // room left to run — not yet confirmed overbought
+  const stillFresh = r15v < rsiHot; // room left to run — not yet confirmed overbought
 
   let penalty = 0, reason = null;
-  if (consecutiveUp >= CHASE_BLOCK_STREAK && !stillFresh) {
+  if (consecutiveUp >= chaseBlockStreak && !stillFresh) {
     penalty = 2;
-    reason = `${consecutiveUp} straight green 15m candles with RSI ${r15v.toFixed(0)} already hot — buying deep into an already-extended move, not a fresh spike`;
-  } else if (consecutiveUp >= CHASE_WARN_STREAK && !stillFresh) {
+    reason = `${consecutiveUp} straight green candles with RSI ${r15v.toFixed(0)} already hot — buying deep into an already-extended move, not a fresh spike`;
+  } else if (consecutiveUp >= chaseWarnStreak && !stillFresh) {
     penalty = 1;
-    reason = `${consecutiveUp} straight green 15m candles with RSI ${r15v.toFixed(0)} already hot — move is losing freshness`;
+    reason = `${consecutiveUp} straight green candles with RSI ${r15v.toFixed(0)} already hot — move is losing freshness`;
   }
   // else: streak exists but RSI still has room — treated as a fresh spike
   // starting, not chasing. No penalty, deliberately.
 
   let knifePenalty = 0, knifeReason = null;
   if (KNIFE_ENABLED) {
-    if (consecutiveDown >= KNIFE_BLOCK_STREAK) {
+    if (consecutiveDown >= knifeBlockStreak) {
       knifePenalty = 2;
-      knifeReason = `${consecutiveDown} straight red 15m candles — still actively falling, not a stabilized dip`;
-    } else if (consecutiveDown >= KNIFE_WARN_STREAK) {
+      knifeReason = `${consecutiveDown} straight red candles — still actively falling, not a stabilized dip`;
+    } else if (consecutiveDown >= knifeWarnStreak) {
       knifePenalty = 1;
-      knifeReason = `${consecutiveDown} straight red 15m candles — momentum still pointing down`;
+      knifeReason = `${consecutiveDown} straight red candles — momentum still pointing down`;
     }
   }
 
@@ -116,15 +122,19 @@ export function calcEntryFreshness(k15, r15 = null) {
 }
 
 // ── RSI extension check ─────────────────────────────────────────────────
-export function calcEntryExtension(r15, r1h) {
+export function calcEntryExtension(r15, r1h, opts = {}) {
+  const rsi15Hot  = opts.rsi15Hot  ?? RSI_15M_HOT;
+  const rsi15VHot = opts.rsi15VHot ?? RSI_15M_VHOT;
+  const rsi1hHot  = opts.rsi1hHot  ?? RSI_1H_HOT;
+
   if (!RSI_ENABLED) return { penalty: 0, reason: null };
   const r15v = r15 ?? 50, r1hv = r1h ?? 50;
 
   let penalty = 0;
   const hits = [];
-  if (r15v >= RSI_15M_VHOT)     { penalty += 2; hits.push(`15m RSI ${r15v.toFixed(0)} ≥ ${RSI_15M_VHOT} (very extended)`); }
-  else if (r15v >= RSI_15M_HOT) { penalty += 1; hits.push(`15m RSI ${r15v.toFixed(0)} ≥ ${RSI_15M_HOT}`); }
-  if (r1hv >= RSI_1H_HOT)       { penalty += 1; hits.push(`1h RSI ${r1hv.toFixed(0)} ≥ ${RSI_1H_HOT}`); }
+  if (r15v >= rsi15VHot)     { penalty += 2; hits.push(`RSI ${r15v.toFixed(0)} ≥ ${rsi15VHot} (very extended)`); }
+  else if (r15v >= rsi15Hot) { penalty += 1; hits.push(`RSI ${r15v.toFixed(0)} ≥ ${rsi15Hot}`); }
+  if (r1hv >= rsi1hHot)      { penalty += 1; hits.push(`confirming-timeframe RSI ${r1hv.toFixed(0)} ≥ ${rsi1hHot}`); }
 
   return { penalty, reason: hits.length ? hits.join(' · ') : null };
 }
@@ -154,11 +164,15 @@ export function calcSignalQuality(bullConfCount, whaleScore, isOffHours = false)
 }
 
 // ── Pullback-from-recent-high check ─────────────────────────────────────
-export function calcPullbackFromHigh(k15, currentPrice) {
-  if (!PULLBACK_ENABLED || !Array.isArray(k15) || k15.length < PULLBACK_LOOKBACK + 1 || currentPrice == null) {
+export function calcPullbackFromHigh(k15, currentPrice, opts = {}) {
+  const lookback = opts.lookback ?? PULLBACK_LOOKBACK;
+  const warnPct  = opts.warnPct  ?? PULLBACK_WARN_PCT;
+  const blockPct = opts.blockPct ?? PULLBACK_BLOCK_PCT;
+
+  if (!PULLBACK_ENABLED || !Array.isArray(k15) || k15.length < lookback + 1 || currentPrice == null) {
     return { penalty: 0, reason: null, pullbackPct: 0, recentHigh: null };
   }
-  const closed = k15.slice(0, -1).slice(-PULLBACK_LOOKBACK);
+  const closed = k15.slice(0, -1).slice(-lookback);
   const recentHigh = Math.max(...closed.map(c => parseFloat(c[2]))); // index 2 = candle high
   if (!isFinite(recentHigh) || recentHigh <= 0) {
     return { penalty: 0, reason: null, pullbackPct: 0, recentHigh: null };
@@ -166,12 +180,12 @@ export function calcPullbackFromHigh(k15, currentPrice) {
   const pullbackPct = ((recentHigh - currentPrice) / recentHigh) * 100;
 
   let penalty = 0, reason = null;
-  if (pullbackPct >= PULLBACK_BLOCK_PCT) {
+  if (pullbackPct >= blockPct) {
     penalty = 2;
-    reason = `${pullbackPct.toFixed(2)}% below the ${PULLBACK_LOOKBACK}-candle high — buying into an active breakdown, not a dip`;
-  } else if (pullbackPct >= PULLBACK_WARN_PCT) {
+    reason = `${pullbackPct.toFixed(2)}% below the ${lookback}-period high — buying into an active breakdown, not a dip`;
+  } else if (pullbackPct >= warnPct) {
     penalty = 1;
-    reason = `${pullbackPct.toFixed(2)}% below the ${PULLBACK_LOOKBACK}-candle high — price already rolled over from a recent top`;
+    reason = `${pullbackPct.toFixed(2)}% below the ${lookback}-period high — price already rolled over from a recent top`;
   }
   return { penalty, reason, pullbackPct: parseFloat(pullbackPct.toFixed(3)), recentHigh };
 }
@@ -212,4 +226,59 @@ export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore,
   const reasons = [freshness.reason, freshness.knifeReason, extension.reason, quality.reason, pullback.reason, tod.reason].filter(Boolean);
 
   return { penalty, reasons, freshness, extension, quality, pullback, tod };
+}
+
+// ── Stock-calibrated entry check — called from scoreStock() ────────────────
+// Reuses the SAME underlying check functions as evaluateBuyReadiness above
+// (same math, same reasoning), but with its own thresholds calibrated for
+// DAILY bars instead of 15m candles. "2 consecutive up periods" means two
+// entire days for a stock, not 30 minutes — treating that as equivalent to
+// crypto's chase threshold would either never fire (if left at crypto's
+// tight streak counts, which are trivially exceeded by any stock in a
+// short rally) or fire on totally ordinary week-to-week movement. Pullback
+// percentages are similarly rescaled: equities routinely move 2-4% off a
+// recent high without it meaning anything, where the same magnitude in
+// crypto (calibrated at 0.5-1.0%) would already be a real signal.
+//
+// No time-of-day check here — that's specifically about crypto's 24/7
+// off-hours liquidity window (5 PM - 2 AM EST thinness); it doesn't map to
+// anything meaningful for exchange-hours equities without building actual
+// market-hours-aware logic, which is out of scope here.
+const STOCK_CHASE_WARN_STREAK   = parseInt(process.env.BUY_STOCK_CHASE_WARN_STREAK   || '2', 10); // days
+const STOCK_CHASE_BLOCK_STREAK  = parseInt(process.env.BUY_STOCK_CHASE_BLOCK_STREAK  || '3', 10);
+const STOCK_KNIFE_WARN_STREAK   = parseInt(process.env.BUY_STOCK_FALLING_KNIFE_WARN_STREAK  || '2', 10);
+const STOCK_KNIFE_BLOCK_STREAK  = parseInt(process.env.BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK || '3', 10);
+const STOCK_RSI_HOT             = parseFloat(process.env.BUY_STOCK_RSI_HOT  || '70'); // classic equity overbought convention
+const STOCK_RSI_VHOT            = parseFloat(process.env.BUY_STOCK_RSI_VHOT || '80');
+const STOCK_RSI_CONFIRM_HOT     = parseFloat(process.env.BUY_STOCK_RSI_CONFIRM_HOT || '70'); // r1h proxy (30-day RSI window in scoreStock)
+const STOCK_PULLBACK_LOOKBACK   = parseInt(process.env.BUY_STOCK_PULLBACK_LOOKBACK || '5', 10); // trading days (~1 week)
+const STOCK_PULLBACK_WARN_PCT   = parseFloat(process.env.BUY_STOCK_PULLBACK_WARN_PCT  || '2.0');
+const STOCK_PULLBACK_BLOCK_PCT  = parseFloat(process.env.BUY_STOCK_PULLBACK_BLOCK_PCT || '4.0');
+
+export function evaluateStockBuyReadiness({ r15, r1h, bars, bullConfCount, whaleScore, currentPrice }) {
+  // Reformat {c,o,h,l,v} daily bars into the same [time,open,high,low,close,volume]
+  // array shape the crypto checks already expect — array index stands in
+  // for time since only recency/ordering matters to these functions, not
+  // the actual timestamp value.
+  const k = Array.isArray(bars) ? bars.map((b, i) => [i, b.o, b.h, b.l, b.c, b.v]) : [];
+
+  const freshness = calcEntryFreshness(k, r15, {
+    chaseWarnStreak:  STOCK_CHASE_WARN_STREAK,
+    chaseBlockStreak: STOCK_CHASE_BLOCK_STREAK,
+    knifeWarnStreak:  STOCK_KNIFE_WARN_STREAK,
+    knifeBlockStreak: STOCK_KNIFE_BLOCK_STREAK,
+    rsiHot: STOCK_RSI_HOT,
+  });
+  const extension = calcEntryExtension(r15, r1h, {
+    rsi15Hot: STOCK_RSI_HOT, rsi15VHot: STOCK_RSI_VHOT, rsi1hHot: STOCK_RSI_CONFIRM_HOT,
+  });
+  const quality  = calcSignalQuality(bullConfCount, whaleScore, false); // no off-hours concept for daily bars
+  const pullback = calcPullbackFromHigh(k, currentPrice, {
+    lookback: STOCK_PULLBACK_LOOKBACK, warnPct: STOCK_PULLBACK_WARN_PCT, blockPct: STOCK_PULLBACK_BLOCK_PCT,
+  });
+
+  const penalty = freshness.penalty + freshness.knifePenalty + extension.penalty + quality.penalty + pullback.penalty;
+  const reasons = [freshness.reason, freshness.knifeReason, extension.reason, quality.reason, pullback.reason].filter(Boolean);
+
+  return { penalty, reasons, freshness, extension, quality, pullback, tod: { penalty: 0, reason: null, isOffHours: false } };
 }
