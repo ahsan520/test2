@@ -901,19 +901,57 @@ function _spikeStrength(e) {
   return Math.round(shockPts + obiPts + cvdPts + whalePts + convPts);
 }
 
+// Severity for the WARNING tier (knife / exhausted / chasing) — distinct
+// from _spikeStrength, which is a bullish-continuation formula (shock/obi/
+// cvd/whale/conv) that doesn't mean anything for "how bad is this warning".
+// Uses each check's own already-computed penalty/RSI value instead, so
+// sorting SIGNAL and flipping to ascending (warnings-first) surfaces the
+// single WORST offender in each category at the very top, not an
+// arbitrary tie order.
+function _warningSeverity(e) {
+  const bi = e.d?.buyIntel;
+  const fresh = bi?.freshness;
+  if (fresh?.knifePenalty > 0) return fresh.knifePenalty * 10; // 1 or 2 -> 10/20
+  const r15 = e.d?.r15;
+  if (r15 != null && r15 >= _MD_EXHAUSTED_RSI && _marketDataState.positions?.[e.base]) return Math.round(r15); // ~75-100
+  if (bi?.penalty > 0) return bi.penalty; // 0-11ish, already the right scale
+  return 0;
+}
+
 // ── Signal classification column — computed, read-only, no click ────────────
 // Not a manual flag — synthesizes buyIntel + conv (already in market-data.json)
-// into one label per row. Priority order matters: falling-knife is checked
-// first since it's the most urgent warning regardless of anything else.
+// into one label per row. Priority order (checked top to bottom, first
+// match wins): urgent warnings first, then the more specific/valuable
+// opportunity signals, then generic fallbacks.
 //
-// EARLY SPIKE requires FOUR things together, not candle count alone:
-//   1. consecutiveUp >= 2 — real momentum, not one-candle noise (was > 0,
-//      which fired on almost anything and buried the genuinely strong ones)
-//   2. shock >= 1.3x — actual volume behind the move, not a thin drift
-//   3. obi > 0 OR cvdTrend === 'up' — real order-flow confirmation, at
-//      least one independent signal agreeing price isn't moving on air
-//   4. freshness.penalty === 0 (already existing) — RSI hasn't confirmed
-//      overbought yet, which is what makes it "early" vs. an extended move
+//   🔪 FALLING KNIFE — server buyIntel.freshness.knifePenalty>0. Most
+//      urgent, always checked first regardless of anything else.
+//   ⚠️ EXHAUSTED — ONLY shown for a symbol you're currently holding (checked
+//      against _marketDataState.positions), RSI15 already very hot. This is
+//      deliberately gated on holding a position so it doesn't just duplicate
+//      CHASING for every non-held symbol with a hot RSI — CHASING already
+//      covers that for new entries via buyIntel's own RSI-extension penalty.
+//      75 below is a fixed client-side threshold (not synced to the server's
+//      BUY_RSI_15M_VHOT var) — this is a display heuristic, not a real gate.
+//   ⚠ CHASING — existing, buyIntel.penalty>0.
+//   🔄 REVERSAL — RSI15 oversold + price ticking back up + CVD confirming.
+//      APPROXIMATE: market-data.json doesn't retain the prior cycle's
+//      candle streak, so this can't confirm "was falling, just flipped" the
+//      way FALLING KNIFE can — it infers likely-reversal from oversold +
+//      current uptick + order-flow confirmation instead. Treat as a
+//      "worth a look" flag, not as certain as the other checks.
+//   📈 BREAKOUT — price at/above the recent 15m-candle high (pullbackPct<=0,
+//      already computed and saved server-side) with volume confirming.
+//      Stronger/more specific than EARLY SPIKE: this crosses an actual
+//      level, a spike is just momentum building without necessarily
+//      clearing a prior high yet.
+//   🚀 EARLY SPIKE — existing 4-signal check (candle momentum + volume +
+//      order-flow + RSI still fresh).
+//   🪦 THIN — clears conv>=6 but weak whale+volume behind it. Same pass/fail
+//      bar as BUY, just flagged as lower-conviction instead of showing the
+//      identical ✅ BUY label as a much stronger setup.
+//   ✅ BUY — clean pass, none of the more specific signals above applied.
+//   —  — nothing notable.
 //
 // NOTE ON "SELL": this column classifies ENTRY signal quality, the same
 // thing buyIntel/conv are computed for. A real sell/exit signal comes from
@@ -924,18 +962,43 @@ function _spikeStrength(e) {
 // server version. For an open position, the existing POSITION column
 // already shows live P&L; this column intentionally still shows the
 // buy-side read for context, not a sell recommendation.
+const _MD_EXHAUSTED_RSI = 75; // fixed display threshold, see comment above
+
 function _classifySignal(e) {
   const bi = e.d?.buyIntel;
   const fresh = bi?.freshness;
   const d = e.d || {};
+  const r15 = d.r15;
+  const shock = d.shock || 0;
   const orderFlowConfirms = (d.obi || 0) > 0 || d.cvdTrend === 'up';
+  const held = !!_marketDataState.positions?.[e.base];
+  const pullbackPct = bi?.pullback?.pullbackPct;
 
   if (fresh?.knifePenalty > 0) return { label: '🔪 FALLING KNIFE', color: 'var(--bear)' };
-  if (fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && (d.shock || 0) >= 1.3 && orderFlowConfirms) {
+
+  if (held && r15 != null && r15 >= _MD_EXHAUSTED_RSI) {
+    return { label: '⚠️ EXHAUSTED', color: 'var(--warn, orange)' };
+  }
+
+  if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: 'var(--warn, orange)' };
+
+  if (r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
+    return { label: `🔄 REVERSAL (${_spikeStrength(e)})`, color: 'var(--bull)' };
+  }
+
+  if (pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
+    return { label: `📈 BREAKOUT (${_spikeStrength(e)})`, color: 'var(--bull)' };
+  }
+
+  if (fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && shock >= 1.3 && orderFlowConfirms) {
     return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: 'var(--bull)' };
   }
-  if (bi?.penalty > 0) return { label: '⚠ CHASING', color: 'var(--warn, orange)' };
-  if ((e.conv ?? -Infinity) >= 6) return { label: '✅ BUY', color: 'var(--bull)' };
+
+  if ((e.conv ?? -Infinity) >= 6) {
+    const weak = (e.whale?.score ?? 0) < 40 && shock < 1.1;
+    return weak ? { label: '🪦 THIN', color: 'var(--text-dim)' } : { label: '✅ BUY', color: 'var(--bull)' };
+  }
+
   return { label: '—', color: 'var(--text-dim)' };
 }
 
@@ -951,13 +1014,30 @@ const _MD_TREND_RANK  = { 'down': 0, 'FADING': 0, 'FLAT': 1, '—': 1, 'up': 2, 
 const _MD_SORT_ACCESSORS = {
   symbol:   e => e.base || '',
   price:    e => e.price,
-  // Category rank * 100 + strength score, so sorting this column puts
-  // EARLY SPIKE rows together AND ranks them strongest-first within that
-  // group — no separate "top 3" filter needed, just click SIGNAL once.
+  // Category rank * 100 + strength score. Warnings (knife/exhausted/chasing)
+  // rank lowest so they sink to the bottom on the default descending sort —
+  // clicking SIGNAL once surfaces the best opportunities first, not warnings.
+  // Reversal/breakout/early-spike share the top tier, differentiated only
+  // by their strength score, so all three "worth a look" signals cluster
+  // together with the strongest of any of them first.
+  // Warning tier uses NEGATIVE severity (catRank*100 - severity, not +).
+  // Reasoning: default first click is descending (best opportunities at
+  // top, warnings sink to the bottom — unchanged). Click SIGNAL a second
+  // time to flip ascending, and this sign flip means the WORST offender in
+  // the warning tier (highest severity = most negative combined value)
+  // surfaces at the very top of that ascending view — "find the top
+  // chaser" is just: click SIGNAL twice. Without the sign flip, ascending
+  // would show warnings first but mildest-first within that group, burying
+  // the one that actually needs attention.
   signal:   e => {
     const label = _classifySignal(e).label;
-    const catRank = label.startsWith('🔪') ? 0 : label.startsWith('⚠') ? 1 : label === '—' ? 2 : label.startsWith('✅') ? 3 : label.startsWith('🚀') ? 4 : 2;
-    return catRank * 100 + _spikeStrength(e);
+    const isWarning = label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠');
+    const catRank =
+      isWarning ? 0 :
+      label.startsWith('🪦') || label === '—' ? 1 :
+      label.startsWith('✅') ? 2 :
+      label.startsWith('🔄') || label.startsWith('📈') || label.startsWith('🚀') ? 3 : 1;
+    return isWarning ? (catRank * 100 - _warningSeverity(e)) : (catRank * 100 + _spikeStrength(e));
   },
   chg:      e => e.chg,
   conv:     e => e.conv,
