@@ -885,10 +885,35 @@ function _mdColorBias(b)     { if (!b) return 'var(--text-dim)'; return /BULL/i.
 function _mdColorWinRate(v)  { if (v == null) return 'var(--text-dim)'; return v >= 0.5 ? 'var(--bull)' : v >= 0.3 ? 'var(--text-bright)' : 'var(--bear)'; }
 function _mdColorTrend(t)    { return t === 'ACCELERATING' ? 'var(--bull)' : t === 'FADING' ? 'var(--bear)' : 'var(--text-dim)'; }
 
+// Spike strength — 0-100ish composite, used ONLY to rank/differentiate rows
+// that already qualify as EARLY SPIKE (or any category); not itself a
+// pass/fail gate. Combines the signals that distinguish a strong,
+// well-confirmed move from a marginal one: volume shock, order-book
+// imbalance, CVD strength, whale accumulation, and the underlying conv
+// score itself (which already folds in several of these).
+function _spikeStrength(e) {
+  const d = e.d || {};
+  const shockPts = Math.min((d.shock || 0) * 15, 30);       // 2x shock -> 30 pts cap
+  const obiPts   = Math.min(Math.max(d.obi || 0, 0) * 0.4, 20); // obi=50 -> 20 pts cap
+  const cvdPts   = Math.min(Math.max(d.cvdStrength || 0, 0) * 40, 20); // cvdStrength~0.5 -> 20 pts cap
+  const whalePts = Math.min((e.whale?.score || 0) * 0.2, 20); // whale=100 -> 20 pts cap
+  const convPts  = Math.min(Math.max(e.conv ?? 0, 0) * 1.5, 15); // conv=10 -> 15 pts cap
+  return Math.round(shockPts + obiPts + cvdPts + whalePts + convPts);
+}
+
 // ── Signal classification column — computed, read-only, no click ────────────
 // Not a manual flag — synthesizes buyIntel + conv (already in market-data.json)
 // into one label per row. Priority order matters: falling-knife is checked
 // first since it's the most urgent warning regardless of anything else.
+//
+// EARLY SPIKE requires FOUR things together, not candle count alone:
+//   1. consecutiveUp >= 2 — real momentum, not one-candle noise (was > 0,
+//      which fired on almost anything and buried the genuinely strong ones)
+//   2. shock >= 1.3x — actual volume behind the move, not a thin drift
+//   3. obi > 0 OR cvdTrend === 'up' — real order-flow confirmation, at
+//      least one independent signal agreeing price isn't moving on air
+//   4. freshness.penalty === 0 (already existing) — RSI hasn't confirmed
+//      overbought yet, which is what makes it "early" vs. an extended move
 //
 // NOTE ON "SELL": this column classifies ENTRY signal quality, the same
 // thing buyIntel/conv are computed for. A real sell/exit signal comes from
@@ -902,10 +927,15 @@ function _mdColorTrend(t)    { return t === 'ACCELERATING' ? 'var(--bull)' : t =
 function _classifySignal(e) {
   const bi = e.d?.buyIntel;
   const fresh = bi?.freshness;
-  if (fresh?.knifePenalty > 0)                    return { label: '🔪 FALLING KNIFE', color: 'var(--bear)' };
-  if (fresh?.consecutiveUp > 0 && fresh.penalty === 0) return { label: '🚀 EARLY SPIKE',    color: 'var(--bull)' };
-  if (bi?.penalty > 0)                            return { label: '⚠ CHASING',        color: 'var(--warn, orange)' };
-  if ((e.conv ?? -Infinity) >= 6)                 return { label: '✅ BUY',            color: 'var(--bull)' };
+  const d = e.d || {};
+  const orderFlowConfirms = (d.obi || 0) > 0 || d.cvdTrend === 'up';
+
+  if (fresh?.knifePenalty > 0) return { label: '🔪 FALLING KNIFE', color: 'var(--bear)' };
+  if (fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && (d.shock || 0) >= 1.3 && orderFlowConfirms) {
+    return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: 'var(--bull)' };
+  }
+  if (bi?.penalty > 0) return { label: '⚠ CHASING', color: 'var(--warn, orange)' };
+  if ((e.conv ?? -Infinity) >= 6) return { label: '✅ BUY', color: 'var(--bull)' };
   return { label: '—', color: 'var(--text-dim)' };
 }
 
@@ -917,12 +947,18 @@ function _classifySignal(e) {
 const _MD_BIAS_RANK   = { 'BEAR 4H': 0, 'LEAN BEAR': 1, 'NEUTRAL': 2, '—': 2, 'LEAN BULL': 3, 'BULL 4H': 4 };
 const _MD_OIDIV_RANK  = { 'OI DROP': 0, 'NEUTRAL': 1, 'CONFIRM': 2, 'DIP BUY': 3 };
 const _MD_TREND_RANK  = { 'down': 0, 'FADING': 0, 'FLAT': 1, '—': 1, 'up': 2, 'ACCELERATING': 2 };
-const _MD_SIGNAL_RANK = { '🔪 FALLING KNIFE': 0, '⚠ CHASING': 1, '—': 2, '✅ BUY': 3, '🚀 EARLY SPIKE': 4 };
 
 const _MD_SORT_ACCESSORS = {
   symbol:   e => e.base || '',
   price:    e => e.price,
-  signal:   e => _MD_SIGNAL_RANK[_classifySignal(e).label] ?? 2,
+  // Category rank * 100 + strength score, so sorting this column puts
+  // EARLY SPIKE rows together AND ranks them strongest-first within that
+  // group — no separate "top 3" filter needed, just click SIGNAL once.
+  signal:   e => {
+    const label = _classifySignal(e).label;
+    const catRank = label.startsWith('🔪') ? 0 : label.startsWith('⚠') ? 1 : label === '—' ? 2 : label.startsWith('✅') ? 3 : label.startsWith('🚀') ? 4 : 2;
+    return catRank * 100 + _spikeStrength(e);
+  },
   chg:      e => e.chg,
   conv:     e => e.conv,
   bullConf: e => e.bullConf,
