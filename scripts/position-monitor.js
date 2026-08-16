@@ -800,17 +800,19 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     }
 
     // ── 5b. Position Intelligence Engine (v15 design doc, sell-side) ──
-    // Only acts on positions that carry an entrySnapshot (set at buy time
-    // by mexc-trader.js — see buildEntrySnapshot()). Pre-existing positions
-    // opened before this feature shipped are skipped (evaluatePosition
-    // returns skipped:true), never retroactively evaluated on partial data.
+    // Positions with an entrySnapshot (set at buy time by mexc-trader.js —
+    // see buildEntrySnapshot()) get the full thesis/confidence/falling-knife
+    // composite. Positions without one (manually adopted, or pre-dating this
+    // feature) still get evaluated — evaluatePosition() runs a falling-knife-
+    // only fallback for those (see its no-snapshot branch), since knife
+    // scoring only needs current market state, not an entry comparison.
     // EXIT / EMERGENCY_EXIT reuse the same proven closeLiveOrder() full-close
     // path as every other exit above. REDUCE_25 / REDUCE_50 (partial exits)
     // auto-execute via closeLiveOrderPartial() when SELL_AUTO_PARTIAL_EXIT=true
     // (off by default) — crypto only, each level fires at most once per
     // position (pos.piPartialLevel). With it off, or for non-crypto
     // positions, these stay a Telegram recommendation for manual action.
-    if (isCrypto && positionIntelligenceEnabled() && pos.entrySnapshot) {
+    if (isCrypto && positionIntelligenceEnabled()) {
       const symbolState = marketState?.symbols?.[mKey];
       const pi = evaluatePosition({
         pos, currentEntry: mData, symbolState, marketState, pnlPct: parseFloat(pnlPct) || 0,
@@ -825,6 +827,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
           fallingKnifeScore: pi.fallingKnifeScore, thesisDrop: pi.thesisDrop,
           confidenceDecay: pi.confidenceDecay, exitProbability: pi.exitProbability,
           dynamicPositionRisk: pi.dynamicPositionRisk, recovery: pi.recovery,
+          noSnapshotFallback: pi.noSnapshotFallback || false,
           evaluatedAt: now,
         };
         changed = true;

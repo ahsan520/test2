@@ -55,6 +55,23 @@ const STALE_NUDGE_AGE_MIN  = parseFloat(process.env.SELL_STALE_NUDGE_AGE_MIN  ||
 const STALE_NUDGE_FLAT_PCT = parseFloat(process.env.SELL_STALE_NUDGE_FLAT_PCT || '0.3');
 const STALE_NUDGE_AMOUNT   = parseFloat(process.env.SELL_STALE_NUDGE_AMOUNT   || '15');
 
+// ── No-snapshot fallback (manually adopted positions) ───────────────
+// Positions adopted from an existing MEXC balance (source: manual_adopted)
+// never went through buildEntrySnapshot(), so thesisDrop and
+// confidenceDecay can't be computed — there's nothing to compare "now"
+// against. Previously this meant such positions were 100% invisible to
+// Position Intelligence forever, relying solely on the hard price stop.
+// fallingKnifeScore, however, only needs CURRENT market state (BTC risk,
+// CVD/OI/breadth/whale momentum, pnlPct) — no entry comparison — so it can
+// still run. This fallback lets a severe, still-accelerating knife trigger
+// an exit even with no snapshot, using a slightly stricter bar than the
+// normal ladder (knife score alone, with no thesis/confidence corroboration,
+// is a weaker signal than the full composite).
+const NO_SNAPSHOT_FALLBACK_ENABLED = (process.env.SELL_NO_SNAPSHOT_FALLBACK || 'true') !== 'false';
+const NO_SNAPSHOT_REDUCE25_LEVEL   = parseFloat(process.env.SELL_NO_SNAPSHOT_REDUCE25_LEVEL || '75');
+const NO_SNAPSHOT_REDUCE50_LEVEL   = parseFloat(process.env.SELL_NO_SNAPSHOT_REDUCE50_LEVEL || '85');
+const NO_SNAPSHOT_EXIT_LEVEL       = parseFloat(process.env.SELL_NO_SNAPSHOT_EXIT_LEVEL     || '92');
+
 export function positionIntelligenceEnabled() { return ENABLED; }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -171,7 +188,51 @@ function detectRecovery(history = [], recoveryWaitMin) {
 export function evaluatePosition({ pos, currentEntry, symbolState, marketState, pnlPct }) {
   if (!ENABLED) return { action: 'HOLD', reason: 'intelligence disabled', skipped: true };
   const snap = pos.entrySnapshot;
-  if (!snap) return { action: 'HOLD', reason: 'no entry snapshot (pre-dates this feature)', skipped: true };
+
+  // ── No entry snapshot (e.g. manually adopted position) ──
+  // Thesis/confidence comparisons are impossible without a captured entry
+  // state, but falling-knife scoring only needs current market state, so
+  // run a knife-only evaluation instead of skipping entirely.
+  if (!snap) {
+    if (!NO_SNAPSHOT_FALLBACK_ENABLED) {
+      return { action: 'HOLD', reason: 'no entry snapshot (pre-dates this feature)', skipped: true };
+    }
+
+    const refAt = pos.liveOrder?.buyAt ?? pos.alertedAt ?? Date.now();
+    const ageMin = (Date.now() - refAt) / 60000;
+    if (ageMin < MIN_POSITION_AGE_MIN) {
+      return { action: 'HOLD', reason: `position age ${ageMin.toFixed(1)}m < min ${MIN_POSITION_AGE_MIN}m (no entry snapshot)`, positionAgeMin: ageMin, skipped: true };
+    }
+
+    const fallingKnifeScore = calcFallingKnifeScore({
+      btcRiskScore:     marketState?.btcRiskScore,
+      cvdMomentum:      symbolState?.cvdMomentum,
+      oiMomentum:       symbolState?.oiMomentum,
+      breadthMomentum:  marketState?.breadthMomentum,
+      whaleMomentum:    symbolState?.whaleMomentum,
+      pnlPct,
+    });
+
+    const recovery = detectRecovery(symbolState?.history, RECOVERY_WAIT_MIN);
+    const btcOkForRecovery = !REQUIRE_BTC_RECOVERY || (marketState?.btcRiskScore ?? 100) < FALLING_KNIFE_MAX;
+    const recoveryConfirmed = recovery.recovering && recovery.sustainedMin >= RECOVERY_WAIT_MIN && btcOkForRecovery;
+    const dynamicKnifeScore = recoveryConfirmed ? Math.round(fallingKnifeScore * 0.6) : fallingKnifeScore;
+
+    let action = 'HOLD';
+    if (dynamicKnifeScore >= NO_SNAPSHOT_EXIT_LEVEL)          action = 'EXIT';
+    else if (dynamicKnifeScore >= NO_SNAPSHOT_REDUCE50_LEVEL) action = 'REDUCE_50';
+    else if (dynamicKnifeScore >= NO_SNAPSHOT_REDUCE25_LEVEL) action = 'REDUCE_25';
+
+    const reason = action === 'HOLD'
+      ? `no entry snapshot — falling-knife-only score ${dynamicKnifeScore} below ${NO_SNAPSHOT_REDUCE25_LEVEL} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}`
+      : `no entry snapshot — falling-knife-only score ${dynamicKnifeScore} ≥ ${action === 'EXIT' ? NO_SNAPSHOT_EXIT_LEVEL : action === 'REDUCE_50' ? NO_SNAPSHOT_REDUCE50_LEVEL : NO_SNAPSHOT_REDUCE25_LEVEL}${recoveryConfirmed ? ' (recovery softened but not enough)' : ''}`;
+
+    return {
+      action, reason, noSnapshotFallback: true,
+      fallingKnifeScore, dynamicPositionRisk: dynamicKnifeScore, exitProbability: fallingKnifeScore,
+      positionAgeMin: ageMin, recovery, isStaleAndFlat: false,
+    };
+  }
 
   const ageMin = (Date.now() - snap.at) / 60000;
   if (ageMin < MIN_POSITION_AGE_MIN) {
