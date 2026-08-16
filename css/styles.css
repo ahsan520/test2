@@ -101,6 +101,20 @@ body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 .tc{display:none;flex-direction:column;}
 .tc.on{display:flex;}
 
+/* ── MATRIX-TAB EXTRAS gating (market bar / market intel / sector flow /
+   leaderboard) ──
+   #matrix-extras lives outside the .tc tab divs (see index.html comment)
+   so it can sit visually above/around the tab content rather than nested
+   inside #tab-matrix's own scroll container. That structural choice
+   means the .tc/.tc.on system above never touches it — it stays visible
+   on every tab, all the time, on desktop. Previously only gated on
+   mobile (the media query below still has its own copy of this rule,
+   now redundant but left as-is since it's harmless). This makes that
+   the same behavior on desktop: hidden by default, shown only when the
+   Matrix tab is the active one. */
+#matrix-extras{display:none;}
+body:has(#tab-matrix.on) #matrix-extras{display:block;}
+
 /* ── NEWS TAB — subtabs ── */
 #tab-news{overflow-y:auto;overflow-x:hidden;padding:10px;gap:0;}
 .news-subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:10px;flex-shrink:0;}
