@@ -500,6 +500,18 @@ jobs:
           SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
           SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
           SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
+          # No-entry-snapshot fallback — manually adopted positions (source:
+          # manual_adopted, e.g. a balance bought directly on MEXC and picked
+          # up into tracking) never went through buildEntrySnapshot(), so
+          # thesis/confidence-decay comparisons can't run for them. This
+          # runs a falling-knife-only read instead (current market state
+          # only, no entry comparison needed), with a stricter bar than the
+          # normal ladder since a knife-only signal has no thesis/confidence
+          # corroboration.
+          SELL_NO_SNAPSHOT_FALLBACK:       ${{ vars.SELL_NO_SNAPSHOT_FALLBACK || 'true' }}
+          SELL_NO_SNAPSHOT_REDUCE25_LEVEL: ${{ vars.SELL_NO_SNAPSHOT_REDUCE25_LEVEL || '75' }}
+          SELL_NO_SNAPSHOT_REDUCE50_LEVEL: ${{ vars.SELL_NO_SNAPSHOT_REDUCE50_LEVEL || '85' }}
+          SELL_NO_SNAPSHOT_EXIT_LEVEL:     ${{ vars.SELL_NO_SNAPSHOT_EXIT_LEVEL || '92' }}
           # ── Profit Intelligence Engine (profit-intelligence.js) ──
           # Independent sell reason — protects unrealized profit giving
           # itself back, separate from Position Intelligence above (which
