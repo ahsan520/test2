@@ -355,6 +355,23 @@ jobs:
           BUY_ENABLE_FALLING_KNIFE_CHECK:  ${{ vars.BUY_ENABLE_FALLING_KNIFE_CHECK || 'true' }}
           BUY_FALLING_KNIFE_WARN_STREAK:   ${{ vars.BUY_FALLING_KNIFE_WARN_STREAK || '2' }}
           BUY_FALLING_KNIFE_BLOCK_STREAK:  ${{ vars.BUY_FALLING_KNIFE_BLOCK_STREAK || '3' }}
+          # New — stock-calibrated equivalents (buy-intelligence.js's
+          # evaluateStockBuyReadiness), used by scoreStock() only. Crypto's
+          # own checks above are 15m-candle-calibrated; these are day-bar
+          # calibrated (a "2-candle streak" here means 2 whole trading
+          # days, and pullback %s are wider since equities routinely move
+          # 2-4% off a recent high without it meaning anything, unlike the
+          # tighter 0.5-1.0% that's meaningful for crypto).
+          BUY_STOCK_CHASE_WARN_STREAK:          ${{ vars.BUY_STOCK_CHASE_WARN_STREAK || '2' }}
+          BUY_STOCK_CHASE_BLOCK_STREAK:         ${{ vars.BUY_STOCK_CHASE_BLOCK_STREAK || '3' }}
+          BUY_STOCK_FALLING_KNIFE_WARN_STREAK:  ${{ vars.BUY_STOCK_FALLING_KNIFE_WARN_STREAK || '2' }}
+          BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK: ${{ vars.BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK || '3' }}
+          BUY_STOCK_RSI_HOT:                    ${{ vars.BUY_STOCK_RSI_HOT || '70' }}
+          BUY_STOCK_RSI_VHOT:                   ${{ vars.BUY_STOCK_RSI_VHOT || '80' }}
+          BUY_STOCK_RSI_CONFIRM_HOT:             ${{ vars.BUY_STOCK_RSI_CONFIRM_HOT || '70' }}
+          BUY_STOCK_PULLBACK_LOOKBACK:          ${{ vars.BUY_STOCK_PULLBACK_LOOKBACK || '5' }}
+          BUY_STOCK_PULLBACK_WARN_PCT:          ${{ vars.BUY_STOCK_PULLBACK_WARN_PCT || '2.0' }}
+          BUY_STOCK_PULLBACK_BLOCK_PCT:         ${{ vars.BUY_STOCK_PULLBACK_BLOCK_PCT || '4.0' }}
           BUY_ENABLE_RSI_EXTENSION_CHECK:  ${{ vars.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true' }}
           BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '64' }}
           BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '72' }}
