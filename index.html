@@ -411,6 +411,32 @@
     <div id="market-data-regime" style="font-family:var(--mono);font-size:9px;padding:6px 10px;border-bottom:1px solid var(--text-dim);display:flex;gap:16px;flex-wrap:wrap;color:var(--text-dim);">
       Loading BTC regime…
     </div>
+
+    <!-- Manual-buy reading order — same priority the bot's own gates use
+         (buy-intelligence.js / leaderboard-scanner), condensed for a
+         human eyeballing this table before buying early by hand. Collapsed
+         by default so it doesn't eat table space; state isn't persisted,
+         intentionally — a fresh page load re-collapses it rather than
+         adding another localStorage key for a one-line convenience. -->
+    <details id="market-data-notes" style="border-bottom:1px solid var(--text-dim);font-family:var(--mono);">
+      <summary style="cursor:pointer;font-size:9px;color:var(--text-dim);padding:5px 10px;letter-spacing:1px;user-select:none;">
+        ℹ NOTES — which columns to weigh when buying manually
+      </summary>
+      <div style="font-size:9px;line-height:1.7;padding:2px 10px 10px 10px;color:var(--text-dim);">
+        <div style="color:var(--text-bright);margin-top:4px;">Tier 1 — gate conditions (must pass first)</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">BUY INTEL</b> — composite penalty score. <span style="color:var(--bear)">FALLING KNIFE</span> or <span style="color:#ffa500">CHASING (3-4)</span> tags mean the bot's own gates are already penalizing it — avoid regardless of other numbers.</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">CONV</b> — core conviction score. Negative CONV is a bot no-buy by the live LB_MIN_SCORE gate; don't override it manually without a specific reason.</div>
+        <div style="color:var(--text-bright);margin-top:6px;">Tier 2 — quality confirmation</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">WHALE</b> — smart-money accumulation. &gt;60/100 is meaningfully strong; &lt;30-40 is thin support.</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">BULLCONF</b> — confluence checks passing. ≥6/10 is solid; 4-5/10 is mediocre.</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">4H BIAS / DAILY BIAS</b> — want these aligned bullish. Conflicting timeframes (e.g. 4H bull, Daily bear) plus a knife/chase tag is a classic trap.</div>
+        <div style="color:var(--text-bright);margin-top:6px;">Tier 3 — momentum, secondary confirmation</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">CVD / OI MOM</b> — want up/ACCELERATING, not FADING. FADING means momentum is weakening even if price looks fine.</div>
+        <div>&nbsp;&nbsp;• <b style="color:var(--accent)">RSI15</b> — avoid buying into extension (roughly &gt;65-70); low-to-mid 50s-60s has more room to run.</div>
+        <div style="color:var(--text-bright);margin-top:6px;">Overrides everything above</div>
+        <div>&nbsp;&nbsp;• Check the regime banner above (<b>Regime / Breadth / Risk score</b>). A RISK_OFF regime with breadth/risk failing the bot's own BUY_MIN_BREADTH / BUY_BTC_RISK_MAX gates means even a clean-looking row is fighting a market-wide headwind the bot itself would likely block or discount right now.</div>
+      </div>
+    </details>
     <div class="api-trades-header">
       <span class="api-trades-title">📊 MARKET DATA</span>
       <div class="api-trades-stats" id="market-data-stats"></div>
