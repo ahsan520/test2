@@ -300,7 +300,7 @@ jobs:
           # exchange position stayed open, unmonitored). This closes that
           # gap: a live position stale past this threshold gets a REAL
           # sell order placed before its tracking is removed.
-          LB_STALE_LIVE_HRS: ${{ vars.LB_STALE_LIVE_HRS || '3' }}
+          LB_STALE_LIVE_HRS: ${{ vars.LB_STALE_LIVE_HRS || '6' }}
           LB_ALLOW_PRE_MARKET: ${{ vars.LB_ALLOW_PRE_MARKET || 'false' }}
           LB_ALLOW_AH:        ${{ vars.LB_ALLOW_AH || 'false' }}
           LB_ALERT_STATE_TTL_HOURS: ${{ vars.LB_ALERT_STATE_TTL_HOURS || '6' }}
