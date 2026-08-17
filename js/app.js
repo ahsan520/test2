@@ -1087,6 +1087,27 @@ function _renderMarketDataHeader() {
 }
 
 
+// ── Row-level flash highlight — deliberately narrow scope ──────────────
+// FALLING KNIFE / CHASING on a symbol you don't hold is informational
+// (that's what the SIGNAL column already shows in-line); flashing every
+// such row would just be noise given how many rows can carry that label
+// at once (see e.g. a broad risk-off tape). This only flashes for the
+// two situations that are actually time-sensitive to notice:
+//   danger  (red)   — a position you're CURRENTLY HOLDING has degraded
+//                      to FALLING KNIFE or EXHAUSTED. Real risk on a
+//                      real position, not a hypothetical entry.
+//   opportunity (green) — a symbol you're NOT holding just cleared a
+//                      genuine ✅ BUY (conv>=6, not the weak 🪦 THIN
+//                      variant) — worth a look before it fades.
+// Returns '' (no class) for every other row, which is most of them.
+function _rowFlashClass(e) {
+  const held = !!_marketDataState.positions?.[e.base];
+  const { label } = _classifySignal(e);
+  if (held && (label.startsWith('🔪') || label.startsWith('⚠️ EXHAUSTED'))) return 'md-flash-danger';
+  if (!held && label.startsWith('✅ BUY')) return 'md-flash-buy';
+  return '';
+}
+
 function renderMarketData() {
   const tbody = document.getElementById('market-data-tbody');
   const stats = document.getElementById('market-data-stats');
@@ -1142,7 +1163,7 @@ function renderMarketData() {
       ? `<span style="color:${pos.liveOrder?.mode === 'live' ? 'var(--accent)' : 'var(--text-bright)'}" title="Entry $${pos.entryPrice} · Stop $${pos.stop}">${pos.liveOrder?.mode === 'live' ? '🔴 LIVE' : '👁 watch'} ${pos.highestPnLSeen != null ? (pos.highestPnLSeen >= 0 ? '+' : '') + pos.highestPnLSeen + '%' : ''}</span>`
       : '<span style="color:var(--text-dim)">—</span>';
 
-    return `<tr>
+    return `<tr class="${_rowFlashClass(e)}">
       <td style="font-weight:700;color:var(--text-bright)">${e.base}</td>
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${_classifySignal(e).color}" title="${(bi?.reasons || []).join(' · ') || ''}">${_classifySignal(e).label}</td>
