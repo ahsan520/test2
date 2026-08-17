@@ -193,6 +193,31 @@ table.mx tbody tr{border-bottom:1px solid rgba(30,37,48,.8);transition:backgroun
 table.mx tbody tr:hover{background:rgba(255,255,255,.02);}
 table.mx tbody tr.ru{background:rgba(0,229,160,.04);}
 table.mx tbody tr.rd{background:rgba(255,69,96,.04);}
+
+/* ── Market Data row flash highlights (see _rowFlashClass in app.js) ──
+   Narrow, deliberate use: only a HELD position degrading to falling-knife/
+   exhausted (danger), or an unheld symbol clearing a genuine BUY
+   (opportunity). Not applied broadly — most rows get no flash at all, so
+   the ones that do actually stand out. 2.2s cycle: slow enough not to be
+   seizure-triggering or distracting while scanning the rest of the table,
+   fast enough to catch the eye in peripheral vision. Background-color only
+   (no layout shift, no opacity-based motion) to keep it calm. */
+@keyframes md-flash-danger{
+  0%,100%{background:rgba(255,69,96,.05);}
+  50%{background:rgba(255,69,96,.22);}
+}
+@keyframes md-flash-buy{
+  0%,100%{background:rgba(0,229,160,.05);}
+  50%{background:rgba(0,229,160,.20);}
+}
+table.mx tbody tr.md-flash-danger{animation:md-flash-danger 2.2s ease-in-out infinite;}
+table.mx tbody tr.md-flash-buy{animation:md-flash-buy 2.2s ease-in-out infinite;}
+/* Respect reduced-motion preference — flash is a nice-to-have affordance,
+   not the only way this info is conveyed (SIGNAL column text/color and
+   POSITION column already show the same thing statically). */
+@media(prefers-reduced-motion:reduce){
+  table.mx tbody tr.md-flash-danger,table.mx tbody tr.md-flash-buy{animation:none;}
+}
 table.mx td{padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--text);white-space:nowrap;vertical-align:middle;}
 .td-reason{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim);font-style:italic;font-size:9px;cursor:help;}
 .td-sym{font-size:11px;font-weight:700;color:var(--accent);}
