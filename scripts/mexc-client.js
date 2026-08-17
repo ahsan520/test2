@@ -182,3 +182,21 @@ export async function mexcFreeBalance(apiKey, apiSecret, asset, withLocked = fal
   const locked = row ? parseFloat(row.locked) : 0;
   return withLocked ? { free, locked } : free;
 }
+
+// Account trade history for one symbol (most recent first from MEXC, we
+// re-sort ascending by time so callers can walk it chronologically).
+// Used by adoptManualHoldings to recover the REAL price a manual buy
+// actually filled at, instead of falling back to whatever the market
+// happens to be trading at when the next decide run notices the balance —
+// those two can differ significantly (see MANUAL_ADOPTED cost-basis bug).
+export async function mexcGetMyTrades(apiKey, apiSecret, symbol, limit = 50) {
+  const trades = await signedRequest(apiKey, apiSecret, 'GET', '/api/v3/myTrades', { symbol, limit });
+  return (Array.isArray(trades) ? trades : [])
+    .map(t => ({
+      price: parseFloat(t.price),
+      qty:   parseFloat(t.qty),
+      isBuyer: !!t.isBuyer,
+      time:  t.time,
+    }))
+    .sort((a, b) => a.time - b.time);
+}

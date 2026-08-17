@@ -19,7 +19,7 @@
 // actually fired. Fixed here by taking closedOutcomes as an explicit param.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, getBaseSizePrecision, floorToStep } from './mexc-client.js';
+import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, mexcGetMyTrades, getBaseSizePrecision, floorToStep } from './mexc-client.js';
 import { closeLiveOrder, countLiveOpenPositions } from './position-monitor.js';
 import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
@@ -459,17 +459,20 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 //
 // Called every live-mode cycle, before the buy-signal scan: any live MEXC
 // balance with no matching non-terminal positions.json entry gets a
-// synthetic tracking record created for it — entry price = current market
-// price, since the bot has no way to know the real historical buy price —
-// plus an immediate real exchange-side stop. From the next monitorPositions
-// pass onward it's managed exactly like a bot-opened position: T1/T2/stop/
-// exit-signal all apply normally. It also can never get double-bought,
-// since the open-position gate in the scan loop sees it as already-tracked
-// the moment this function runs.
+// tracking record created for it, plus an immediate real exchange-side
+// stop. From the next monitorPositions pass onward it's managed exactly
+// like a bot-opened position: T1/T2/stop/exit-signal all apply normally.
+// It also can never get double-bought, since the open-position gate in the
+// scan loop sees it as already-tracked the moment this function runs.
 //
-// P&L on an adopted position is measured from the ADOPTION price, not the
-// real cost basis — the Telegram alert says so explicitly so it's never
-// mistaken for the real entry/PnL.
+// Entry price = the REAL fill price recovered from MEXC's own trade
+// history (GET /api/v3/myTrades) for the balance being adopted, so P&L is
+// measured against the actual cost basis rather than whatever the market
+// happens to be trading at the moment this cycle first notices the coin.
+// Only falls back to current market price if trade history can't be
+// fetched or no matching BUY fills are found — the Telegram alert and
+// liveOrder.priceSource always say which one was used, so a fallback
+// adoption is never silently mistaken for a real cost basis.
 export async function adoptManualHoldings({ positions, market, evaluateSymbol, calcEntryLevels }) {
   let changed = false;
   let balances = [];
@@ -521,10 +524,44 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
       continue; // silent, no Telegram alert — this is expected/routine, not worth a message every cycle
     }
 
-    const evald  = evaluateSymbol(entry);
-    const levels = calcEntryLevels(entry.price, evald.shock);
+    // Recover the REAL fill price of the manual buy from MEXC's own trade
+    // history instead of defaulting straight to whatever the market is
+    // trading at when this cycle happens to run — those two can differ
+    // enough to flip a real loss into a reported profit (e.g. bought at
+    // .1088, this cycle first sees it when price has drifted to .1066:
+    // adopting at .1066 makes a later .1084 exit look like a +1.7% win when
+    // it was actually a real loss against the .1088 cost basis).
+    // Walks trade history backward (most recent first) accumulating BUY
+    // fills until their quantity covers the current free balance — a FIFO
+    // approximation (skips SELL rows on the assumption they consumed older
+    // lots first) rather than an exact reconciliation, but far closer to
+    // the truth than "current price" for the common case of one manual buy.
+    let realFillPrice = null;
+    let priceSource = 'current_market_fallback';
+    try {
+      const trades = await mexcGetMyTrades(MEXC_API_KEY, MEXC_API_SECRET, bareSym, 50);
+      let remaining = bal.free, costSum = 0, qtySum = 0;
+      for (let i = trades.length - 1; i >= 0 && remaining > 1e-12; i--) {
+        const t = trades[i];
+        if (!t.isBuyer) continue;
+        const take = Math.min(t.qty, remaining);
+        costSum += take * t.price;
+        qtySum  += take;
+        remaining -= take;
+      }
+      if (qtySum > 0) {
+        realFillPrice = costSum / qtySum;
+        priceSource = remaining > 1e-9 ? 'trade_history_partial' : 'trade_history';
+      }
+    } catch (e) {
+      console.log(`  ⚠️  ${base}: couldn't fetch MEXC trade history (${e.message}) — falling back to current price for adoption`);
+    }
 
-    const usdSizeEst = parseFloat((bal.free * entry.price).toFixed(2));
+    const adoptionPrice = realFillPrice ?? entry.price;
+    const evald  = evaluateSymbol(entry);
+    const levels = calcEntryLevels(adoptionPrice, evald.shock);
+
+    const usdSizeEst = parseFloat((bal.free * adoptionPrice).toFixed(2));
     positions[sym] = {
       sym, base, assetType: 'crypto',
       exchangePrefix: entry.exchangePrefix, session: entry.session,
@@ -538,25 +575,31 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
       recommended: false,
       liveOrder: {
         mode: 'live', buyAt: Date.now(), usdSize: usdSizeEst,
-        qty: bal.free, fillPrice: entry.price, buyOrderId: `MANUAL_ADOPTED_${Date.now()}`,
-        adopted: true,
+        qty: bal.free, fillPrice: adoptionPrice, buyOrderId: `MANUAL_ADOPTED_${Date.now()}`,
+        adopted: true, priceSource,
       },
     };
-    logAudit('manual_position_adopted', { sym, base, qty: bal.free, entryPrice: entry.price, stop: levels.stop });
+    logAudit('manual_position_adopted', { sym, base, qty: bal.free, entryPrice: adoptionPrice, priceSource, currentMarketPrice: entry.price, stop: levels.stop });
     changed = true;
 
     recordTradeOpen(positions[sym], {
       mode: 'live', orderId: positions[sym].liveOrder.buyOrderId,
-      qty: bal.free, fillPrice: entry.price, usdSize: usdSizeEst,
+      qty: bal.free, fillPrice: adoptionPrice, usdSize: usdSizeEst,
     });
     await pushTradeLogToGitHub(loadTradeLog());
+
+    const priceNote = priceSource === 'trade_history'
+      ? `  _P&L tracked from your actual MEXC buy fill(s) — real cost basis._`
+      : priceSource === 'trade_history_partial'
+        ? `  _P&L tracked from a partial match against your MEXC trade history — some of this balance's origin trades weren't found, so treat as an estimate._`
+        : `  _P&L tracked from THIS adoption price, not your real buy price — trade history lookup failed, so the bot has no way to know your actual cost basis. Verify manually._`;
 
     await sendTelegram(
       `🔍 *MANUAL POSITION ADOPTED* — ${base}\n` +
       `  Found ${bal.free} ${base} on MEXC with no bot tracking — now under bot management.\n` +
-      `  Adoption price $${entry.price}  Stop $${levels.stop}  T1 $${levels.t1}  T2 $${levels.t2}\n` +
+      `  Adoption price $${adoptionPrice}  Stop $${levels.stop}  T1 $${levels.t1}  T2 $${levels.t2}\n` +
       `  🛡 Watched by the 15-min software stop check.\n` +
-      `  _P&L tracked from this adoption price, not your real buy price — the bot has no way to know your actual cost basis._`
+      priceNote
     );
   }
 
