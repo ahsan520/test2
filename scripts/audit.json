@@ -1,13 +1,5 @@
 [
   {
-    "timestamp": "2026-08-17T04:52:52.817Z",
-    "job": "leaderboard-decider",
-    "action": "mexc_sell_failed",
-    "sym": "IMXUSDT",
-    "reason": "Stale — 7.1h with no stop/target hit",
-    "error": "MEXC POST /api/v3/order failed (HTTP 400):  quantity scale is invalid"
-  },
-  {
     "timestamp": "2026-08-17T04:52:53.887Z",
     "job": "leaderboard-decider",
     "action": "positions_pushed",
@@ -5290,7 +5282,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-17T05:52:49.450Z",
+    "timestamp": "2026-08-17T05:52:49.303Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 20,
@@ -5407,7 +5399,7 @@
       {
         "pair": "UNIUSDT",
         "status": "ok",
-        "conv": 0,
+        "conv": -5,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5440,5 +5432,106 @@
         "assetType": "crypto"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-17T05:52:49.371Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-17T05:52:50.269Z",
+    "job": "leaderboard-decider",
+    "action": "mexc_sell_failed",
+    "sym": "IMXUSDT",
+    "reason": "Stale — 8.1h with no stop/target hit",
+    "error": "MEXC POST /api/v3/order failed (HTTP 400):  quantity scale is invalid"
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.069Z",
+    "job": "leaderboard-decider",
+    "action": "positions_push_failed",
+    "error": "PUT 409 is at 18ea79d429b9ea97d346418d22f7eecff54110a7 but expected ff8cf4180ec8afff9f10359524abce639c676997"
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.326Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 7,
+    "openAfter": 7,
+    "alerts": 1
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.533Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:UNIUSDT",
+    "base": "UNI",
+    "free": 0.16,
+    "estNotional": 0.52176
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.535Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.22644000000000003
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.536Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.085717,
+    "estNotional": 0.0859141491
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.539Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.002,
+    "estNotional": 0.39380000000000004
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.540Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.00015,
+    "estNotional": 0.0742515
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.717Z",
+    "job": "leaderboard-decider",
+    "action": "no_candidates",
+    "bestConv": 4
+  },
+  {
+    "timestamp": "2026-08-17T05:52:51.719Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-17T05:52:52.900Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 7,
+    "monitored": 7
   }
 ]
