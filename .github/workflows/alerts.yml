@@ -413,6 +413,18 @@ jobs:
           BUY_PULLBACK_LOOKBACK:   ${{ vars.BUY_PULLBACK_LOOKBACK || '10' }}
           BUY_PULLBACK_WARN_PCT:  ${{ vars.BUY_PULLBACK_WARN_PCT || '0.5%' }}
           BUY_PULLBACK_BLOCK_PCT:      ${{ vars.BUY_PULLBACK_BLOCK_PCT || '1.0%' }}
+          # ── Pre-spike trigger (calcSpikeTrigger, buy-intelligence.js) —
+          # short-timeframe (5m) breakout/reclaim confirmation layered UNDER
+          # the candidate/setup checks above. Gates signal-evaluator.js's
+          # BUY path and leaderboard-decider.js's final candidate→alert step
+          # (see dev-team "Pre-Spike Detection, Trigger Confirmation" note).
+          BUY_ENABLE_SPIKE_TRIGGER:        ${{ vars.BUY_ENABLE_SPIKE_TRIGGER || 'true' }}
+          BUY_TRIGGER_LOOKBACK_15M:        ${{ vars.BUY_TRIGGER_LOOKBACK_15M || '12' }}
+          BUY_TRIGGER_BREAKOUT_BUFFER_PCT: ${{ vars.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15' }}
+          BUY_TRIGGER_NEAR_PCT:            ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.5' }}
+          BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
+          BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.3' }}
+          BTC_TRIGGER_MOMENTUM_FLOOR_PCT:  ${{ vars.BTC_TRIGGER_MOMENTUM_FLOOR_PCT || '-0.5' }}
 
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
