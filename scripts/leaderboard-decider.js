@@ -492,8 +492,29 @@ async function main() {
     if (livePosEntries.length) {
       console.log(`  🚨  Emergency close — ${livePosEntries.length} live position(s)`);
       const guardSells = [];
+      let failedCount = 0;
       for (const [, pos] of livePosEntries) {
-        await closeLiveOrder(pos, `market guard: ${guard.reasons[0]}`, guardSells);
+        // MUST check closeResult.closed before marking terminal — closeLiveOrder
+        // can fail (zero_balance / API error / MEXC downtime) and return
+        // { closed:false }, in which case the real MEXC balance is still
+        // sitting untouched on the exchange. Previously this loop ignored
+        // that return value and force-set status:'stopped' unconditionally,
+        // with no liveOrder.closedAt (only closeLiveOrder itself sets that,
+        // on an actual successful sell). A position stopped-without-closedAt
+        // was then invisible to adoptManualHoldings' alreadyTracked check
+        // (which excludes anything status:'stopped'), so next cycle saw the
+        // still-real balance as "untracked" and re-adopted it as brand new —
+        // then the same failing sell repeated, stopping it again, forever.
+        // Result: a fresh MANUAL_ADOPTED_* position + duplicate trade-log
+        // "open" row every single decide cycle (~5 min) for as long as the
+        // panic regime and the underlying sell failure both persisted.
+        const closeResult = await closeLiveOrder(pos, `market guard: ${guard.reasons[0]}`, guardSells);
+        if (!closeResult.closed) {
+          failedCount++;
+          console.log(`  ⚠️  Emergency close failed for ${pos.base} (${closeResult.reason}) — left tracked, will retry next cycle`);
+          logAudit('market_guard_close_failed', { base: pos.base, reason: closeResult.reason });
+          continue; // leave status/liveOrder untouched — real balance is still open on the exchange
+        }
         pos.status          = 'stopped';
         pos.statusChangedAt = Date.now();
         pos.rotatedOut      = true;
@@ -503,7 +524,7 @@ async function main() {
       await sendTelegram(
         `🚨 *MARKET GUARD — EMERGENCY CLOSE* — ${new Date().toUTCString().slice(17, 22)} UTC\n` +
         `  Reason: ${guard.reasons[0]}\n` +
-        `  Closed ${livePosEntries.length} live position(s)\n` +
+        `  Closed ${livePosEntries.length - failedCount}/${livePosEntries.length} live position(s)${failedCount ? ` — ${failedCount} sell(s) FAILED, see logs, will retry next cycle` : ''}\n` +
         `  _New buys blocked until market stabilises_`
       );
       for (const m of guardSells) await sendTelegram(m);
