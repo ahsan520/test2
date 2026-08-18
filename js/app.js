@@ -1217,6 +1217,29 @@ function _classifySignal(e) {
 }
 
 
+// ── TRIGGER cell — reads the server-computed calcSpikeTrigger() status ──
+// Separate from _classifySignal()/SIGNAL on purpose: SIGNAL is the
+// candidate/execution-intent classification, TRIGGER is the short-timeframe
+// "has the move actually started" confirmation underneath it (dev-team
+// pre-spike note, §5 — "SIGNAL | SETUP | TRIGGER | TRIGGER SCORE"). Reads
+// e.triggerStatus/e.triggerScore/e.triggerReasons exactly as persisted by
+// market-fetcher.js — no client-side recomputation, so this can never
+// disagree with the Decider's own trigger gate.
+function _mdTriggerCell(e) {
+  const status = e.triggerStatus;
+  const score  = e.triggerScore;
+  const reasons = (e.triggerReasons || []).join(' · ');
+  if (status == null) return { label: '—', color: 'var(--text-dim)', title: '' };
+  switch (status) {
+    case 'BREAKOUT':   return { label: `🚀 BREAKOUT (${score})`,   color: _MD_GREEN_FULL, title: reasons };
+    case 'TRIGGERING': return { label: `⚡ TRIGGERING (${score})`, color: 'var(--accent)', title: reasons };
+    case 'SETUP':      return { label: `🌀 SETUP (${score})`,      color: 'var(--text-dim)', title: reasons };
+    case 'FAILED':      return { label: `❌ FAILED`,                 color: _MD_DEEP_RED, title: reasons };
+    case 'WAIT':
+    default:            return { label: '⏳ WAIT',                   color: 'var(--text-dim)', title: reasons };
+  }
+}
+
 // ── Market Data: click-to-sort on every column header ───────────────────────
 // Categorical columns (bias, OI DIV, CVD, OI MOM) get ranked rather than
 // alphabetized — "BULL 4H" should sort above "BEAR 4H", not below it just
@@ -1267,11 +1290,18 @@ const _MD_SORT_ACCESSORS = {
   hist:     e => e.hist?.winRate,
   position: e => _marketDataState.positions[e.base] ? (_marketDataState.positions[e.base].highestPnLSeen ?? 0) : -Infinity,
   buyIntel: e => e.d?.buyIntel?.penalty ?? -1,
+  // Server-computed short-timeframe trigger (calcSpikeTrigger, buy-intelligence.js
+  // → persisted top-level as e.triggerStatus/e.triggerScore by market-fetcher.js).
+  // Rank so BREAKOUT sorts above TRIGGERING above SETUP, FAILED sinks lowest;
+  // within a tier, higher triggerScore sorts first.
+  trigger:  e => (_MD_TRIGGER_RANK[e.triggerStatus] ?? 1) * 1000 + (e.triggerScore ?? 0),
 };
+
+const _MD_TRIGGER_RANK = { FAILED: 0, WAIT: 1, SETUP: 1, TRIGGERING: 2, BREAKOUT: 3 };
 
 // [header label, sort key] — order here IS the column order rendered.
 const _MD_COLUMNS = [
-  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['24H%', 'chg'],
+  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['TRIGGER', 'trigger'], ['24H%', 'chg'],
   ['CONV', 'conv'], ['BULLCONF', 'bullConf'], ['WHALE', 'whale'], ['SHOCK', 'shock'],
   ['RSI15', 'rsi15'], ['4H BIAS', 'bias4h'], ['DAILY BIAS', 'biasDay'], ['OI DIV', 'oiDiv'],
   ['CVD', 'cvd'], ['OI MOM', 'oiMom'], ['HIST (30D)', 'hist'], ['POSITION', 'position'],
@@ -1372,7 +1402,7 @@ function renderMarketData() {
   }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="18" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
     return;
   }
 
@@ -1382,6 +1412,7 @@ function renderMarketData() {
     const bi = e.d?.buyIntel; // was e.buyIntel — actual saved path is nested under d, this was always reading undefined
     const sig = _classifySignal(e); // computed once — reused for the SIGNAL cell AND the row tint below, so they can never disagree
     const rowTint = _mdRowTint(sig.color);
+    const trig = _mdTriggerCell(e);
     const biText = bi && bi.penalty > 0
       ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
       : bi ? '<span style="color:var(--bull)">clean</span>' : '<span style="color:var(--text-dim)">—</span>';
@@ -1404,6 +1435,7 @@ function renderMarketData() {
       <td style="font-weight:700;color:var(--text-bright);box-shadow:inset 3px 0 0 0 ${rowTint.border};">${e.base}</td>
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${sig.color}" title="${(bi?.reasons || []).join(' · ') || ''}">${sig.label}</td>
+      <td style="font-size:9px;color:${trig.color}" title="${trig.title}">${trig.label}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
       <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}" title="${e.buyIntelPenalty > 0 ? `raw ${e.rawConv} − ${e.buyIntelPenalty} penalty = ${e.conv}` : ''}">${e.conv ?? '—'}${e.buyIntelPenalty > 0 ? ` <span style="color:var(--text-dim);font-weight:400">(${e.rawConv})</span>` : ''}</td>
       <td style="font-size:9px;color:${_mdColorBullConf(e.bullConf)}">${e.bullConf != null ? e.bullConf + '/10' : '—'}</td>
