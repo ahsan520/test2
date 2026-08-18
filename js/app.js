@@ -1091,6 +1091,15 @@ const _MD_BIAS_RANK   = { 'BEAR 4H': 0, 'LEAN BEAR': 1, 'NEUTRAL': 2, '—': 2, 
 const _MD_OIDIV_RANK  = { 'OI DROP': 0, 'NEUTRAL': 1, 'CONFIRM': 2, 'DIP BUY': 3 };
 const _MD_TREND_RANK  = { 'down': 0, 'FADING': 0, 'FLAT': 1, '—': 1, 'up': 2, 'ACCELERATING': 2 };
 
+// Tier a classified SIGNAL label falls into — shared by the sort accessor
+// below and the header stats bar, so "how many rows are buy-side right
+// now" always means the same thing in both places.
+function _mdSignalTier(label) {
+  if (label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠')) return 'warning';
+  if (label === '—') return 'neutral';
+  return 'buy'; // ✅ BUY, 🪦 THIN, 🔄 REVERSAL, 📈 BREAKOUT, 🚀 EARLY SPIKE
+}
+
 const _MD_SORT_ACCESSORS = {
   symbol:   e => e.base || '',
   price:    e => e.price,
@@ -1111,13 +1120,13 @@ const _MD_SORT_ACCESSORS = {
   // the one that actually needs attention.
   signal:   e => {
     const label = _classifySignal(e).label;
-    const isWarning = label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠');
+    const tier = _mdSignalTier(label);
     const catRank =
-      isWarning ? 0 :
-      label.startsWith('🪦') || label === '—' ? 1 :
+      tier === 'warning' ? 0 :
+      label.startsWith('🪦') || tier === 'neutral' ? 1 :
       label.startsWith('✅') ? 2 :
       label.startsWith('🔄') || label.startsWith('📈') || label.startsWith('🚀') ? 3 : 1;
-    return isWarning ? (catRank * 100 - _warningSeverity(e)) : (catRank * 100 + _spikeStrength(e));
+    return tier === 'warning' ? (catRank * 100 - _warningSeverity(e)) : (catRank * 100 + _spikeStrength(e));
   },
   chg:      e => e.chg,
   conv:     e => e.conv,
@@ -1150,6 +1159,34 @@ const _MD_COLUMNS = [
 // DIFFERENT column resets to descending on the new one.
 let _marketDataSort = { key: 'conv', dir: -1 };
 
+// Asset-type sub-tabs (ALL / CRYPTO / STOCKS) — every symbol in
+// market-data.json already carries `assetType: 'crypto' | 'stock'`
+// (set server-side; stocks come through as the ".TO" tickers). This is a
+// pure client-side filter over the same _marketDataState.symbols the table
+// already has, no extra fetch needed.
+let _marketDataAssetFilter = 'all'; // 'all' | 'crypto' | 'stock'
+
+function setMarketDataAssetFilter(type) {
+  _marketDataAssetFilter = type;
+  renderMarketData();
+}
+
+function _renderMarketDataAssetFilter() {
+  const el = document.getElementById('market-data-asset-filter');
+  if (!el) return;
+  const all = _marketDataState.symbols || [];
+  const counts = {
+    all: all.length,
+    crypto: all.filter(s => s.assetType === 'crypto').length,
+    stock: all.filter(s => s.assetType === 'stock').length,
+  };
+  const tabs = [['all', 'ALL'], ['crypto', 'CRYPTO'], ['stock', 'STOCKS']];
+  el.innerHTML = tabs.map(([key, label]) => {
+    const active = _marketDataAssetFilter === key;
+    return `<button class="bsm" onclick="setMarketDataAssetFilter('${key}')" style="${active ? 'border-color:var(--accent);color:var(--accent);' : ''}">${label} (${counts[key]})</button>`;
+  }).join('');
+}
+
 function sortMarketDataBy(key) {
   if (_marketDataSort.key === key) _marketDataSort.dir *= -1;
   else _marketDataSort = { key, dir: -1 };
@@ -1173,8 +1210,10 @@ function renderMarketData() {
   if (!tbody) return;
 
   _renderMarketDataHeader();
+  _renderMarketDataAssetFilter();
 
   let rows = [...(_marketDataState.symbols || [])];
+  if (_marketDataAssetFilter !== 'all') rows = rows.filter(r => r.assetType === _marketDataAssetFilter);
   const acc = _MD_SORT_ACCESSORS[_marketDataSort.key] || _MD_SORT_ACCESSORS.conv;
   rows.sort((a, b) => {
     const av = acc(a), bv = acc(b);
@@ -1185,12 +1224,24 @@ function renderMarketData() {
     return _marketDataSort.dir * (an - bn);
   });
 
+  // Stats bar — was a flat conv>=6 threshold ("clearing conv≥6"), which
+  // could disagree with the SIGNAL column right next to it (e.g. a row
+  // clearing conv>=6 but tagged CHASING/FALLING KNIFE still counted as
+  // "clearing"). Now driven by the same _classifySignal()/_mdSignalTier()
+  // every row's SIGNAL cell already uses, so this bar and the column below
+  // it always tell the same story.
   if (stats) {
-    const clearing = rows.filter(r => (r.conv ?? -Infinity) >= 6).length;
+    let buyTier = 0, warnTier = 0;
+    rows.forEach(r => {
+      const tier = _mdSignalTier(_classifySignal(r).label);
+      if (tier === 'buy') buyTier++;
+      else if (tier === 'warning') warnTier++;
+    });
     const held = rows.filter(r => _marketDataState.positions[r.base]).length;
     stats.innerHTML = [
       `<span>${rows.length}</span> symbols`,
-      `<span style="color:var(--bull)">${clearing}</span> clearing conv≥6`,
+      `<span style="color:${_MD_GREEN_FULL}">${buyTier}</span> buy-side signal`,
+      warnTier ? `<span style="color:${_MD_RED}">${warnTier}</span> chasing/warning` : null,
       held ? `<span style="color:var(--accent)">${held}</span> currently held` : null,
     ].filter(Boolean).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
   }
