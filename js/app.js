@@ -1002,7 +1002,11 @@ function _warningSeverity(e) {
 //      identical ✅ BUY label as a much stronger setup.
 //   ✅ BUY — clean pass, none of the more specific signals above applied.
 //   👀 WATCHING (n) / 😐 FLAT (0) / 🔻 WEAK (n) — below conv>=6, graded by
-//      the conv score itself rather than collapsing to a bare '—'.
+//      the conv score itself rather than collapsing to a bare '—'. WATCHING
+//      additionally gets a "⭐ possible early buy" qualifier + brighter
+//      color when 3+ of {whale>=60, bullConf>=6, CVD up, 4H bias not
+//      bearish} corroborate it (see _mdWatchSupport) — same checks the
+//      NOTES panel above tells you to eyeball manually before buying early.
 //   — no data — conv itself is missing, distinct from "conv says nothing".
 //
 // NOTE ON "SELL": this column classifies ENTRY signal quality, the same
@@ -1085,16 +1089,37 @@ function _mdExhaustedGradient(r15) {
 // showed a bare '—' — same as truly no-data rows, discarding the conv score
 // they DO have. These two ramps use that score instead of throwing it away:
 //   WATCHING (conv > 0): dim -> green as conv approaches the BUY threshold,
-//   capped at 70% of full --bull intensity so an actual ✅ BUY still reads
+//   capped at 70% of full --bull intensity (85% if "possible early buy"
+//   qualified, see _mdWatchSupport below) so an actual ✅ BUY still reads
 //   as visibly stronger than "getting close".
 //   WEAK (conv < 0): dim -> red as conv drops, capped at 60% intensity so
 //   this never reads as alarming as an actual ⚠ CHASING tag.
 const _MD_NEUTRAL_BASE = '#3a4048'; // flat/no-edge base, distinct from pure --text-dim
-function _mdWatchGradient(conv) {
-  return _lerpColor(_MD_NEUTRAL_BASE, _MD_GREEN_FULL, Math.min(1, conv / 6) * 0.7);
+function _mdWatchGradient(conv, boosted) {
+  return _lerpColor(_MD_NEUTRAL_BASE, _MD_GREEN_FULL, Math.min(1, conv / 6) * (boosted ? 0.85 : 0.7));
 }
 function _mdWeakGradient(conv) {
   return _lerpColor(_MD_NEUTRAL_BASE, _MD_RED, Math.min(1, -conv / 6) * 0.6);
+}
+
+// A WATCHING row is just "conv is positive but under 6" — that alone
+// doesn't say whether it's actually building toward something or just
+// noise. This counts the same corroborating signals a person would eyeball
+// manually before buying early (per the NOTES panel above the table):
+// meaningful whale accumulation, decent confluence count, order flow
+// confirming, and the 4H trend not actively fighting it. 3+ of 4 gets the
+// "⭐ possible early buy" qualifier — not a new gate/threshold on conv
+// itself, just a flag on top of the existing WATCHING label so a
+// well-supported near-miss stands out from a bare "conv=1, nothing else
+// backing it up" row.
+function _mdWatchSupport(e) {
+  const d = e.d || {};
+  let score = 0;
+  if ((e.whale?.score ?? 0) >= 60) score++;
+  if ((e.bullConf ?? 0) >= 6) score++;
+  if (d.cvdTrend === 'up') score++;
+  if (d.bias4h !== 'BEAR 4H' && d.bias4h !== 'LEAN BEAR') score++;
+  return score;
 }
 
 // Tier a classified SIGNAL label falls into — shared by the sort accessor
@@ -1187,7 +1212,12 @@ function _classifySignal(e) {
 
   const conv = e.conv;
   if (conv == null) return { label: '— no data', color: 'var(--text-dim)' };
-  if (conv > 0)  return { label: `👀 WATCHING (${conv})`, color: _mdWatchGradient(conv) };
+  if (conv > 0) {
+    const support = _mdWatchSupport(e);
+    const boosted = support >= 3;
+    const label = boosted ? `👀 WATCHING (${conv}) ⭐ possible early buy` : `👀 WATCHING (${conv})`;
+    return { label, color: _mdWatchGradient(conv, boosted) };
+  }
   if (conv === 0) return { label: '😐 FLAT (0)', color: 'var(--text-dim)' };
   return { label: `🔻 WEAK (${conv})`, color: _mdWeakGradient(conv) };
 }
