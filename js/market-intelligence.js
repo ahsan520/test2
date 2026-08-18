@@ -52,10 +52,11 @@ async function fetchMarketIntelligence() {
 }
 
 function _bandColor(band) {
-  return band === 'BUY'    ? 'var(--bull)'
-       : band === 'REDUCE' ? '#ffa500'
-       : band === 'WATCH'  ? '#ff8c00'
-       : band === 'BLOCK'  ? 'var(--bear)'
+  return band === 'LOW RISK'  ? 'var(--bull)'
+       : band === 'MODERATE'  ? 'var(--bull)'
+       : band === 'ELEVATED'  ? '#ffa500'
+       : band === 'HIGH'      ? '#ff8c00'
+       : band === 'EXTREME'   ? 'var(--bear)'
        : '#888';
 }
 function _regimeColor(regime) {
@@ -85,11 +86,11 @@ function renderMarketIntelligence(data, note) {
   // ── Header pill ──
   if (pill) {
     pill.textContent = `🧠 ${data.btcRiskScore} · ${data.btcRiskBand}`;
-    pill.style.background = data.btcRiskBand === 'BUY' ? 'var(--bull-dim)'
-                           : data.btcRiskBand === 'BLOCK' ? 'var(--bear-dim)'
+    pill.style.background = data.btcRiskBand === 'LOW RISK' || data.btcRiskBand === 'MODERATE' ? 'var(--bull-dim)'
+                           : data.btcRiskBand === 'EXTREME' ? 'var(--bear-dim)'
                            : 'rgba(255,140,0,.15)';
     pill.style.color = bandColor;
-    pill.title = `BTC Risk ${data.btcRiskScore}/100 (${data.btcRiskBand}) · Regime ${data.marketRegime} · Breadth ${data.breadth?.score ?? '—'}%`;
+    pill.title = `BTC Risk ${data.btcRiskScore}/100 (${data.btcRiskBand}) · Regime ${data.marketRegime} · Breadth ${data.breadth?.score ?? '—'}% · Buy status: ${data.buyStatus?.status ?? '—'}`;
   }
 
   // ── Tile row ──

@@ -892,16 +892,26 @@ function renderMarketDataRegimeBanner(marketData) {
   const riskBand  = ms.btcRiskBand;
   const regime    = ms.marketRegime;
   const breadth   = ms.breadth?.score;
+  const buyStatus = ms.buyStatus || {};
   const riskColor = riskScore == null ? 'var(--text-dim)' : riskScore > 60 ? 'var(--bear)' : 'var(--bull)';
   const regimeColor = regime === 'RISK_OFF' ? 'var(--bear)' : regime === 'RISK_ON' ? 'var(--bull)' : 'var(--text-dim)';
   const breadthColor = breadth == null ? 'var(--text-dim)' : breadth < 60 ? 'var(--bear)' : 'var(--bull)';
+  // BUY STATUS is real market permission (mirrors the portfolio-wide
+  // gates in checkMarketIntelligenceGate — market-guard.js), kept
+  // deliberately separate from BTC RISK below: a low risk score does NOT
+  // by itself mean buying is currently allowed (breadth can still block
+  // it) — see §6 of the architecture doc. Individual symbols may still
+  // pass via a relative-strength/breadth exception even when this reads
+  // CONDITIONAL — this is the portfolio-wide view, not a per-symbol verdict.
+  const statusColor = buyStatus.status === 'OPEN' ? 'var(--bull)' : buyStatus.status === 'CONDITIONAL' ? '#ff8c00' : 'var(--text-dim)';
   el.innerHTML = [
     `BTC 24h: <b style="color:${_mdColorChg(g.btcChg24h)}">${g.btcChg24h != null ? (g.btcChg24h > 0 ? '+' : '') + g.btcChg24h.toFixed(2) + '%' : '—'}</b>`,
     `BTC 4H bias: <b style="color:${_mdColorBias(g.btcBias4h)}">${g.btcBias4h || '—'}</b>`,
-    `Risk score: <b style="color:${riskColor}">${riskScore ?? '—'}${riskBand ? ' (' + riskBand + ')' : ''}</b>`,
+    `BTC risk: <b style="color:${riskColor}">${riskScore ?? '—'}${riskBand ? ' (' + riskBand + ')' : ''}</b>`,
     `Regime: <b style="color:${regimeColor}">${regime || '—'}</b>`,
     `Breadth: <b style="color:${breadthColor}">${breadth != null ? breadth + '%' : '—'}</b>`,
     `Fear/Greed: <b>${g.fearGreed ?? '—'}</b>`,
+    `<span title="${buyStatus.reason || ''}">Buy status: <b style="color:${statusColor}">${buyStatus.status || '—'}</b></span>`,
   ].join('&nbsp;&nbsp;·&nbsp;&nbsp;');
 }
 
@@ -1128,9 +1138,9 @@ function _mdWatchSupport(e) {
 // "everything not warning/dash" — WATCHING/FLAT/WEAK read as prose but
 // aren't real buy signals and must not inflate the buy-side count.
 function _mdSignalTier(label) {
-  if (label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠')) return 'warning';
-  if (label.startsWith('✅') || label.startsWith('🪦') || label.startsWith('🔄') || label.startsWith('📈') || label.startsWith('🚀')) return 'buy';
-  return 'neutral'; // 👀 WATCHING, 😐 FLAT, 🔻 WEAK, — no data
+  if (label.startsWith('🔪') || label.startsWith('⛔') || label.startsWith('⚠️') || label.startsWith('⚠')) return 'warning';
+  if (label.startsWith('✅') || label.startsWith('🌱')) return 'buy';
+  return 'neutral'; // 👀 WATCH, 🔻 WEAK, — no data
 }
 
 // Row-level tint, derived from the same SIGNAL color _classifySignal()
@@ -1153,73 +1163,57 @@ function _mdRowTint(colorStr) {
   return { bg: `rgba(${r},${g},${b},0.07)`, border: `rgba(${r},${g},${b},0.9)` };
 }
 
+// ── SIGNAL column — reads the server-computed classification ────────────
+// SIGNAL and ENTRY_STATE are now computed ONCE, server-side, by
+// scripts/signal-evaluator.js during market-fetcher.js's fetch cycle, and
+// written onto every market-data.json entry (e.signal / e.entryState).
+// This function used to independently reclassify each row client-side with
+// its own thresholds — that meant the GUI could show "BUY" on a row the
+// server/Decider would score differently. It now just maps the server's
+// SIGNAL to a label + color; ENTRY_STATE (CHASING, HIGH SHOCK, etc.) is
+// shown as a qualifier rather than folded back into the primary category,
+// per the architecture doc's SIGNAL/ENTRY_STATE split (§4).
+//
+// EXHAUSTED is the one check still evaluated client-side: it's gated on
+// _marketDataState.positions (an open position), which is GUI-local state
+// the shared evaluator has no reason to know about.
 function _classifySignal(e) {
-  const bi = e.d?.buyIntel;
-  const fresh = bi?.freshness;
   const d = e.d || {};
   const r15 = d.r15;
-  const shock = d.shock || 0;
-  const orderFlowConfirms = (d.obi || 0) > 0 || d.cvdTrend === 'up';
   const held = !!_marketDataState.positions?.[e.base];
-  const pullbackPct = bi?.pullback?.pullbackPct;
-
-  if (fresh?.knifePenalty > 0) return { label: '🔪 FALLING KNIFE', color: _mdKnifeGradient(fresh.knifePenalty) };
 
   if (held && r15 != null && r15 >= _MD_EXHAUSTED_RSI) {
     return { label: '⚠️ EXHAUSTED', color: _mdExhaustedGradient(r15) };
   }
 
-  if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: _mdChasingGradient(bi.penalty) };
+  const signal = e.signal;
+  const entryState = e.entryState;
+  const stateTag = (entryState && entryState !== 'CLEAN') ? ` · ${entryState}` : '';
 
-  // BREAKOUT and EARLY SPIKE are momentum-continuation checks with no
-  // oversold/counter-signal logic behind them — a 15m high break or an
-  // acceleration streak with the 4H trend actively fighting it really is
-  // more likely a relief pop than a real move, so these two stay hard-gated
-  // on the 4H trend not being bearish (fall through to conv>=6/WATCHING/
-  // WEAK instead of firing).
-  //
-  // REVERSAL is intentionally different and NOT gated the same way: it
-  // requires RSI15 oversold, which by construction means the 4H bias
-  // usually HASN'T caught up yet — bias only flips bull/neutral after
-  // several 4H candles confirm the move, well after a 15m bounce off
-  // oversold has already started. Hard-blocking REVERSAL on bearish bias
-  // would filter out almost every genuine early catch, not just the traps,
-  // since "still oversold" and "4H already turned bullish" are nearly
-  // mutually exclusive in time. Instead: still fires, but the label/color
-  // flags it as counter-trend so a bounce-with-the-bias-against-it reads
-  // differently from one the trend has already confirmed.
-  const biasBearish = d.bias4h === 'BEAR 4H' || d.bias4h === 'LEAN BEAR';
+  if (signal == null) return { label: '— no data', color: 'var(--text-dim)' }; // stale market-data.json, pre-evaluator
 
-  if (r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
-    const strength = _spikeStrength(e);
-    const color = biasBearish ? _blendToward(_mdBuyGradient(e), _MD_YELLOW, 0.45) : _mdBuyGradient(e);
-    const label = biasBearish ? `🔄 REVERSAL (${strength}) ⚠ vs 4H` : `🔄 REVERSAL (${strength})`;
-    return { label, color };
+  switch (signal) {
+    case 'FALLING KNIFE': {
+      const knifePenalty = d.buyIntel?.freshness?.knifePenalty ?? 1;
+      return { label: `🔪 FALLING KNIFE${stateTag}`, color: _mdKnifeGradient(knifePenalty) };
+    }
+    case 'AVOID':
+      return { label: `⛔ AVOID${stateTag}`, color: _MD_DEEP_RED };
+    case 'WEAK':
+      return { label: `🔻 WEAK (${e.conv ?? '—'})${stateTag}`, color: _mdWeakGradient(e.conv ?? 0) };
+    case 'BUY':
+      return { label: `✅ BUY${stateTag}`, color: _mdBuyGradient(e) };
+    case 'EARLY BUY':
+      return { label: `🌱 EARLY BUY (${_spikeStrength(e)})${stateTag}`, color: _mdBuyGradient(e) };
+    case 'WATCH':
+    default: {
+      const conv = e.conv;
+      const support = _mdWatchSupport(e);
+      const boosted = support >= 3;
+      const label = boosted ? `👀 WATCH (${conv ?? '—'}) ⭐ possible early buy${stateTag}` : `👀 WATCH (${conv ?? '—'})${stateTag}`;
+      return { label, color: _mdWatchGradient(conv ?? 0, boosted) };
+    }
   }
-
-  if (!biasBearish && pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
-    return { label: `📈 BREAKOUT (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
-  }
-
-  if (!biasBearish && fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && shock >= 1.3 && orderFlowConfirms) {
-    return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
-  }
-
-  if ((e.conv ?? -Infinity) >= 6) {
-    const weak = (e.whale?.score ?? 0) < 40 && shock < 1.1;
-    return weak ? { label: '🪦 THIN', color: _mdBuyGradient(e) } : { label: '✅ BUY', color: _mdBuyGradient(e) };
-  }
-
-  const conv = e.conv;
-  if (conv == null) return { label: '— no data', color: 'var(--text-dim)' };
-  if (conv > 0) {
-    const support = _mdWatchSupport(e);
-    const boosted = support >= 3;
-    const label = boosted ? `👀 WATCHING (${conv}) ⭐ possible early buy` : `👀 WATCHING (${conv})`;
-    return { label, color: _mdWatchGradient(conv, boosted) };
-  }
-  if (conv === 0) return { label: '😐 FLAT (0)', color: 'var(--text-dim)' };
-  return { label: `🔻 WEAK (${conv})`, color: _mdWeakGradient(conv) };
 }
 
 
@@ -1411,7 +1405,7 @@ function renderMarketData() {
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${sig.color}" title="${(bi?.reasons || []).join(' · ') || ''}">${sig.label}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
-      <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}">${e.conv ?? '—'}</td>
+      <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}" title="${e.buyIntelPenalty > 0 ? `raw ${e.rawConv} − ${e.buyIntelPenalty} penalty = ${e.conv}` : ''}">${e.conv ?? '—'}${e.buyIntelPenalty > 0 ? ` <span style="color:var(--text-dim);font-weight:400">(${e.rawConv})</span>` : ''}</td>
       <td style="font-size:9px;color:${_mdColorBullConf(e.bullConf)}">${e.bullConf != null ? e.bullConf + '/10' : '—'}</td>
       <td style="font-size:9px;color:${_mdColorWhale(whale)}">${whale != null ? whale + '/100' : '—'}</td>
       <td style="font-size:9px;color:${_mdColorShock(d.shock)}">${d.shock != null ? d.shock.toFixed(2) + 'x' : '—'}</td>
