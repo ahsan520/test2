@@ -971,12 +971,19 @@ function _warningSeverity(e) {
 //      75 below is a fixed client-side threshold (not synced to the server's
 //      BUY_RSI_15M_VHOT var) — this is a display heuristic, not a real gate.
 //   ⚠ CHASING — existing, buyIntel.penalty>0.
-//   🔄 REVERSAL / 📈 BREAKOUT / 🚀 EARLY SPIKE — all three gated on 4H bias
-//      NOT being BEAR 4H/LEAN BEAR (see biasBearish below). Without this, a
-//      genuine 15m breakout and a dead-cat bounce inside a bearish 4H trend
-//      rendered as the identical green BUY-tier label — no way to tell them
-//      apart at a glance. A bearish 4H bias now suppresses all three; they
-//      fall through to conv>=6/WATCHING/WEAK instead of firing.
+//   🔄 REVERSAL / 📈 BREAKOUT / 🚀 EARLY SPIKE — BREAKOUT and EARLY SPIKE
+//      are hard-gated on 4H bias NOT being BEAR 4H/LEAN BEAR (biasBearish
+//      below) — they're pure momentum-continuation checks with nothing
+//      counter-signaling a bearish trend, so a pop against it is more
+//      likely a relief bounce than a real move.
+//      REVERSAL is NOT gated the same way — it requires oversold RSI15,
+//      which by construction usually fires BEFORE the 4H bias has caught
+//      up (bias flips only after several 4H candles confirm the move).
+//      Blocking it on bearish bias would filter out almost every genuine
+//      early catch, not just the traps. It still fires against a bearish
+//      bias, just flagged (label gets "⚠ vs 4H", color blends toward
+//      amber) so it visually reads as higher-risk rather than being
+//      indistinguishable from a reversal the trend has already confirmed.
 //   🔄 REVERSAL — RSI15 oversold + price ticking back up + CVD confirming.
 //      APPROXIMATE: market-data.json doesn't retain the prior cycle's
 //      candle streak, so this can't confirm "was falling, just flipped" the
@@ -1047,6 +1054,16 @@ const _MD_DEEP_RED   = '#7a0d24'; // FALLING KNIFE / EXHAUSTED end
 // the ramp at 90 rather than letting it cluster near the top unused.
 function _mdBuyGradient(e) {
   return _lerpColor(_MD_GREEN_DIM, _MD_GREEN_FULL, _spikeStrength(e) / 90);
+}
+// Blends an already-computed rgb(...) color toward amber — used to flag a
+// REVERSAL firing AGAINST the 4H trend (see biasBearish below) without
+// suppressing the signal entirely. `amount` 0-1, how far toward amber.
+function _blendToward(rgbStr, hex, amount) {
+  const m = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(rgbStr);
+  if (!m) return rgbStr;
+  const from = [+m[1], +m[2], +m[3]];
+  const to = _hexToRgb(hex);
+  return `rgb(${from.map((v, i) => Math.round(v + (to[i] - v) * amount)).join(',')})`;
 }
 // buyIntel.penalty is "0-11ish" per _warningSeverity's own comment; 8 is a
 // realistic ceiling for the ramp (higher is rare in practice).
@@ -1129,21 +1146,30 @@ function _classifySignal(e) {
 
   if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: _mdChasingGradient(bi.penalty) };
 
-  // These three checks are deliberately "early" — they fire on 15m-candle
-  // micro-structure (recent-high break, oversold bounce, momentum streak)
-  // that a composite conv score hasn't caught up to yet. That's the whole
-  // point of having them ahead of the conv>=6 BUY gate below. But none of
-  // them look at the higher-timeframe trend, so a real 15m pop inside a
-  // bearish 4H trend used to get the exact same green BUY-tier label as one
-  // WITH the trend behind it — no visible difference between "breakout"
-  // and "dead cat bounce". Gated out here instead: a bearish 4H bias means
-  // these three fall through to conv>=6 / WATCHING / WEAK below rather than
-  // firing at all, so they only show for moves the higher timeframe isn't
-  // actively fighting.
+  // BREAKOUT and EARLY SPIKE are momentum-continuation checks with no
+  // oversold/counter-signal logic behind them — a 15m high break or an
+  // acceleration streak with the 4H trend actively fighting it really is
+  // more likely a relief pop than a real move, so these two stay hard-gated
+  // on the 4H trend not being bearish (fall through to conv>=6/WATCHING/
+  // WEAK instead of firing).
+  //
+  // REVERSAL is intentionally different and NOT gated the same way: it
+  // requires RSI15 oversold, which by construction means the 4H bias
+  // usually HASN'T caught up yet — bias only flips bull/neutral after
+  // several 4H candles confirm the move, well after a 15m bounce off
+  // oversold has already started. Hard-blocking REVERSAL on bearish bias
+  // would filter out almost every genuine early catch, not just the traps,
+  // since "still oversold" and "4H already turned bullish" are nearly
+  // mutually exclusive in time. Instead: still fires, but the label/color
+  // flags it as counter-trend so a bounce-with-the-bias-against-it reads
+  // differently from one the trend has already confirmed.
   const biasBearish = d.bias4h === 'BEAR 4H' || d.bias4h === 'LEAN BEAR';
 
-  if (!biasBearish && r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
-    return { label: `🔄 REVERSAL (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
+  if (r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
+    const strength = _spikeStrength(e);
+    const color = biasBearish ? _blendToward(_mdBuyGradient(e), _MD_YELLOW, 0.45) : _mdBuyGradient(e);
+    const label = biasBearish ? `🔄 REVERSAL (${strength}) ⚠ vs 4H` : `🔄 REVERSAL (${strength})`;
+    return { label, color };
   }
 
   if (!biasBearish && pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
