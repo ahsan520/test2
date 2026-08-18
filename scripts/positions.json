@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787038076230
+      "evaluatedAt": 1787038371582
     }
   },
   "TSX:HTAE.TO": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787038076230
+      "evaluatedAt": 1787038371582
     }
   },
   "BINANCE:ETHUSDT": {
@@ -103,19 +103,19 @@
     "caution": false,
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 4 below 75 threshold",
-      "fallingKnifeScore": 4,
-      "exitProbability": 4,
-      "dynamicPositionRisk": 4,
+      "reason": "no entry snapshot — falling-knife-only score 19 below 75 threshold",
+      "fallingKnifeScore": 19,
+      "exitProbability": 19,
+      "dynamicPositionRisk": 19,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787038076230
+      "evaluatedAt": 1787038371582
     },
     "highestPnLSeen": 0.39,
-    "lastR15": 51.3,
+    "lastR15": 50.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.39% below 0.4% floor — not evaluated yet",
@@ -123,7 +123,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787038076230
+      "evaluatedAt": 1787038371582
     }
   },
   "BINANCE:AAVEUSDT": {
@@ -142,9 +142,9 @@
     "t2": 93.62,
     "score": 9,
     "spikeScore": 1.4211700672810963,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787038371582,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -159,7 +159,10 @@
       "qty": 9.635,
       "fillPrice": 88.32449922158796,
       "buyOrderId": "C02__718272621560356865036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__718300297801216000036",
+      "exitFillPrice": 88.53,
+      "closedAt": 1787038372838
     },
     "entrySnapshot": {
       "at": 1787031774365,
@@ -187,30 +190,32 @@
       "marketRegime": "NEUTRAL"
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 18 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 30,
-      "confidenceDecay": 33,
-      "exitProbability": 18,
-      "dynamicPositionRisk": 18,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 53 ≥ 50",
+      "fallingKnifeScore": 48,
+      "thesisDrop": 58,
+      "confidenceDecay": 56,
+      "exitProbability": 53,
+      "dynamicPositionRisk": 53,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787038076230
+      "evaluatedAt": 1787038371582
     },
     "highestPnLSeen": 0.8,
-    "lastR15": 54.2,
+    "lastR15": 51.1,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.43% ≥ 0.3% but momentum not yet weak — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.80% (tier B) → now +0.24%, gave back 0.56% ≥ 0.3% with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.8,
-      "drawdownFromPeak": 0.43000000000000005,
+      "drawdownFromPeak": 0.56,
       "tier": "B",
       "giveBack": 0.3,
-      "evaluatedAt": 1787038076230
-    }
+      "evaluatedAt": 1787038371582
+    },
+    "exitPrice": 88.54,
+    "statusChangedAt": 1787038371582
   }
 }
