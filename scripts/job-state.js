@@ -103,7 +103,9 @@ export const saveMarketData = d  => saveJSON(MARKET_DATA_PATH, d);
 export const loadMarketState = () => loadJSON(MARKET_STATE_PATH, {
   fetchedAt: 0, btcRiskScore: null, btcRiskBand: 'UNKNOWN', btcRiskAction: 'watch',
   marketRegime: 'NEUTRAL', breadth: { score: null, bullCount: 0, total: 0 },
-  breadthMomentum: { delta: 0, trend: 'FLAT' }, symbols: {},
+  breadthMomentum: { delta: 0, trend: 'FLAT' },
+  buyStatus: { status: 'UNKNOWN', canBuyNormally: false, reason: 'Market state not ready yet', btcRiskGate: 'UNKNOWN', breadthGate: 'UNKNOWN' },
+  symbols: {},
 });
 export const loadPositions  = () => loadJSON(POSITIONS_PATH, {});
 export const savePositions  = p  => saveJSON(POSITIONS_PATH, p);

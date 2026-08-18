@@ -14,6 +14,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry.js';
 import { evaluateBuyReadiness, evaluateStockBuyReadiness } from './buy-intelligence.js';
+import { classifySignal, isBuyEligible } from './signal-evaluator.js';
+import { runAllBuyGuards, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
+import { loadMarketData, loadMarketState, loadPositions } from './job-state.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -814,7 +817,16 @@ export async function scoreSymbol(pair, prevFr = null) {
     // from conv so it can push a marginal symbol below LB_MIN_SCORE without
     // needing a separate hard gate.
     const buyIntel = evaluateBuyReadiness({ r15, r1h, k15, bullConfCount: bullConf.count, whaleScore: whale.score, currentPrice: price });
+    // Preserve raw vs. adjusted conviction (§9 of the architecture doc) —
+    // rawConv is the pre-penalty score (fundamentally strong setup, poor
+    // entry timing); conv/adjustedConv is what everything downstream
+    // (LB_MIN_SCORE, grading, SIGNAL) actually gates on. Keeping both lets
+    // the UI/debugging distinguish "weak setup" from "strong setup, bad
+    // entry" instead of only ever seeing the post-penalty number.
+    d.rawConv = d.conv;
     if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
+    d.adjustedConv = d.conv;
+    d.buyIntelPenalty = buyIntel.penalty;
     d.buyIntel = buyIntel;
 
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
@@ -822,7 +834,7 @@ export async function scoreSymbol(pair, prevFr = null) {
     const finalSetup = capBuy.isCapBuy ? { label: 'CAP BUY', emoji: '💥' } : setup;
 
     return {
-      pair, price, chg, conv: d.conv, setup: finalSetup,
+      pair, price, chg, conv: d.conv, rawConv: d.rawConv, buyIntelPenalty: d.buyIntelPenalty, setup: finalSetup,
       assetType: 'crypto', exchangePrefix: 'BINANCE',
       d,
       whale: { score: whale.score, zone: whale.zone, emoji: whale.emoji },
@@ -949,14 +961,17 @@ export async function scoreStock(sym) {
     const flow      = calcFlow(d, whale.score);
 
     const buyIntel = evaluateStockBuyReadiness({ r15, r1h, bars, bullConfCount: bullConf.count, whaleScore: whale.score, currentPrice: price });
+    d.rawConv = d.conv;
     if (buyIntel.penalty > 0) d.conv -= buyIntel.penalty;
+    d.adjustedConv = d.conv;
+    d.buyIntelPenalty = buyIntel.penalty;
     d.buyIntel = buyIntel;
 
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
     const archetype = calcSetupArchetype(d, whale.score);
 
     return {
-      pair: sym, price, chg, conv: d.conv, setup,
+      pair: sym, price, chg, conv: d.conv, rawConv: d.rawConv, buyIntelPenalty: d.buyIntelPenalty, setup,
       assetType: 'stock', exchangePrefix,
       d,
       whale: { score: whale.score, zone: whale.zone, emoji: whale.emoji },
@@ -997,15 +1012,67 @@ export async function runLeaderboardScanner(state) {
   const scored = allResults.filter(Boolean).filter(r => r.conv >= LB_MIN_SCORE);
   scored.sort((a, b) => b.conv - a.conv);
 
+  // ── Market guard — same gate stack leaderboard-decider.js uses before it
+  // will let anything buy. Previously this scanner only checked
+  // conv >= LB_MIN_SCORE, so it could (and did) fire a Telegram "BUY" alert
+  // for a candidate the Decider would separately block on BTC risk,
+  // breadth, bull-4H persistence, or the BTC regime gate — the exact
+  // failure mode called out in the dev-team architecture doc (§8): server-
+  // side alerts must use the same market/symbol evaluation as the Decider,
+  // not just a bare conviction threshold. Loaded once per scan, not per
+  // symbol — market/positions/marketState don't change mid-cycle.
+  const market      = loadMarketData();
+  const positions   = loadPositions();
+  const marketState = loadMarketState();
+  const guard        = runAllBuyGuards(market, positions, marketState);
+  if (guard.hardBlocked) {
+    console.log(`  🛡  Leaderboard scanner — market guard hard-blocked this cycle (${guard.reasons.join('; ')}) — no alerts.`);
+  }
+
   const buyAlerts = [];
   for (const r of scored) {
     const { pair, price, conv, setup } = r;
     if (setup.label === 'WATCHING' || setup.label === 'SHORT SETUP') continue;
     if (isOnCooldown(state, pair)) { console.log(`  🔕  ${pair} [${setup.label}] — cooldown`); continue; }
+
+    // ── Shared SIGNAL evaluator — must be BUY/EARLY BUY, matching the
+    // execution-intent taxonomy every other consumer of market-data.json
+    // now reads (see signal-evaluator.js). Replaces the old bare
+    // "conv >= LB_MIN_SCORE" as the sole bar for firing an alert.
+    const { signal, entryState } = classifySignal(r);
+    if (!isBuyEligible(signal)) {
+      console.log(`  ⏭  ${pair} [${setup.label}] score:${conv} — SIGNAL=${signal}, not buy-eligible — skipping alert`);
+      continue;
+    }
+
+    if (guard.hardBlocked) continue; // circuit breaker / BTC panic / blackout — no per-symbol exception applies here
+
+    if (r.assetType === 'crypto') {
+      if (guard.btcRegimeBlocked) {
+        console.log(`  🛡  ${pair} — BTC 4H regime block active this cycle — skipping (scanner has no per-symbol Alpha Exception path)`);
+        continue;
+      }
+      // bull4hCount is maintained by market-fetcher.js on the PERSISTED
+      // market-data.json entry (this fresh scan result has no such field
+      // of its own — it's a brand-new scoreSymbol() call, not the
+      // accumulated multi-cycle state).
+      const persistedEntry = market.symbols?.[pair];
+      const persistence = checkBull4hPersistence(persistedEntry || r);
+      if (!persistence.allowed) {
+        console.log(`  ⏳  ${pair} — 4H bull trend only ${persistence.count} cycle(s) old — skipping, possible short-lived flip`);
+        continue;
+      }
+      const miGate = checkMarketIntelligenceGate(marketState, { ...r, symbol: pair }, marketState.symbols?.[pair], market.global || {});
+      if (!miGate.notReady && !miGate.allowed) {
+        console.log(`  🧠  ${pair} — Market Intelligence gate blocked (${miGate.reasons.join('; ')}) — skipping alert`);
+        continue;
+      }
+    }
+
     const levels = calcEntryLevels(price, r.d.shock);
-    buyAlerts.push({ pair, conv, setup, price, levels, d: r.d, assetType: r.assetType });
+    buyAlerts.push({ pair, conv, setup, price, levels, d: r.d, assetType: r.assetType, signal, entryState });
     markCooldown(state, pair);
-    console.log(`  🟢  ${pair} [${setup.label}] score:${conv} (${r.assetType})`);
+    console.log(`  🟢  ${pair} [${setup.label}] score:${conv} SIGNAL=${signal} (${r.assetType})`);
   }
 
   if (!buyAlerts.length) { console.log('  ✓  No new buy signals'); return; }
@@ -1015,6 +1082,7 @@ export async function runLeaderboardScanner(state) {
     const l = a.levels;
     return [
       `${a.setup.emoji} *${a.pair.replace('USDT', '')}* — ${a.setup.label}  [${a.conv}/20]  (${a.assetType})`,
+      `  SIGNAL: ${a.signal}  ENTRY_STATE: ${a.entryState}`,
       `  Entry $${l?.entry || '—'}  Stop $${l?.stop || '—'}  T1 $${l?.t1 || '—'}  T2 $${l?.t2 || '—'}`,
       `  R:R ${l?.rr || '—'}  4H: ${a.d.bias4h}  CVD: ${a.d.cvdTrend}  FR: ${a.d.fr?.toFixed(3) || '0.000'}%`,
     ].join('\n');

@@ -18,6 +18,7 @@ import path from 'path';
 import { scoreSymbol, scoreStock, initYahoo } from './leaderboard-scanner.js';
 import { resolveExchange, getMarketSession, EXCHANGES } from './exchange-registry.js';
 import { computeMarketState } from './market-intelligence.js';
+import { classifySignal } from './signal-evaluator.js';
 
 const WATCHLIST_PATH    = path.join(process.cwd(), '..', 'watchlist.json');
 const MARKET_DATA_PATH  = path.join(process.cwd(), 'market-data.json');
@@ -108,17 +109,27 @@ function buildEntry(r, prev, now, session) {
   const isBearish4h = BEAR_VALUES.includes(r.d.bias4h);
   const bull4hCount  = isBearish4h ? 0 : (prev?.bull4hCount || 0) + 1;
 
+  // ── SIGNAL / ENTRY_STATE — single shared evaluator (signal-evaluator.js).
+  // Computed here, once, per fetch cycle — this is now the source of truth
+  // that leaderboard-scanner.js's alert gate and the GUI SIGNAL column both
+  // read, instead of each recreating their own classification.
+  const { signal, entryState } = classifySignal(r);
+
   return {
     pair:           r.pair,
     price:          r.price,
     chg:            r.chg,
     conv:           r.conv,
+    rawConv:        r.rawConv,
+    buyIntelPenalty: r.buyIntelPenalty,
     setup:          r.setup,
     assetType:      r.assetType,
     exchangePrefix: r.exchangePrefix,
     session,                                        // 'open' | 'pre_market' | 'after_hours' | '24/7'
     marketClosed:   false,
     d:              r.d,
+    signal,                                          // BUY | EARLY BUY | WATCH | WEAK | AVOID | FALLING KNIFE
+    entryState,                                      // CLEAN | DIP BUY | BREAKOUT | RETEST | EXTENDED | CHASING | HIGH SHOCK
     bullConf:       r.bullConf,
     bullChecks:     r.bullChecks,
     whale:          r.whale,

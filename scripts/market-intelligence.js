@@ -39,12 +39,86 @@
 const HISTORY_LEN = parseInt(process.env.MI_HISTORY_LEN || '4', 10); // ≈20 min at 5-min cadence
 
 // ── Risk band classification — shared by BTC risk score and per-symbol use ──
+// ── Risk band terminology ──
+// Previously used BUY/REDUCE/WATCH/BLOCK — overloading "BUY" on a risk
+// score reads as market permission ("Risk score: 0 (BUY)") when it's really
+// only describing BTC risk, one input among several (breadth, relative
+// strength, bull-4H persistence, etc. — see checkMarketIntelligenceGate in
+// market-guard.js) that determine whether a buy is actually allowed. Pure
+// risk-severity language avoids that ambiguity; actual buy permission is
+// now a separate field (see computeBuyStatus below / market-state.json's
+// buyStatus).
 export function getRiskBand(score) {
   if (score == null || isNaN(score)) return { band: 'UNKNOWN', action: 'watch' };
-  if (score <= 30) return { band: 'BUY',        action: 'buy' };
-  if (score <= 50) return { band: 'REDUCE',     action: 'reduce_size' };
-  if (score <= 70) return { band: 'WATCH',      action: 'watch' };
-  return             { band: 'BLOCK',     action: 'block_buys' };
+  if (score <= 20) return { band: 'LOW RISK',  action: 'buy' };
+  if (score <= 40) return { band: 'MODERATE',  action: 'buy' };
+  if (score <= 60) return { band: 'ELEVATED',  action: 'reduce_size' };
+  if (score <= 80) return { band: 'HIGH',      action: 'watch' };
+  return             { band: 'EXTREME',  action: 'block_buys' };
+}
+
+// ── BUY STATUS — portfolio-level buy permission, separate from risk band ──
+// Mirrors the two portfolio-wide (non-per-candidate) checks from
+// checkMarketIntelligenceGate() in market-guard.js — BTC risk ceiling and
+// market breadth — using the SAME env vars so the effective threshold is
+// guaranteed identical under the "GitHub Variables override YAML defaults"
+// precedence model, without market-intelligence.js needing to import
+// market-guard.js. This is deliberately NOT the full per-candidate gate
+// (relative strength, bull-4H persistence, breadth exception, etc. all
+// still require a specific symbol) — it's the always-on portfolio-wide
+// subset, exposed so the GUI can show real buy permission instead of
+// inferring it from the risk score alone (§6/§7 of the architecture doc).
+const BUY_STATUS_BTC_RISK_MAX = parseFloat(process.env.BUY_BTC_RISK_MAX || '60');
+const BUY_STATUS_MIN_BREADTH  = parseFloat(process.env.BUY_MIN_BREADTH  || '60');
+
+// ── Runtime config precedence debug snapshot (§11 of the architecture doc) ──
+// GitHub Variables override YAML defaults, but that resolution happens at
+// the Actions-runner/YAML level (`${{ vars.X || 'default' }}`) — by the
+// time this script runs, process.env.X is already the single resolved
+// value and there is no way to tell FROM HERE whether it came from an
+// actual repo Variable or the YAML fallback. So this snapshot reports what
+// this process is actually running with (the thing that matters for
+// debugging "why did it behave that way"), not a verified claim about
+// where each value originated — hence 'runtime_env', not the doc's
+// 'github_variables' label, which would overstate what this can confirm.
+function snapshotRuntimeConfig() {
+  return {
+    config: {
+      BUY_MIN_BREADTH:            process.env.BUY_MIN_BREADTH            ?? null,
+      BUY_BTC_RISK_MAX:           process.env.BUY_BTC_RISK_MAX           ?? null,
+      BUY_BULL4H_COUNT_MIN:       process.env.BUY_BULL4H_COUNT_MIN       ?? null,
+      BTC_ALPHA_BULL4H_COUNT_MIN: process.env.BTC_ALPHA_BULL4H_COUNT_MIN ?? null,
+      EXEC_MIN_GRADE:             process.env.EXEC_MIN_GRADE             ?? null,
+      LB_MIN_SCORE:               process.env.LB_MIN_SCORE               ?? null,
+    },
+    configSource: 'runtime_env', // resolved value this process saw — see comment above
+  };
+}
+
+function computeBuyStatus(btcRiskScore, btcRiskBand, breadthScore) {
+  const btcRiskGate = btcRiskScore == null ? 'UNKNOWN' : (btcRiskScore <= BUY_STATUS_BTC_RISK_MAX ? 'PASS' : 'FAIL');
+  const breadthGate = breadthScore == null ? 'UNKNOWN' : (breadthScore >= BUY_STATUS_MIN_BREADTH ? 'PASS' : 'FAIL');
+
+  const gatesReady = btcRiskGate !== 'UNKNOWN' && breadthGate !== 'UNKNOWN';
+  const bothPass   = btcRiskGate === 'PASS' && breadthGate === 'PASS';
+
+  let status, canBuyNormally, reason;
+  if (!gatesReady) {
+    status = 'UNKNOWN'; canBuyNormally = false; reason = 'Market state not ready yet';
+  } else if (bothPass) {
+    status = 'OPEN'; canBuyNormally = true; reason = null;
+  } else {
+    // A candidate can still pass via the relative-strength/breadth
+    // exceptions in checkMarketIntelligenceGate — this portfolio-level
+    // view can't evaluate those (they're per-symbol), so this reads as
+    // CONDITIONAL rather than a flat BLOCKED.
+    status = 'CONDITIONAL'; canBuyNormally = false;
+    reason = btcRiskGate === 'FAIL'
+      ? `BTC risk score ${btcRiskScore} > ${BUY_STATUS_BTC_RISK_MAX} (${btcRiskBand})`
+      : `Breadth ${breadthScore}% < required ${BUY_STATUS_MIN_BREADTH}%`;
+  }
+
+  return { status, canBuyNormally, reason, btcRiskGate, breadthGate };
 }
 
 // ── Small helpers ──
@@ -273,6 +347,8 @@ export function computeMarketState(prevState = {}, market = {}) {
     };
   }
 
+  const buyStatus = computeBuyStatus(btcRiskScore, btcRiskBand.band, breadth.score);
+
   return {
     fetchedAt,
     btcRiskScore,
@@ -281,6 +357,8 @@ export function computeMarketState(prevState = {}, market = {}) {
     marketRegime,
     breadth: { score: breadth.score, bullCount: breadth.bullCount, total: breadth.total },
     breadthMomentum,
+    buyStatus, // { status, canBuyNormally, reason, btcRiskGate, breadthGate } — see computeBuyStatus above
+    ...snapshotRuntimeConfig(), // { config, configSource } — see snapshotRuntimeConfig above
     symbols: outSymbols,
   };
 }
