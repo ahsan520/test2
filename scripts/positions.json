@@ -60,22 +60,22 @@
       "marketRegime": "RISK_ON"
     },
     "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 88 → current 15 (drop 73 > 60)",
-      "fallingKnifeScore": 34,
-      "thesisDrop": 73,
-      "confidenceDecay": 50,
-      "exitProbability": 45,
-      "dynamicPositionRisk": 45,
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 43 below 50 threshold",
+      "fallingKnifeScore": 49,
+      "thesisDrop": 56,
+      "confidenceDecay": 38,
+      "exitProbability": 43,
+      "dynamicPositionRisk": 43,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 7
+        "sustainedMin": 8
       },
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     },
     "highestPnLSeen": -0.54,
-    "lastR15": 51,
+    "lastR15": 52.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.54% below 0.4% floor — not evaluated yet",
@@ -83,7 +83,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787067773251
+      "evaluatedAt": 1787068268387
     }
   },
   "BINANCE:BTCUSDT": {
@@ -114,19 +114,19 @@
     "caution": false,
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 33 below 75 threshold",
-      "fallingKnifeScore": 33,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "reason": "no entry snapshot — falling-knife-only score 48 below 75 threshold",
+      "fallingKnifeScore": 48,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 48,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     },
     "highestPnLSeen": -0.04,
-    "lastR15": 67.7,
+    "lastR15": 66.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.04% below 0.4% floor — not evaluated yet",
@@ -134,7 +134,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     }
   },
   "BINANCE:DOGEUSDT": {
@@ -199,21 +199,21 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 28 below 50 threshold",
-      "fallingKnifeScore": 33,
-      "thesisDrop": 34,
+      "reason": "dynamicPositionRisk 38 below 50 threshold",
+      "fallingKnifeScore": 48,
+      "thesisDrop": 41,
       "confidenceDecay": 38,
-      "exitProbability": 28,
-      "dynamicPositionRisk": 28,
+      "exitProbability": 38,
+      "dynamicPositionRisk": 38,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     },
     "highestPnLSeen": 0.01,
-    "lastR15": 61.1,
+    "lastR15": 59.5,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.01% below 0.4% floor — not evaluated yet",
@@ -221,7 +221,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     }
   },
   "BINANCE:LINKUSDT": {
@@ -240,9 +240,9 @@
     "t2": 10.0774,
     "score": 6,
     "spikeScore": 0.49728943267336323,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787068268387,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -252,28 +252,30 @@
     "caution": false,
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold",
-      "fallingKnifeScore": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "no entry snapshot — falling-knife-only score 48 below 75 threshold",
+      "fallingKnifeScore": 48,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 48,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     },
     "highestPnLSeen": 0.47,
-    "lastR15": 60.9,
+    "lastR15": 54.5,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.40% ≥ 0.2% but momentum not yet weak — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.47% (tier C) → now +-0.23%, gave back 0.70% ≥ 0.2% with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.47,
-      "drawdownFromPeak": 0.39999999999999997,
+      "drawdownFromPeak": 0.7,
       "tier": "C",
       "giveBack": 0.2,
-      "evaluatedAt": 1787068072225
-    }
+      "evaluatedAt": 1787068268387
+    },
+    "exitPrice": 9.485,
+    "statusChangedAt": 1787068268387
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -337,29 +339,29 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold",
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": 15,
-      "confidenceDecay": 13,
-      "exitProbability": 2,
-      "dynamicPositionRisk": 2,
+      "thesisDrop": 6,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     },
     "highestPnLSeen": 0.85,
-    "lastR15": 63.1,
+    "lastR15": 61.9,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.08% below tier B give-back 0.3%",
+      "reason": "drawdown 0.22% below tier B give-back 0.3%",
       "highestPnLSeen": 0.85,
-      "drawdownFromPeak": 0.07999999999999996,
+      "drawdownFromPeak": 0.21999999999999997,
       "tier": "B",
       "giveBack": 0.3,
-      "evaluatedAt": 1787068072225
+      "evaluatedAt": 1787068268387
     }
   },
   "BINANCE:ETHUSDT": {
@@ -387,34 +389,30 @@
     "rankScore": 0.441,
     "histWinRate": 1,
     "histSample": 2,
-    "caution": false
-  },
-  "BINANCE:XMRUSDT": {
-    "sym": "BINANCE:XMRUSDT",
-    "base": "XMR",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "DIP BUY",
-    "dir": "bull",
-    "alertedAt": 1787067775138,
-    "holdLockUntil": 1787068975138,
-    "entryPrice": 415.89,
-    "stop": 409.65,
-    "t1": 428.37,
-    "t2": 440.84,
-    "score": 7,
-    "spikeScore": 1.5979836497026483,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "stopped",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": true,
-    "rankScore": 0.31,
-    "histWinRate": null,
-    "histSample": 0,
     "caution": false,
-    "statusChangedAt": 1787067786852
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "no entry snapshot — falling-knife-only score 60 below 75 threshold",
+      "fallingKnifeScore": 60,
+      "exitProbability": 60,
+      "dynamicPositionRisk": 60,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "noSnapshotFallback": true,
+      "evaluatedAt": 1787068268387
+    },
+    "highestPnLSeen": -0.03,
+    "lastR15": 66,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.03% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": -0.03,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1787068268387
+    }
   }
 }
