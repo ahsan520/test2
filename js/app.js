@@ -235,6 +235,17 @@ async function init() {
   setInterval(fetchMarketPulseIfActive, 300_000);
   setInterval(renderWL, 30_000);
   setInterval(scheduleLeaderboard, 60_000);
+  // Market Data previously only fetched on tab-open/manual Refresh — leave
+  // it open for a while and it just sits on stale data. Polls every 60s,
+  // but only while the tab is actually visible ('on' class from
+  // switchTab) — no point re-fetching market-data.json (~5min update
+  // cadence) in the background for a tab nobody's looking at, and it
+  // avoids fighting a fetch already in flight from the manual Refresh
+  // button (_marketDataState.loading guard inside refreshMarketData
+  // itself already no-ops a call that lands mid-fetch).
+  setInterval(() => {
+    if (document.getElementById('tab-market-data')?.classList.contains('on')) refreshMarketData();
+  }, 60_000);
 
   renderJournal();
   initAlertCfg();
@@ -960,6 +971,12 @@ function _warningSeverity(e) {
 //      75 below is a fixed client-side threshold (not synced to the server's
 //      BUY_RSI_15M_VHOT var) — this is a display heuristic, not a real gate.
 //   ⚠ CHASING — existing, buyIntel.penalty>0.
+//   🔄 REVERSAL / 📈 BREAKOUT / 🚀 EARLY SPIKE — all three gated on 4H bias
+//      NOT being BEAR 4H/LEAN BEAR (see biasBearish below). Without this, a
+//      genuine 15m breakout and a dead-cat bounce inside a bearish 4H trend
+//      rendered as the identical green BUY-tier label — no way to tell them
+//      apart at a glance. A bearish 4H bias now suppresses all three; they
+//      fall through to conv>=6/WATCHING/WEAK instead of firing.
 //   🔄 REVERSAL — RSI15 oversold + price ticking back up + CVD confirming.
 //      APPROXIMATE: market-data.json doesn't retain the prior cycle's
 //      candle streak, so this can't confirm "was falling, just flipped" the
@@ -977,7 +994,9 @@ function _warningSeverity(e) {
 //      bar as BUY, just flagged as lower-conviction instead of showing the
 //      identical ✅ BUY label as a much stronger setup.
 //   ✅ BUY — clean pass, none of the more specific signals above applied.
-//   —  — nothing notable.
+//   👀 WATCHING (n) / 😐 FLAT (0) / 🔻 WEAK (n) — below conv>=6, graded by
+//      the conv score itself rather than collapsing to a bare '—'.
+//   — no data — conv itself is missing, distinct from "conv says nothing".
 //
 // NOTE ON "SELL": this column classifies ENTRY signal quality, the same
 // thing buyIntel/conv are computed for. A real sell/exit signal comes from
@@ -1110,15 +1129,28 @@ function _classifySignal(e) {
 
   if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: _mdChasingGradient(bi.penalty) };
 
-  if (r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
+  // These three checks are deliberately "early" — they fire on 15m-candle
+  // micro-structure (recent-high break, oversold bounce, momentum streak)
+  // that a composite conv score hasn't caught up to yet. That's the whole
+  // point of having them ahead of the conv>=6 BUY gate below. But none of
+  // them look at the higher-timeframe trend, so a real 15m pop inside a
+  // bearish 4H trend used to get the exact same green BUY-tier label as one
+  // WITH the trend behind it — no visible difference between "breakout"
+  // and "dead cat bounce". Gated out here instead: a bearish 4H bias means
+  // these three fall through to conv>=6 / WATCHING / WEAK below rather than
+  // firing at all, so they only show for moves the higher timeframe isn't
+  // actively fighting.
+  const biasBearish = d.bias4h === 'BEAR 4H' || d.bias4h === 'LEAN BEAR';
+
+  if (!biasBearish && r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
     return { label: `🔄 REVERSAL (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
-  if (pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
+  if (!biasBearish && pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
     return { label: `📈 BREAKOUT (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
-  if (fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && shock >= 1.3 && orderFlowConfirms) {
+  if (!biasBearish && fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && shock >= 1.3 && orderFlowConfirms) {
     return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
