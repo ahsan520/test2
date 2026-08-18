@@ -73,6 +73,8 @@ export function classifySignal(entry) {
   const whale     = entry.whale?.score ?? 0;
   const knifePenalty = buyIntel?.freshness?.knifePenalty ?? 0;
   const entryState = classifyEntryState(d, buyIntel);
+  const trigger = d.trigger || null;
+  const triggerStatus = trigger?.triggerStatus ?? null; // WAIT | SETUP | TRIGGERING | BREAKOUT | FAILED (calcSpikeTrigger, buy-intelligence.js)
 
   // FALLING KNIFE — severe negative momentum / extreme shock, checked first,
   // regardless of anything else (matches server's own knifePenalty semantics).
@@ -94,22 +96,43 @@ export function classifySignal(entry) {
   // BUY — strong bullish structure + confirmation. Entry-state disqualifiers
   // (CHASING / HIGH SHOCK) block the BUY path even if everything else clears,
   // matching the doc's "no disqualifying entry state" clause.
+  //
+  // Trigger-aware per the "Pre-Spike Detection, Trigger Confirmation" dev
+  // note: Candidate/Setup ≠ BUY. A candidate that clears every structural
+  // bar above but hasn't shown a confirmed short-timeframe trigger
+  // (calcSpikeTrigger, buy-intelligence.js) is a real setup, not yet a BUY —
+  // it falls through to EARLY BUY (still buy-eligible for the Alpha/early
+  // path, per isBuyEligible()) rather than being silently treated as a full
+  // BUY on structure alone. A trigger that has explicitly FAILED (the
+  // ZEC-509 pattern — broke the level on 5m then reversed) blocks the BUY
+  // path outright regardless of how strong bullCall/conv/whale look, since
+  // a strong Whale/CVD reading must never override a rejected breakout.
+  // trigger === null (evaluator disabled, or not enough 15m history yet)
+  // does NOT block BUY — it falls back to the pre-trigger-layer behavior so
+  // this stays backward-compatible until 5m data has actually accumulated.
   const entryOkForBuy = entryState !== 'CHASING' && entryState !== 'HIGH SHOCK';
+  const triggerBlocksBuy   = triggerStatus === 'FAILED';
+  const triggerConfirmsBuy = trigger == null || triggerStatus === 'BREAKOUT';
   if (
     isBull4h(bias4h) && isLeanBullDaily(biasDay) &&
     bullCall >= SIG_BULLCALL_BUY_MIN && (conv ?? 0) >= SIG_CONV_BUY_MIN &&
-    whale >= SIG_WHALE_BUY_MIN && knifePenalty === 0 && entryOkForBuy
+    whale >= SIG_WHALE_BUY_MIN && knifePenalty === 0 && entryOkForBuy &&
+    triggerConfirmsBuy && !triggerBlocksBuy
   ) {
-    return { signal: 'BUY', entryState, reasons: ['bull 4H+daily', `bullCall=${bullCall}`, `conv=${conv}`, `whale=${whale}`] };
+    return { signal: 'BUY', entryState, reasons: ['bull 4H+daily', `bullCall=${bullCall}`, `conv=${conv}`, `whale=${whale}`, `trigger=${triggerStatus ?? 'n/a'}`] };
   }
 
-  // EARLY BUY — developing bullish structure, lower bar than BUY.
+  // EARLY BUY — developing bullish structure, lower bar than BUY. Also
+  // where a structurally BUY-qualified candidate lands while its trigger is
+  // still SETUP/TRIGGERING (setup confirmed, breakout not yet confirmed) —
+  // this is the doc's PRE-SPIKE WATCH state made visible without adding a
+  // new SIGNAL value every consumer has to learn.
   if (
     isBull4h(bias4h) && isLeanBullDaily(biasDay) &&
     bullCall >= SIG_BULLCALL_EARLY_MIN && (conv ?? 0) >= SIG_CONV_EARLY_MIN &&
-    !isSevereBear(bias4h) && !isSevereBear(biasDay)
+    !isSevereBear(bias4h) && !isSevereBear(biasDay) && !triggerBlocksBuy
   ) {
-    return { signal: 'EARLY BUY', entryState, reasons: ['bull 4H, lean bull daily', `bullCall=${bullCall}`, `conv=${conv}`] };
+    return { signal: 'EARLY BUY', entryState, reasons: ['bull 4H, lean bull daily', `bullCall=${bullCall}`, `conv=${conv}`, `trigger=${triggerStatus ?? 'n/a'}`] };
   }
 
   // WEAK — negative/deteriorating momentum, not severe enough for AVOID/knife.

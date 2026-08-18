@@ -13,7 +13,7 @@ import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry.js';
-import { evaluateBuyReadiness, evaluateStockBuyReadiness } from './buy-intelligence.js';
+import { evaluateBuyReadiness, evaluateStockBuyReadiness, calcSpikeTrigger } from './buy-intelligence.js';
 import { classifySignal, isBuyEligible } from './signal-evaluator.js';
 import { runAllBuyGuards, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { loadMarketData, loadMarketState, loadPositions } from './job-state.js';
@@ -714,15 +714,20 @@ async function fetchKrakenDepth(krakenPair, count) {
   return { bids: row.bids || [], asks: row.asks || [] }; // already [price, qty, timestamp] — same shape calcOBI expects
 }
 
-export async function scoreSymbol(pair, prevFr = null) {
+export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
   try {
     // XMR only — see fetchKrakenTicker/OHLC/Depth comment block above for why
     // this is unconditional routing to Kraken, not a try-Binance-first fallback.
     const useKraken = pair === 'XMRUSDT';
     const krakenPair = 'XMRUSD';
 
-    const [ticker, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
+    const [ticker, k5m, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
       useKraken ? fetchKrakenTicker(krakenPair)                    : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
+      // 5m candles — short-timeframe trigger confirmation only (calcSpikeTrigger
+      // in buy-intelligence.js). Distinct from this job's ~5min RUN CADENCE:
+      // running every 5 minutes does not mean the bot has 5-minute candle
+      // data unless it's actually fetched, per the dev-team pre-spike note.
+      useKraken ? fetchKrakenOHLC(krakenPair, '5m', 20)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=5m&limit=20`),
       useKraken ? fetchKrakenOHLC(krakenPair, '15m', 60)           : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
       useKraken ? fetchKrakenOHLC(krakenPair, '1h', 30)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
       useKraken ? fetchKrakenOHLC(krakenPair, '4h', 50)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
@@ -738,7 +743,7 @@ export async function scoreSymbol(pair, prevFr = null) {
       return null;
     }
 
-    const k15 = val(k15m), k1 = val(k1h), k4 = val(k4h), kD = val(kDay);
+    const k5 = val(k5m), k15 = val(k15m), k1 = val(k1h), k4 = val(k4h), kD = val(kDay);
     const dep = val(depth);
 
     const price = parseFloat(t.lastPrice);
@@ -829,6 +834,16 @@ export async function scoreSymbol(pair, prevFr = null) {
     d.buyIntelPenalty = buyIntel.penalty;
     d.buyIntel = buyIntel;
 
+    // ── Pre-spike short-timeframe trigger (calcSpikeTrigger, buy-intelligence.js) ──
+    // Setup/candidate quality is everything computed above (conv, bullConf,
+    // whale, CVD, RSI, OI/funding, bias4h/biasDay). This is the separate
+    // question the dev-team note calls out: has the move actually started?
+    // Kept as its own object (not folded into buyIntel/conv) since it's a
+    // gating status for signal-evaluator.js/leaderboard-decider.js, not a
+    // conviction penalty.
+    const trigger = calcSpikeTrigger({ k5, k15, currentPrice: price, cvdTrend, btcTriggerOk });
+    d.trigger = trigger;
+
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
     const archetype = calcSetupArchetype(d, whale.score);
     const finalSetup = capBuy.isCapBuy ? { label: 'CAP BUY', emoji: '💥' } : setup;
@@ -841,6 +856,7 @@ export async function scoreSymbol(pair, prevFr = null) {
       capBuy: { isCapBuy: capBuy.isCapBuy, capScore: capBuy.capScore },
       bullConf: bullConf.count, bullChecks: bullConf.checks,
       flow, grade: gradeInfo.grade, successProb: gradeInfo.successProb, archetype,
+      trigger,
     };
   } catch (e) {
     console.log(`  ⚠  ${pair} crypto score failed: ${e.message}`);

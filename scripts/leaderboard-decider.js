@@ -691,6 +691,38 @@ async function main() {
       console.log(`  ✅  ${pair} — Extreme Fear but diverging +${symChg}% vs BTC ${guard.btcChg}% — allowing at ${guard.sizeMult * 100}% size`);
     }
 
+    // ── Pre-spike trigger gate ──
+    // Per the "Pre-Spike Detection, Trigger Confirmation" dev-team note:
+    // Candidate/Setup ≠ BUY. Everything above (score/history/persistence/
+    // BTC regime/Alpha Exception/F&G divergence) qualifies a CANDIDATE.
+    // This is the last gate before a candidate becomes a live buy alert —
+    // require the short-timeframe trigger (calcSpikeTrigger, computed once
+    // in scoreSymbol/market-fetcher.js and persisted as entry.triggerStatus)
+    // to have actually confirmed a BREAKOUT. A FAILED trigger (the ZEC-509
+    // pattern: broke the level on 5m then reversed) hard-blocks regardless
+    // of score, whale, or CVD — those inputs support a reversal hypothesis,
+    // they don't get to override an active failed-breakout signal.
+    //
+    // CAP BUY is the one deliberate exception, consistent with it already
+    // bypassing the bull-confirmation gate below: a CAP BUY is itself an
+    // extreme-shock event (see calcCapBuy) where "wait for a 5m breakout
+    // reclaim" doesn't apply the same way — the shock IS the trigger.
+    //
+    // entry.triggerStatus == null (5m history not yet accumulated, or the
+    // trigger check is disabled via BUY_ENABLE_SPIKE_TRIGGER=false) does
+    // NOT block — same backward-compatible fallback as signal-evaluator.js.
+    const isCapBuyForTrigger = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
+    if (entry.assetType === 'crypto' && !isCapBuyForTrigger) {
+      if (entry.triggerStatus === 'FAILED') {
+        console.log(`  🔻  ${pair} — trigger FAILED (breakout reclaimed then lost) — skipping regardless of score`);
+        continue;
+      }
+      if (entry.triggerStatus != null && entry.triggerStatus !== 'BREAKOUT') {
+        console.log(`  ⏳  ${pair} — trigger not confirmed yet (${entry.triggerStatus}, score ${entry.triggerScore ?? '—'}) — setup qualifies, waiting for 5m breakout confirmation`);
+        continue;
+      }
+    }
+
     // CAP BUY bypasses bull confirmation gate
     const isCapBuy = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
     if (!isCapBuy && (entry.bullConf ?? 0) < LB_BULL_CONF_MIN) {

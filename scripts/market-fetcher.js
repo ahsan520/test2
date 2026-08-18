@@ -115,6 +115,11 @@ function buildEntry(r, prev, now, session) {
   // read, instead of each recreating their own classification.
   const { signal, entryState } = classifySignal(r);
 
+  // ── Pre-spike trigger fields — surfaced top-level (not just nested under
+  // d.trigger) so the Decider and GUI read the identical fields without
+  // reaching into r.d, matching how signal/entryState are already exposed.
+  const trigger = r.d?.trigger || null;
+
   return {
     pair:           r.pair,
     price:          r.price,
@@ -130,6 +135,12 @@ function buildEntry(r, prev, now, session) {
     d:              r.d,
     signal,                                          // BUY | EARLY BUY | WATCH | WEAK | AVOID | FALLING KNIFE
     entryState,                                      // CLEAN | DIP BUY | BREAKOUT | RETEST | EXTENDED | CHASING | HIGH SHOCK
+    triggerStatus:      trigger?.triggerStatus ?? null,      // WAIT | SETUP | TRIGGERING | BREAKOUT | FAILED
+    triggerScore:       trigger?.triggerScore ?? null,       // 0-100
+    breakoutConfirmed:  trigger?.breakoutConfirmed ?? false,
+    breakoutLevel:      trigger?.breakoutLevel ?? null,
+    triggerReasons:     trigger?.triggerReasons ?? [],
+    btcTriggerOk:       trigger?.btcTriggerOk ?? null,
     bullConf:       r.bullConf,
     bullChecks:     r.bullChecks,
     whale:          r.whale,
@@ -183,6 +194,24 @@ async function fetchBtcShortTermChange() {
   }
 }
 
+// ── BTC short-term trigger confirmation ──
+// Per the dev-team note's §9 "BTC Trigger Guard": BTC 4H acceptable AND BTC
+// price/momentum not sharply bearish short-term. Deliberately a coarse
+// approximation (btcChg15m sign/magnitude) of the doc's "BTC price >=
+// short-term Supertrend/trigger level" — a real Supertrend calculation is
+// flagged in the doc as a follow-up needing the team's own indicator/timeframe
+// choice, not something to invent silently here. null (not false) means
+// "unknown this cycle" (e.g. BTC's own bias4h or the 5m fetch failed) so
+// callers don't treat missing data as a hard bearish block.
+const BTC_TRIGGER_MOMENTUM_FLOOR = parseFloat(process.env.BTC_TRIGGER_MOMENTUM_FLOOR_PCT || '-0.5');
+function computeBtcTriggerOk(btcD, btcShort) {
+  if (!btcD?.bias4h) return null;
+  const bias4hOk = btcD.bias4h === 'BULL 4H' || btcD.bias4h === 'LEAN BULL' || btcD.bias4h === 'NEUTRAL';
+  if (!bias4hOk) return false;
+  if (btcShort?.btcChg15m == null) return null;
+  return btcShort.btcChg15m > BTC_TRIGGER_MOMENTUM_FLOOR;
+}
+
 async function fetchFearGreed() {
   try {
     const res = await fetch('https://api.alternative.me/fng/?limit=1',
@@ -228,9 +257,20 @@ async function main() {
   // Init Yahoo once if any stocks need scoring
   if (stocksToScore.length) await initYahoo();
 
+  // ── BTC trigger confirmation carried forward from last cycle ──
+  // scoreSymbol() for every crypto pair (including BTCUSDT itself) runs in
+  // the SAME Promise.all below, so a same-cycle "fresh" BTC trigger value
+  // isn't available yet without serializing every other symbol behind BTC's
+  // own score. Carrying forward the prior cycle's value (same ~5min-cycle
+  // staleness already accepted for bull4hCount/prevFr elsewhere in this
+  // file) is the same tradeoff already made throughout this pipeline. The
+  // FRESH value computed at the end of this cycle (below) is what next
+  // cycle's symbols will actually use.
+  const prevBtcTriggerOk = existing.global?.btcTriggerOk ?? null;
+
   // ── Fetch in parallel — symbols + global guard data ──
   const [cryptoResults, stockResults, btcShort, fgVal] = await Promise.all([
-    Promise.all(cryptoPairs.map(pair => scoreSymbol(pair, existing.symbols?.[pair]?.d?.fr ?? null))),
+    Promise.all(cryptoPairs.map(pair => scoreSymbol(pair, existing.symbols?.[pair]?.d?.fr ?? null, prevBtcTriggerOk))),
     Promise.all(stocksToScore.map(({ sym }) => scoreStock(sym))),
     fetchBtcShortTermChange(),
     fetchFearGreed(),
@@ -291,6 +331,7 @@ async function main() {
   // symbol's buy decision (market-guard.js's BTC regime gate).
   const btcEntry = symbols['BTCUSDT'] || {};
   const btcD     = btcEntry.d || {};
+  const btcTriggerOk = computeBtcTriggerOk(btcD, btcShort);
   const global = {
     btcChg15m:    btcShort?.btcChg15m    ?? null,
     btcVolatility:btcShort?.btcVolatility ?? null,
@@ -300,6 +341,11 @@ async function main() {
     btcEmaTrend:  btcD.emaTrend || null,
     btcOiDiv:     btcD.oiDiv    ?? null,
     btcCvdTrend:  btcD.cvdTrend || null,
+    // Fresh-as-of-this-cycle BTC trigger confirmation (§9 of the dev-team
+    // note) — this is what NEXT cycle's scoreSymbol() calls consume via
+    // prevBtcTriggerOk above; this cycle's own symbols used last cycle's
+    // value (see prevBtcTriggerOk comment).
+    btcTriggerOk,
     // 24h % change, same field/timeframe every other symbol's entry.chg
     // uses (Binance's priceChangePercent) — needed for a fair
     // apples-to-apples comparison in calcRelativeStrength() rather than

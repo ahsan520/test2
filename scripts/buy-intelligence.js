@@ -228,6 +228,104 @@ export function evaluateBuyReadiness({ r15, r1h, k15, bullConfCount, whaleScore,
   return { penalty, reasons, freshness, extension, quality, pullback, tod };
 }
 
+// ── Short-timeframe spike trigger — calcSpikeTrigger() ──────────────────
+// Per the "Pre-Spike Detection, Trigger Confirmation" dev-team note: the
+// checks above (freshness/extension/quality/pullback/ToD) all describe a
+// CANDIDATE — a setup that looks good on 15m/1h/4h/daily structure. None of
+// them answer a different question: has the move actually STARTED? This is
+// the missing short-timeframe trigger layer, evaluated on 5m candles
+// against a 15m-derived resistance level, so a strong-looking setup that
+// hasn't actually broken out yet (or already broke out and failed — the
+// ZEC-509 case from the dev note) doesn't get treated as buy-ready.
+//
+// Deliberately separate from evaluateBuyReadiness()/penalty above: a failed
+// trigger is not "a few extra penalty points off conv", it's a hard
+// execution-gating status (Candidate/Setup ≠ BUY), consumed by
+// signal-evaluator.js's BUY path and leaderboard-decider.js's execution
+// gate, not folded into the conv score.
+const TRIGGER_ENABLED         = (process.env.BUY_ENABLE_SPIKE_TRIGGER || 'true') !== 'false';
+const TRIGGER_LOOKBACK_15M    = parseInt(process.env.BUY_TRIGGER_LOOKBACK_15M || '12', 10);       // ~3h of closed 15m candles used for the breakout level
+const TRIGGER_BREAKOUT_BUFFER = parseFloat(process.env.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15'); // % above the level required to count as a real reclaim, not noise
+const TRIGGER_NEAR_PCT        = parseFloat(process.env.BUY_TRIGGER_NEAR_PCT || '0.5');             // % below the level still counted as "TRIGGERING" (imminent)
+const TRIGGER_FAIL_LOOKBACK   = parseInt(process.env.BUY_TRIGGER_FAIL_LOOKBACK || '3', 10);        // closed 5m candles scanned for a recent failed break
+const TRIGGER_VOL_EXPANSION_X = parseFloat(process.env.BUY_TRIGGER_VOL_EXPANSION_X || '1.3');      // latest 5m volume vs its own recent average
+
+export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk = null } = {}) {
+  if (!TRIGGER_ENABLED) {
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['trigger check disabled'] };
+  }
+  if (!Array.isArray(k15) || k15.length < TRIGGER_LOOKBACK_15M + 1 || currentPrice == null) {
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['insufficient 15m data'] };
+  }
+
+  // Breakout level = recent-high resistance on CLOSED 15m candles (same
+  // "drop the still-forming candle" convention calcPullbackFromHigh uses).
+  const closed15 = k15.slice(0, -1).slice(-TRIGGER_LOOKBACK_15M);
+  const breakoutLevel = Math.max(...closed15.map(c => parseFloat(c[2]))); // candle high
+  if (!isFinite(breakoutLevel) || breakoutLevel <= 0) {
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['no valid breakout level'] };
+  }
+
+  const reasons = [];
+  let score = 0;
+
+  // ── 5m confirmation: volume expansion + failed-breakout detection ──
+  let volumeExpansion = false;
+  let recentFailedBreak = false;
+  if (Array.isArray(k5) && k5.length >= 6) {
+    const closed5 = k5.slice(0, -1); // drop the still-forming current 5m candle
+    const vols5     = closed5.slice(-6).map(c => parseFloat(c[5]));
+    const latestVol = vols5[vols5.length - 1] ?? 0;
+    const avgVol5   = vols5.slice(0, -1).reduce((a, b) => a + b, 0) / Math.max(1, vols5.length - 1) || 1;
+    volumeExpansion = latestVol >= avgVol5 * TRIGGER_VOL_EXPANSION_X;
+
+    // A close in the last TRIGGER_FAIL_LOOKBACK 5m candles broke the level,
+    // but current price has since fallen back below it — the exact
+    // "ZEC failed around 509 and reversed" pattern from the dev note,
+    // which 15m/1h/4h scoring alone cannot see.
+    const recentCloses  = closed5.slice(-TRIGGER_FAIL_LOOKBACK).map(c => parseFloat(c[4]));
+    const brokeRecently = recentCloses.some(c => c > breakoutLevel * (1 + TRIGGER_BREAKOUT_BUFFER / 100));
+    recentFailedBreak   = brokeRecently && currentPrice < breakoutLevel;
+  }
+
+  const breakoutConfirmed = currentPrice >= breakoutLevel * (1 + TRIGGER_BREAKOUT_BUFFER / 100);
+  const pctToLevel = ((breakoutLevel - currentPrice) / breakoutLevel) * 100; // positive = still below the level
+
+  if (breakoutConfirmed)              { score += 40; reasons.push(`price reclaimed ${breakoutLevel} (+${TRIGGER_BREAKOUT_BUFFER}% buffer)`); }
+  if (volumeExpansion)                { score += 25; reasons.push(`5m volume ≥ ${TRIGGER_VOL_EXPANSION_X}x recent average`); }
+  if (cvdTrend === 'up')              { score += 20; reasons.push('CVD trend up'); }
+  if (btcTriggerOk)                   { score += 15; reasons.push('BTC short-term trigger OK'); }
+  else if (btcTriggerOk === false)    { reasons.push('BTC short-term trigger NOT confirmed'); }
+
+  // A strong Whale/CVD reading alone must never flip FAILED/SETUP into
+  // BREAKOUT — btcTriggerOk===false and a missing breakout both hard-cap
+  // the status below BREAKOUT regardless of how high `score` climbs.
+  let triggerStatus;
+  if (recentFailedBreak) {
+    triggerStatus = 'FAILED';
+    reasons.push('recent 5m close broke the level then price fell back below it — failed breakout');
+  } else if (breakoutConfirmed && volumeExpansion && cvdTrend === 'up' && btcTriggerOk !== false) {
+    triggerStatus = 'BREAKOUT';
+  } else if (breakoutConfirmed) {
+    triggerStatus = 'TRIGGERING'; // reclaimed the level but missing volume/CVD/BTC confirmation
+  } else if (pctToLevel > 0 && pctToLevel <= TRIGGER_NEAR_PCT) {
+    triggerStatus = 'TRIGGERING'; // close enough that a trigger is imminent
+    reasons.push(`${pctToLevel.toFixed(2)}% below breakout level — approaching`);
+  } else {
+    triggerStatus = 'SETUP';
+  }
+
+  return {
+    triggerStatus,
+    triggerScore: Math.max(0, Math.min(100, score)),
+    breakoutConfirmed,
+    breakoutLevel: parseFloat(breakoutLevel.toFixed(8)),
+    volumeExpansion,
+    btcTriggerOk,
+    triggerReasons: reasons,
+  };
+}
+
 // ── Stock-calibrated entry check — called from scoreStock() ────────────────
 // Reuses the SAME underlying check functions as evaluateBuyReadiness above
 // (same math, same reasoning), but with its own thresholds calibrated for
