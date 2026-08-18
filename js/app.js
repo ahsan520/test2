@@ -1044,6 +1044,54 @@ function _mdExhaustedGradient(r15) {
   return _lerpColor(_MD_RED, _MD_DEEP_RED, (r15 - _MD_EXHAUSTED_RSI) / 25);
 }
 
+// Below-threshold rows (clean buyIntel, but conv hasn't cleared the 6-point
+// BUY bar and none of the more specific patterns fired) previously just
+// showed a bare '—' — same as truly no-data rows, discarding the conv score
+// they DO have. These two ramps use that score instead of throwing it away:
+//   WATCHING (conv > 0): dim -> green as conv approaches the BUY threshold,
+//   capped at 70% of full --bull intensity so an actual ✅ BUY still reads
+//   as visibly stronger than "getting close".
+//   WEAK (conv < 0): dim -> red as conv drops, capped at 60% intensity so
+//   this never reads as alarming as an actual ⚠ CHASING tag.
+const _MD_NEUTRAL_BASE = '#3a4048'; // flat/no-edge base, distinct from pure --text-dim
+function _mdWatchGradient(conv) {
+  return _lerpColor(_MD_NEUTRAL_BASE, _MD_GREEN_FULL, Math.min(1, conv / 6) * 0.7);
+}
+function _mdWeakGradient(conv) {
+  return _lerpColor(_MD_NEUTRAL_BASE, _MD_RED, Math.min(1, -conv / 6) * 0.6);
+}
+
+// Tier a classified SIGNAL label falls into — shared by the sort accessor
+// below and the header stats bar, so "how many rows are buy-side right
+// now" always means the same thing in both places. Whitelist rather than
+// "everything not warning/dash" — WATCHING/FLAT/WEAK read as prose but
+// aren't real buy signals and must not inflate the buy-side count.
+function _mdSignalTier(label) {
+  if (label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠')) return 'warning';
+  if (label.startsWith('✅') || label.startsWith('🪦') || label.startsWith('🔄') || label.startsWith('📈') || label.startsWith('🚀')) return 'buy';
+  return 'neutral'; // 👀 WATCHING, 😐 FLAT, 🔻 WEAK, — no data
+}
+
+// Row-level tint, derived from the same SIGNAL color _classifySignal()
+// already computes for the cell — a translucent wash across the whole row
+// (not just the SIGNAL text) so a strong buy or a severe warning is visible
+// at a glance while scanning, not just when your eye lands on that one
+// column. Kept deliberately subtle (7% alpha) so the per-column colors
+// underneath (CONV, WHALE, etc.) stay perfectly readable — this is a
+// background wash, not a competing color scheme. Neutral '—' rows (color is
+// the var(--text-dim) fallback, not an rgb(...) from the gradient) get no
+// tint at all, so an unclassified row reads as plain/quiet rather than
+// falsely "colored". Applied to the <tr> itself rather than each <td>: the
+// existing `.jtbl tr:hover td{background:rgba(255,255,255,.02)}` hover rule
+// then paints a faint highlight on top of the tint instead of replacing it
+// (translucent-on-translucent, so hover feedback and row tint coexist).
+function _mdRowTint(colorStr) {
+  const m = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(colorStr);
+  if (!m) return { bg: 'transparent', border: 'transparent' };
+  const [, r, g, b] = m;
+  return { bg: `rgba(${r},${g},${b},0.07)`, border: `rgba(${r},${g},${b},0.9)` };
+}
+
 function _classifySignal(e) {
   const bi = e.d?.buyIntel;
   const fresh = bi?.freshness;
@@ -1079,7 +1127,11 @@ function _classifySignal(e) {
     return weak ? { label: '🪦 THIN', color: _mdBuyGradient(e) } : { label: '✅ BUY', color: _mdBuyGradient(e) };
   }
 
-  return { label: '—', color: 'var(--text-dim)' };
+  const conv = e.conv;
+  if (conv == null) return { label: '— no data', color: 'var(--text-dim)' };
+  if (conv > 0)  return { label: `👀 WATCHING (${conv})`, color: _mdWatchGradient(conv) };
+  if (conv === 0) return { label: '😐 FLAT (0)', color: 'var(--text-dim)' };
+  return { label: `🔻 WEAK (${conv})`, color: _mdWeakGradient(conv) };
 }
 
 
@@ -1090,15 +1142,6 @@ function _classifySignal(e) {
 const _MD_BIAS_RANK   = { 'BEAR 4H': 0, 'LEAN BEAR': 1, 'NEUTRAL': 2, '—': 2, 'LEAN BULL': 3, 'BULL 4H': 4 };
 const _MD_OIDIV_RANK  = { 'OI DROP': 0, 'NEUTRAL': 1, 'CONFIRM': 2, 'DIP BUY': 3 };
 const _MD_TREND_RANK  = { 'down': 0, 'FADING': 0, 'FLAT': 1, '—': 1, 'up': 2, 'ACCELERATING': 2 };
-
-// Tier a classified SIGNAL label falls into — shared by the sort accessor
-// below and the header stats bar, so "how many rows are buy-side right
-// now" always means the same thing in both places.
-function _mdSignalTier(label) {
-  if (label.startsWith('🔪') || label.startsWith('⚠️') || label.startsWith('⚠')) return 'warning';
-  if (label === '—') return 'neutral';
-  return 'buy'; // ✅ BUY, 🪦 THIN, 🔄 REVERSAL, 📈 BREAKOUT, 🚀 EARLY SPIKE
-}
 
 const _MD_SORT_ACCESSORS = {
   symbol:   e => e.base || '',
@@ -1255,6 +1298,8 @@ function renderMarketData() {
     const d = e.d || {};
     const whale = e.whale?.score;
     const bi = e.d?.buyIntel; // was e.buyIntel — actual saved path is nested under d, this was always reading undefined
+    const sig = _classifySignal(e); // computed once — reused for the SIGNAL cell AND the row tint below, so they can never disagree
+    const rowTint = _mdRowTint(sig.color);
     const biText = bi && bi.penalty > 0
       ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
       : bi ? '<span style="color:var(--bull)">clean</span>' : '<span style="color:var(--text-dim)">—</span>';
@@ -1273,10 +1318,10 @@ function renderMarketData() {
       ? `<span style="color:${pos.liveOrder?.mode === 'live' ? 'var(--accent)' : 'var(--text-bright)'}" title="Entry $${pos.entryPrice} · Stop $${pos.stop}">${pos.liveOrder?.mode === 'live' ? '🔴 LIVE' : '👁 watch'} ${pos.highestPnLSeen != null ? (pos.highestPnLSeen >= 0 ? '+' : '') + pos.highestPnLSeen + '%' : ''}</span>`
       : '<span style="color:var(--text-dim)">—</span>';
 
-    return `<tr>
-      <td style="font-weight:700;color:var(--text-bright)">${e.base}</td>
+    return `<tr style="background:${rowTint.bg};">
+      <td style="font-weight:700;color:var(--text-bright);box-shadow:inset 3px 0 0 0 ${rowTint.border};">${e.base}</td>
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
-      <td style="font-size:9px;color:${_classifySignal(e).color}" title="${(bi?.reasons || []).join(' · ') || ''}">${_classifySignal(e).label}</td>
+      <td style="font-size:9px;color:${sig.color}" title="${(bi?.reasons || []).join(' · ') || ''}">${sig.label}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
       <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}">${e.conv ?? '—'}</td>
       <td style="font-size:9px;color:${_mdColorBullConf(e.bullConf)}">${e.bullConf != null ? e.bullConf + '/10' : '—'}</td>
