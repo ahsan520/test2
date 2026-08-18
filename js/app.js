@@ -778,7 +778,33 @@ async function _fetchGhJson(fpath, { optional = true } = {}) {
   // (read-only, no sync required).
   const repo   = (typeof _deriveRepo === 'function' ? _deriveRepo() : '') || window.__GH_REPO || cfg.repo || '';
   const branch = cfg.branch || 'main';
+  const token  = cfg.token || window.__GH_PAT || '';
   if (!repo) throw new Error('GitHub repo not configured — set GH_REPO in sync settings.');
+
+  // Primary: Contents API. This was previously raw.githubusercontent.com-only,
+  // which is why Refresh could show "data is 11m old" right after a push that
+  // landed 1m ago — raw.githubusercontent sits behind a CDN whose cache key
+  // ignores query strings, so the `?t=${Date.now()}` cache-bust below never
+  // actually forced a revalidation; it just kept re-serving whatever blob the
+  // edge already had for up to its ~5-10min TTL. api.github.com/contents is
+  // always resolved against the current ref, so it reflects a push within
+  // seconds. Same fallback shape (Contents API first, raw URL if it fails)
+  // already used by position-tracker.js's seedPositionsFromGitHub() — token
+  // is optional there too, since public repos work unauthenticated at the
+  // lower 60 req/hr rate limit.
+  try {
+    const headers = { 'Accept': 'application/vnd.github.raw+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${fpath}?ref=${encodeURIComponent(branch)}`,
+      { headers, cache: 'no-store' }
+    );
+    if (res.status === 404) return optional ? null : (() => { throw new Error(`${fpath} not found`); })();
+    if (res.ok) return await res.json();
+    // Non-OK (rate-limited, transient 5xx, etc.) — fall through to raw below
+    // rather than surfacing an error the raw fetch might still recover from.
+  } catch { /* network error — fall through to raw fallback */ }
+
   const url = `https://raw.githubusercontent.com/${repo}/${branch}/${fpath}?t=${Date.now()}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (res.status === 404) { if (optional) return null; throw new Error(`${fpath} not found`); }
@@ -964,6 +990,60 @@ function _warningSeverity(e) {
 // buy-side read for context, not a sell recommendation.
 const _MD_EXHAUSTED_RSI = 75; // fixed display threshold, see comment above
 
+// ── SIGNAL cell color gradients ─────────────────────────────────────────
+// Previously every row in a category got the exact same flat var(--bull)/
+// var(--bear)/var(--warn,orange) — a "🚀 EARLY SPIKE (95)" and a "🚀 EARLY
+// SPIKE (18)" looked identical even though the number next to them says
+// they're nowhere near the same conviction. These two ramps fix that by
+// deriving the actual color from the same strength/severity numbers already
+// shown in the label (and already used for sort order in _MD_SORT_ACCESSORS
+// above), so color and label always agree instead of being two independent
+// sources of truth.
+//
+//   Buy tier (BUY/THIN/EARLY SPIKE/BREAKOUT/REVERSAL): dim green -> full
+//   --bull, scaled by _spikeStrength(e).
+//
+//   Warning tier: one continuous yellow -> red -> deep-red ramp. CHASING
+//   occupies yellow->red, scaled by buyIntel.penalty. FALLING KNIFE /
+//   EXHAUSTED sit past pure red into a fixed deep-red zone — categorically
+//   worse than any CHASING penalty, not just a bigger number on the same
+//   scale, so they get their own segment rather than extending CHASING's.
+function _hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function _lerpColor(hexA, hexB, t) {
+  t = Math.max(0, Math.min(1, t));
+  const a = _hexToRgb(hexA), b = _hexToRgb(hexB);
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+}
+
+const _MD_GREEN_DIM  = '#3a5048'; // low-conviction buy — muted, not pure gray
+const _MD_GREEN_FULL = '#00e5a0'; // --bull
+const _MD_YELLOW     = '#f5c842'; // --gold — mild CHASING
+const _MD_RED        = '#ff4560'; // --bear — heavy CHASING
+const _MD_DEEP_RED   = '#7a0d24'; // FALLING KNIFE / EXHAUSTED end
+
+// _spikeStrength tops out ~105 but real "strong" rows land ~50-85, so cap
+// the ramp at 90 rather than letting it cluster near the top unused.
+function _mdBuyGradient(e) {
+  return _lerpColor(_MD_GREEN_DIM, _MD_GREEN_FULL, _spikeStrength(e) / 90);
+}
+// buyIntel.penalty is "0-11ish" per _warningSeverity's own comment; 8 is a
+// realistic ceiling for the ramp (higher is rare in practice).
+function _mdChasingGradient(penalty) {
+  return _lerpColor(_MD_YELLOW, _MD_RED, (penalty - 1) / 7);
+}
+// knifePenalty is 1 or 2 (see _warningSeverity) -> maps directly to the
+// red->deep-red segment's two ends.
+function _mdKnifeGradient(knifePenalty) {
+  return _lerpColor(_MD_RED, _MD_DEEP_RED, knifePenalty - 1);
+}
+// EXHAUSTED severity is the RSI itself, ~75-100 (_MD_EXHAUSTED_RSI..100).
+function _mdExhaustedGradient(r15) {
+  return _lerpColor(_MD_RED, _MD_DEEP_RED, (r15 - _MD_EXHAUSTED_RSI) / 25);
+}
+
 function _classifySignal(e) {
   const bi = e.d?.buyIntel;
   const fresh = bi?.freshness;
@@ -974,29 +1054,29 @@ function _classifySignal(e) {
   const held = !!_marketDataState.positions?.[e.base];
   const pullbackPct = bi?.pullback?.pullbackPct;
 
-  if (fresh?.knifePenalty > 0) return { label: '🔪 FALLING KNIFE', color: 'var(--bear)' };
+  if (fresh?.knifePenalty > 0) return { label: '🔪 FALLING KNIFE', color: _mdKnifeGradient(fresh.knifePenalty) };
 
   if (held && r15 != null && r15 >= _MD_EXHAUSTED_RSI) {
-    return { label: '⚠️ EXHAUSTED', color: 'var(--warn, orange)' };
+    return { label: '⚠️ EXHAUSTED', color: _mdExhaustedGradient(r15) };
   }
 
-  if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: 'var(--warn, orange)' };
+  if (bi?.penalty > 0) return { label: `⚠ CHASING (${bi.penalty})`, color: _mdChasingGradient(bi.penalty) };
 
   if (r15 != null && r15 < 35 && (fresh?.consecutiveUp || 0) >= 1 && d.cvdTrend === 'up') {
-    return { label: `🔄 REVERSAL (${_spikeStrength(e)})`, color: 'var(--bull)' };
+    return { label: `🔄 REVERSAL (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
   if (pullbackPct != null && pullbackPct <= 0 && shock >= 1.3) {
-    return { label: `📈 BREAKOUT (${_spikeStrength(e)})`, color: 'var(--bull)' };
+    return { label: `📈 BREAKOUT (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
   if (fresh?.consecutiveUp >= 2 && fresh.penalty === 0 && shock >= 1.3 && orderFlowConfirms) {
-    return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: 'var(--bull)' };
+    return { label: `🚀 EARLY SPIKE (${_spikeStrength(e)})`, color: _mdBuyGradient(e) };
   }
 
   if ((e.conv ?? -Infinity) >= 6) {
     const weak = (e.whale?.score ?? 0) < 40 && shock < 1.1;
-    return weak ? { label: '🪦 THIN', color: 'var(--text-dim)' } : { label: '✅ BUY', color: 'var(--bull)' };
+    return weak ? { label: '🪦 THIN', color: _mdBuyGradient(e) } : { label: '✅ BUY', color: _mdBuyGradient(e) };
   }
 
   return { label: '—', color: 'var(--text-dim)' };
