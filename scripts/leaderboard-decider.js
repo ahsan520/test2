@@ -39,6 +39,7 @@ import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
 import { monitorPositions, reconcileTrackedLiveBalances } from './position-monitor.js';
 import { executeTradeCycle, adoptManualHoldings } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
+import { checkEntryQuality } from './entry-quality-check.js';
 
 const LB_MIN_SCORE       = parseInt(process.env.LB_MIN_SCORE       || '9');
 const LB_BULL_CONF_MIN   = parseInt(process.env.LB_BULL_CONF_MIN   || '5');
@@ -648,126 +649,95 @@ async function main() {
       }
     }
 
-    // BTC market-regime gate (Phase 2 — Alpha Exception) — only relevant
-    // when Layer 6 in market-guard.js actually blocked THIS cycle
-    // (guard.btcRegimeBlocked). A candidate can still buy despite BTC
-    // bearishness if it independently clears every required condition
-    // (whale/volume/CVD/OI/EMA/bias/score/bullConf — see
-    // checkBtcAlphaException()). This is deliberately evaluated per
-    // candidate, not once globally, since "does THIS coin show real
-    // relative strength" is a per-symbol question.
+    // ══════════════════════════════════════════════════════════════════════
+    // ENTRY QUALITY CHECK — per "Leaderboard Decider / Buy Alert Improvement
+    // Notes v2": FETCH → Market State → WATCH/EARLY SETUP → 5m BREAKOUT
+    // detected → Entry Quality Check → PASS? YES → BUY, NO → WAIT.
     //
-    // EXHAUSTED_BULL (guard.btcRegimeName) is a hard reject with NO Alpha
-    // Exception route — per the Market Intelligence Enhancement Proposal
-    // v2 (Scenario 2), a candidate is blocked here even with high Relative
-    // Strength, since the concern is the market's own topping risk, not
-    // this coin's individual quality. Only a BEAR-labeled block
-    // (guard.btcRegimeAllowsAlpha) gets evaluated for the exception.
-    if (guard.btcRegimeBlocked && entry.assetType === 'crypto') {
-      if (!guard.btcRegimeAllowsAlpha) {
-        console.log(`  🛡  ${pair} — BTC regime block (${guard.btcRegimeName || 'unknown'}) — no Alpha Exception available for this regime`);
-        continue;
-      }
-      const alpha = checkBtcAlphaException({ ...entry, d: entry.d, conv: evald.conv });
-      if (!alpha.allowed) {
-        console.log(`  🛡  ${pair} — BTC regime block, no Alpha Exception (failed: ${alpha.failedChecks.join(', ')})`);
-        continue;
-      }
-      const rs = calcRelativeStrength(entry, market.global || {});
-      console.log(`  ✅  ${pair} — Alpha Exception passed (${alpha.passedChecks.join(', ')})${rs.rs !== null ? ` — RS vs BTC: ${rs.rs > 0 ? '+' : ''}${rs.rs}%` : ''}`);
-    }
-
-    // Fear & Greed divergence gate — only active when F&G ≤ FEAR_BLOCK_THRESHOLD
-    // (fearRegime flag set by runAllBuyGuards above).
-    // If BTC is dropping and this symbol is ALSO dropping → block it.
-    // If this symbol is UP while BTC is down → real relative strength → allow.
-    // This is how IMX +4.29% would have passed this morning while BTC was red.
-    if (guard.fearRegime && entry.assetType === 'crypto') {
-      const symChg = parseFloat(entry.d?.chg ?? entry.chg ?? 0);
-      if (!isDivergingFromBtc(symChg, guard.btcChg)) {
-        console.log(`  🛡  ${pair} — Extreme Fear + no BTC divergence (symChg:${symChg}% btcChg:${guard.btcChg}%) — skipped`);
-        continue;
-      }
-      console.log(`  ✅  ${pair} — Extreme Fear but diverging +${symChg}% vs BTC ${guard.btcChg}% — allowing at ${guard.sizeMult * 100}% size`);
-    }
-
-    // ── Pre-spike trigger gate ──
-    // Per the "Pre-Spike Detection, Trigger Confirmation" dev-team note:
-    // Candidate/Setup ≠ BUY. Everything above (score/history/persistence/
-    // BTC regime/Alpha Exception/F&G divergence) qualifies a CANDIDATE.
-    // This is the last gate before a candidate becomes a live buy alert —
-    // require the short-timeframe trigger (calcSpikeTrigger, computed once
-    // in scoreSymbol/market-fetcher.js and persisted as entry.triggerStatus)
-    // to have actually confirmed a BREAKOUT. A FAILED trigger (the ZEC-509
-    // pattern: broke the level on 5m then reversed) hard-blocks regardless
-    // of score, whale, or CVD — those inputs support a reversal hypothesis,
-    // they don't get to override an active failed-breakout signal.
+    // Architectural rule from that doc: a strong Grade A signal does NOT
+    // directly authorize a buy — grade (calcGrade) is never consulted here.
+    // Score/history/persistence/Market-Intelligence gates above this point
+    // qualify a CANDIDATE; everything below decides whether THIS entry, right
+    // now, is still actionable. Only applies to crypto — stocks have no 5m
+    // trigger/order-book layer to evaluate.
     //
-    // CAP BUY is the one deliberate exception, consistent with it already
-    // bypassing the bull-confirmation gate below: a CAP BUY is itself an
-    // extreme-shock event (see calcCapBuy) where "wait for a 5m breakout
-    // reclaim" doesn't apply the same way — the shock IS the trigger.
-    //
-    // entry.triggerStatus == null (5m history not yet accumulated, or the
-    // trigger check is disabled via BUY_ENABLE_SPIKE_TRIGGER=false) does
-    // NOT block — same backward-compatible fallback as signal-evaluator.js.
+    // CAP BUY is the one deliberate exemption throughout (breakoutDistance,
+    // impulseExhaustion) — it's itself an extreme-shock event (calcCapBuy)
+    // where "wait for a clean breakout" doesn't apply — the shock IS the
+    // trigger. See entry-quality-check.js for the full per-check reasoning.
     const isCapBuyForTrigger = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
-    // RETEST exception: signal-evaluator.js classifies a RETEST entryState
-    // (pullback 0-1% off the trigger level) with a TRIGGERING trigger as a
-    // legitimate EARLY BUY — the setup is confirmed and price is sitting at
-    // the retest, it just hasn't printed the final BREAKOUT candle yet.
-    // Previously this blanket gate required BREAKOUT for every candidate
-    // regardless of entryState, so a RETEST+TRIGGERING candidate was killed
-    // here before it ever reached the entryState gate below — even though
-    // that gate (and the GUI SIGNAL column) treats it as buy-eligible.
-    // HIGH SHOCK still requires a fully confirmed BREAKOUT (unchanged,
-    // enforced below) — this exception is deliberately RETEST-only.
-    const retestTriggerOk = entry.entryState === 'RETEST' &&
-      (entry.triggerStatus === 'BREAKOUT' || entry.triggerStatus === 'TRIGGERING');
-    if (entry.assetType === 'crypto' && !isCapBuyForTrigger) {
-      if (entry.triggerStatus === 'FAILED') {
-        console.log(`  🔻  ${pair} — trigger FAILED (breakout reclaimed then lost) — skipping regardless of score`);
-        continue;
-      }
-      if (entry.triggerStatus != null && entry.triggerStatus !== 'BREAKOUT' && !retestTriggerOk) {
+
+    if (entry.assetType === 'crypto') {
+      // ── "5m BREAKOUT detected" — still WATCH/EARLY SETUP until then ──
+      // A candidate whose short-timeframe trigger (calcSpikeTrigger,
+      // buy-intelligence.js) hasn't confirmed a breakout yet is a real
+      // setup, not yet a BUY — send it back to WAIT rather than into the
+      // Entry Quality Check (which only judges an entry that's already
+      // happening). RETEST exception: a RETEST entryState (pullback 0-1%
+      // off the trigger level) with a TRIGGERING trigger is buy-eligible
+      // even without the final BREAKOUT candle — setup confirmed, price
+      // sitting at the retest. entry.triggerStatus == null (insufficient
+      // 5m history, or BUY_ENABLE_SPIKE_TRIGGER=false) does NOT block —
+      // same backward-compatible fallback as signal-evaluator.js. FAILED
+      // is handled inside the Entry Quality Check itself (FAILED_BREAKOUT).
+      const retestTriggerOk = entry.entryState === 'RETEST' &&
+        (entry.triggerStatus === 'BREAKOUT' || entry.triggerStatus === 'TRIGGERING');
+      if (!isCapBuyForTrigger && entry.triggerStatus != null &&
+          entry.triggerStatus !== 'BREAKOUT' && entry.triggerStatus !== 'FAILED' && !retestTriggerOk) {
         console.log(`  ⏳  ${pair} — trigger not confirmed yet (${entry.triggerStatus}, score ${entry.triggerScore ?? '—'}) — setup qualifies, waiting for 5m breakout confirmation`);
         continue;
       }
       if (retestTriggerOk && entry.triggerStatus === 'TRIGGERING') {
         console.log(`  ✅  ${pair} — entryState=RETEST with TRIGGERING trigger (score ${entry.triggerScore ?? '—'}) — allowed via RETEST exception`);
       }
-    }
 
-    // ── Entry-state gate — don't buy into an already-extended move ──
-    // The Decider's own candidate scoring above (conv/whale/bull4h/history)
-    // is entirely independent of buy-intelligence.js's entryState — nothing
-    // upstream of this point ever looks at it. That's the actual mechanism
-    // behind "buying on exhaust/chasing and ending up with a loss": a
-    // candidate can score well on conv/whale/history while ALSO being
-    // CHASING (already extended — buyIntelPenalty > 0) or HIGH SHOCK
-    // (knife penalty active or shock ≥2.5), and nothing here stopped it.
-    // Mirrors signal-evaluator.js's entryOkForBuy exactly, since the
-    // Decider doesn't otherwise consult SIGNAL/entryState at all:
-    //   - CHASING always blocks, regardless of trigger. Trigger
-    //     confirmation means the move is real, not that you're early to
-    //     it — an already-overextended RSI plus a confirmed breakout is
-    //     the textbook blow-off/exhaustion pattern, the same overextension
-    //     concern BUY_MAX_R15_OVEREXTENDED exists to catch elsewhere.
-    //   - HIGH SHOCK is allowed through ONLY when triggerStatus is fully
-    //     BREAKOUT (not merely TRIGGERING, which means volume/CVD/BTC
-    //     confirmation is still missing — the riskiest pairing, not a
-    //     safer one). A shock read with a fully confirmed breakout is
-    //     coherent: the shock IS the breakout.
-    // CAP BUY is exempt for the same reason as the trigger/bullConf gates:
-    // it's an extreme-shock event by definition, "already moving fast" is
-    // the whole premise, not a disqualifier.
-    if (!isCapBuyForTrigger) {
-      if (entry.entryState === 'CHASING') {
-        console.log(`  🏃  ${pair} — entryState=CHASING — already extended, skipping to avoid buying the exhaustion`);
-        continue;
+      // ── BTC condition (row 8 of the Entry Quality Check) ──
+      // Precomputed here since it needs guard/market context the standalone
+      // checkEntryQuality() module deliberately doesn't have (kept in
+      // market-guard.js, single source of truth). Combines Layer 6's BTC
+      // regime block (with per-candidate Alpha Exception — EXHAUSTED_BULL
+      // has no exception route, per the Market Intelligence Enhancement
+      // Proposal v2 Scenario 2; only a BEAR-labeled block gets evaluated)
+      // and the Fear & Greed divergence gate (BTC dropping + this symbol
+      // also dropping → block; this symbol UP while BTC is down → real
+      // relative strength → allow, e.g. IMX +4.29% while BTC was red).
+      let btcCheck = { pass: true, reason: null };
+      if (guard.btcRegimeBlocked) {
+        if (!guard.btcRegimeAllowsAlpha) {
+          btcCheck = { pass: false, reason: `BTC regime block (${guard.btcRegimeName || 'unknown'}) — no Alpha Exception available for this regime` };
+        } else {
+          const alpha = checkBtcAlphaException({ ...entry, d: entry.d, conv: evald.conv });
+          if (!alpha.allowed) {
+            btcCheck = { pass: false, reason: `BTC regime block, no Alpha Exception (failed: ${alpha.failedChecks.join(', ')})` };
+          } else {
+            const rs = calcRelativeStrength(entry, market.global || {});
+            console.log(`  ✅  ${pair} — Alpha Exception passed (${alpha.passedChecks.join(', ')})${rs.rs !== null ? ` — RS vs BTC: ${rs.rs > 0 ? '+' : ''}${rs.rs}%` : ''}`);
+          }
+        }
       }
-      if (entry.entryState === 'HIGH SHOCK' && entry.triggerStatus !== 'BREAKOUT') {
-        console.log(`  🏃  ${pair} — entryState=HIGH SHOCK without a confirmed BREAKOUT (trigger=${entry.triggerStatus ?? 'n/a'}) — skipping`);
+      if (btcCheck.pass && guard.fearRegime) {
+        const symChg = parseFloat(entry.d?.chg ?? entry.chg ?? 0);
+        if (!isDivergingFromBtc(symChg, guard.btcChg)) {
+          btcCheck = { pass: false, reason: `Extreme Fear + no BTC divergence (symChg:${symChg}% btcChg:${guard.btcChg}%)` };
+        } else {
+          console.log(`  ✅  ${pair} — Extreme Fear but diverging +${symChg}% vs BTC ${guard.btcChg}% — allowing at ${guard.sizeMult * 100}% size`);
+        }
+      }
+
+      // ── Run the 8-check Entry Quality Check (entry-quality-check.js) ──
+      // breakoutDistance / triggerAge / impulseExhaustion / bpp / cvd /
+      // volumeFollowThrough / failedBreakout / btcCondition. ANY failure
+      // blocks the buy with an explicit code (ENTRY_EXTENDED, TRIGGER_STALE,
+      // IMPULSE_EXHAUSTED, BPP_FADING, CVD_WEAK, VOLUME_THIN,
+      // FAILED_BREAKOUT, BTC_BLOCK) regardless of how strong conv/whale/CVD
+      // look elsewhere — mirrors the FAILED-trigger reasoning that already
+      // existed here: those inputs support a reversal hypothesis, they
+      // don't get to override an active entry-quality block.
+      const eq = checkEntryQuality({ entry, pair, alertState, isCapBuy: isCapBuyForTrigger, btcCheck });
+      if (!eq.pass) {
+        const summary = eq.blockers.map(b => `${b.code}: ${b.reason}`).join(' · ');
+        console.log(`  🛑  ${pair} — Entry Quality Check FAILED — ${summary}`);
+        logAudit('entry_quality_blocked', { pair, blockers: eq.blockers.map(b => b.code) });
         continue;
       }
     }
