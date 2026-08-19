@@ -723,6 +723,25 @@ async function main() {
       }
     }
 
+    // ── Entry-state gate — don't buy into an already-extended move ──
+    // The Decider's own candidate scoring above (conv/whale/bull4h/history)
+    // is entirely independent of buy-intelligence.js's entryState — nothing
+    // upstream of this point ever looks at it. That's the actual mechanism
+    // behind "buying on exhaust/chasing and ending up with a loss": a
+    // candidate can score well on conv/whale/history while ALSO being
+    // CHASING (already extended — buyIntelPenalty > 0) or HIGH SHOCK
+    // (knife penalty active or shock ≥2.5), and nothing here stopped it.
+    // signal-evaluator.js's BUY tier already excludes these two states —
+    // this mirrors that exact same check for the actual execution path,
+    // since the Decider doesn't otherwise consult SIGNAL/entryState at all.
+    // CAP BUY is exempt for the same reason as the trigger/bullConf gates:
+    // it's an extreme-shock event by definition, "already moving fast" is
+    // the whole premise, not a disqualifier.
+    if (!isCapBuyForTrigger && (entry.entryState === 'CHASING' || entry.entryState === 'HIGH SHOCK')) {
+      console.log(`  🏃  ${pair} — entryState=${entry.entryState} — already extended, skipping to avoid buying the exhaustion`);
+      continue;
+    }
+
     // CAP BUY bypasses bull confirmation gate
     const isCapBuy = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
     if (!isCapBuy && (entry.bullConf ?? 0) < LB_BULL_CONF_MIN) {

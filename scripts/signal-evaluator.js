@@ -127,10 +127,19 @@ export function classifySignal(entry) {
   // still SETUP/TRIGGERING (setup confirmed, breakout not yet confirmed) —
   // this is the doc's PRE-SPIKE WATCH state made visible without adding a
   // new SIGNAL value every consumer has to learn.
+  //
+  // Same entry-state disqualifier as BUY: CHASING/HIGH SHOCK block this
+  // path too. Previously EARLY BUY had no entryState check at all, so a
+  // candidate already extended (buyIntelPenalty > 0) or in active knife/
+  // shock territory could still be labeled EARLY BUY and pass
+  // isBuyEligible() into a live Telegram alert — exactly the "buying on
+  // exhaust/chasing" pattern that causes losses. If the structure still
+  // qualifies but entry timing doesn't, it now falls through to WATCH
+  // instead, which is a truthful label: worth watching, not worth buying.
   if (
     isBull4h(bias4h) && isLeanBullDaily(biasDay) &&
     bullCall >= SIG_BULLCALL_EARLY_MIN && (conv ?? 0) >= SIG_CONV_EARLY_MIN &&
-    !isSevereBear(bias4h) && !isSevereBear(biasDay) && !triggerBlocksBuy
+    !isSevereBear(bias4h) && !isSevereBear(biasDay) && !triggerBlocksBuy && entryOkForBuy
   ) {
     return { signal: 'EARLY BUY', entryState, reasons: ['bull 4H, lean bull daily', `bullCall=${bullCall}`, `conv=${conv}`, `trigger=${triggerStatus ?? 'n/a'}`] };
   }
