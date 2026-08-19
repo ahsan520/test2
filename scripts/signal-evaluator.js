@@ -110,7 +110,23 @@ export function classifySignal(entry) {
   // trigger === null (evaluator disabled, or not enough 15m history yet)
   // does NOT block BUY — it falls back to the pre-trigger-layer behavior so
   // this stays backward-compatible until 5m data has actually accumulated.
-  const entryOkForBuy = entryState !== 'CHASING' && entryState !== 'HIGH SHOCK';
+  //
+  // CHASING always blocks (buyIntelPenalty > 0 — already-overextended
+  // RSI/candle-chase). A confirmed BREAKOUT does NOT override this: trigger
+  // confirmation tells you the move is real, not that you're early to it —
+  // an already-stretched RSI plus a "real" breakout is the textbook
+  // blow-off pattern (confirmed on the tape, still the exhaustion leg).
+  // This is deliberately the same overextension concern
+  // BUY_MAX_R15_OVEREXTENDED exists to catch, just via a different signal.
+  //
+  // HIGH SHOCK is allowed through, but ONLY when the trigger has fully
+  // confirmed BREAKOUT — not merely TRIGGERING, which by definition means
+  // one of volume/CVD/BTC confirmation is still missing (pairing an
+  // already-volatile/knife-prone coin with an UNCONFIRMED trigger is the
+  // riskiest combination on the board, not a safer one). A HIGH SHOCK read
+  // with a fully confirmed breakout is a coherent story instead — the
+  // shock IS the breakout.
+  const entryOkForBuy = entryState !== 'CHASING' && (entryState !== 'HIGH SHOCK' || triggerStatus === 'BREAKOUT');
   const triggerBlocksBuy   = triggerStatus === 'FAILED';
   const triggerConfirmsBuy = trigger == null || triggerStatus === 'BREAKOUT';
   if (
@@ -128,14 +144,16 @@ export function classifySignal(entry) {
   // this is the doc's PRE-SPIKE WATCH state made visible without adding a
   // new SIGNAL value every consumer has to learn.
   //
-  // Same entry-state disqualifier as BUY: CHASING/HIGH SHOCK block this
-  // path too. Previously EARLY BUY had no entryState check at all, so a
+  // Same entry-state gating as BUY (entryOkForBuy, defined above): CHASING
+  // always blocks; HIGH SHOCK only passes if triggerStatus is fully
+  // BREAKOUT. Previously EARLY BUY had no entryState check at all, so a
   // candidate already extended (buyIntelPenalty > 0) or in active knife/
-  // shock territory could still be labeled EARLY BUY and pass
-  // isBuyEligible() into a live Telegram alert — exactly the "buying on
-  // exhaust/chasing" pattern that causes losses. If the structure still
-  // qualifies but entry timing doesn't, it now falls through to WATCH
-  // instead, which is a truthful label: worth watching, not worth buying.
+  // shock territory — even with an unconfirmed trigger — could still be
+  // labeled EARLY BUY and pass isBuyEligible() into a live Telegram alert —
+  // exactly the "buying on exhaust/chasing" pattern that causes losses. If
+  // the structure still qualifies but entry timing doesn't, it now falls
+  // through to WATCH instead, which is a truthful label: worth watching,
+  // not worth buying.
   if (
     isBull4h(bias4h) && isLeanBullDaily(biasDay) &&
     bullCall >= SIG_BULLCALL_EARLY_MIN && (conv ?? 0) >= SIG_CONV_EARLY_MIN &&

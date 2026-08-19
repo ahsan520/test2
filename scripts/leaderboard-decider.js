@@ -731,15 +731,30 @@ async function main() {
     // candidate can score well on conv/whale/history while ALSO being
     // CHASING (already extended — buyIntelPenalty > 0) or HIGH SHOCK
     // (knife penalty active or shock ≥2.5), and nothing here stopped it.
-    // signal-evaluator.js's BUY tier already excludes these two states —
-    // this mirrors that exact same check for the actual execution path,
-    // since the Decider doesn't otherwise consult SIGNAL/entryState at all.
+    // Mirrors signal-evaluator.js's entryOkForBuy exactly, since the
+    // Decider doesn't otherwise consult SIGNAL/entryState at all:
+    //   - CHASING always blocks, regardless of trigger. Trigger
+    //     confirmation means the move is real, not that you're early to
+    //     it — an already-overextended RSI plus a confirmed breakout is
+    //     the textbook blow-off/exhaustion pattern, the same overextension
+    //     concern BUY_MAX_R15_OVEREXTENDED exists to catch elsewhere.
+    //   - HIGH SHOCK is allowed through ONLY when triggerStatus is fully
+    //     BREAKOUT (not merely TRIGGERING, which means volume/CVD/BTC
+    //     confirmation is still missing — the riskiest pairing, not a
+    //     safer one). A shock read with a fully confirmed breakout is
+    //     coherent: the shock IS the breakout.
     // CAP BUY is exempt for the same reason as the trigger/bullConf gates:
     // it's an extreme-shock event by definition, "already moving fast" is
     // the whole premise, not a disqualifier.
-    if (!isCapBuyForTrigger && (entry.entryState === 'CHASING' || entry.entryState === 'HIGH SHOCK')) {
-      console.log(`  🏃  ${pair} — entryState=${entry.entryState} — already extended, skipping to avoid buying the exhaustion`);
-      continue;
+    if (!isCapBuyForTrigger) {
+      if (entry.entryState === 'CHASING') {
+        console.log(`  🏃  ${pair} — entryState=CHASING — already extended, skipping to avoid buying the exhaustion`);
+        continue;
+      }
+      if (entry.entryState === 'HIGH SHOCK' && entry.triggerStatus !== 'BREAKOUT') {
+        console.log(`  🏃  ${pair} — entryState=HIGH SHOCK without a confirmed BREAKOUT (trigger=${entry.triggerStatus ?? 'n/a'}) — skipping`);
+        continue;
+      }
     }
 
     // CAP BUY bypasses bull confirmation gate
