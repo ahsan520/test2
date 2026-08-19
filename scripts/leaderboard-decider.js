@@ -712,14 +712,29 @@ async function main() {
     // trigger check is disabled via BUY_ENABLE_SPIKE_TRIGGER=false) does
     // NOT block — same backward-compatible fallback as signal-evaluator.js.
     const isCapBuyForTrigger = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
+    // RETEST exception: signal-evaluator.js classifies a RETEST entryState
+    // (pullback 0-1% off the trigger level) with a TRIGGERING trigger as a
+    // legitimate EARLY BUY — the setup is confirmed and price is sitting at
+    // the retest, it just hasn't printed the final BREAKOUT candle yet.
+    // Previously this blanket gate required BREAKOUT for every candidate
+    // regardless of entryState, so a RETEST+TRIGGERING candidate was killed
+    // here before it ever reached the entryState gate below — even though
+    // that gate (and the GUI SIGNAL column) treats it as buy-eligible.
+    // HIGH SHOCK still requires a fully confirmed BREAKOUT (unchanged,
+    // enforced below) — this exception is deliberately RETEST-only.
+    const retestTriggerOk = entry.entryState === 'RETEST' &&
+      (entry.triggerStatus === 'BREAKOUT' || entry.triggerStatus === 'TRIGGERING');
     if (entry.assetType === 'crypto' && !isCapBuyForTrigger) {
       if (entry.triggerStatus === 'FAILED') {
         console.log(`  🔻  ${pair} — trigger FAILED (breakout reclaimed then lost) — skipping regardless of score`);
         continue;
       }
-      if (entry.triggerStatus != null && entry.triggerStatus !== 'BREAKOUT') {
+      if (entry.triggerStatus != null && entry.triggerStatus !== 'BREAKOUT' && !retestTriggerOk) {
         console.log(`  ⏳  ${pair} — trigger not confirmed yet (${entry.triggerStatus}, score ${entry.triggerScore ?? '—'}) — setup qualifies, waiting for 5m breakout confirmation`);
         continue;
+      }
+      if (retestTriggerOk && entry.triggerStatus === 'TRIGGERING') {
+        console.log(`  ✅  ${pair} — entryState=RETEST with TRIGGERING trigger (score ${entry.triggerScore ?? '—'}) — allowed via RETEST exception`);
       }
     }
 
