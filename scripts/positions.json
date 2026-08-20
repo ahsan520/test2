@@ -169,7 +169,7 @@
     "spikeScore": 0.4905180526095687,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "tp1_hit",
     "source": "manual_adopted",
     "scoreSource": "peak",
     "recommended": false,
@@ -181,7 +181,10 @@
       "fillPrice": 1.2257018684470151,
       "buyOrderId": "MANUAL_ADOPTED_1787256171436",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "closedAt": 1787261868563,
+      "exitFillPrice": 1.2661,
+      "dustIgnored": true
     },
     "lastPI": {
       "action": "HOLD",
@@ -206,7 +209,9 @@
       "tier": "A+",
       "giveBack": 0.75,
       "evaluatedAt": 1787261577013
-    }
+    },
+    "exitPrice": 1.2661,
+    "statusChangedAt": 1787261868135
   },
   "BINANCE:RENDERUSDT": {
     "sym": "BINANCE:RENDERUSDT",
@@ -271,20 +276,20 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 6,
-      "confidenceDecay": 0,
+      "fallingKnifeScore": 0,
+      "thesisDrop": 9,
+      "confidenceDecay": 13,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787261577013
+      "evaluatedAt": 1787261868135
     },
     "highestPnLSeen": 0.14,
-    "lastR15": 49.7,
+    "lastR15": 48.5,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.4% floor — not evaluated yet",
@@ -292,7 +297,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787261577013
+      "evaluatedAt": 1787261868135
     }
   }
 }
