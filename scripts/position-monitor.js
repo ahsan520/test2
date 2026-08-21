@@ -535,6 +535,36 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       //   - holding to T2 (no exitPrice, liveOrder still open) → do NOT evict
       //   - sold at T1 (exitPrice set, liveOrder closed)       → evict normally
       if (pos.status === 'tp1_hit' && !pos.exitPrice) continue; // still holding
+
+      // A terminal-but-unsold live position: status was stamped terminal
+      // (e.g. by alert-runner.js's watchlist-style stop check, which never
+      // calls closeLiveOrder()) but the liveOrder never actually got a
+      // real MEXC sell. Evicting this on schedule would silently abandon a
+      // real exchange balance with zero further monitoring — exactly the
+      // "phantom position" bug this eviction path was already fixed for
+      // once before. Give it one real close attempt here before either
+      // evicting (on success/no-balance) or leaving it tracked for next
+      // cycle to retry (on failure).
+      const isUnsoldLive = pos.liveOrder?.mode === 'live' && !pos.liveOrder?.closedAt;
+      if (isUnsoldLive) {
+        const mKey  = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+        const mData = marketSymbols[mKey];
+        const price = mData?.d ? parseFloat(mData.d.p || 0) : 0;
+        if (price) pos.exitPrice = price;
+        console.log(`  ⚠️  ${pos.base} (${pos.status}) terminal but liveOrder still open — attempting real close before eviction`);
+        const closeResult = await closeLiveOrder(pos, `${pos.status} (terminal, unsold)`, telegramAlerts, effectiveTradeMode);
+        if (!closeResult.closed) {
+          // Sell didn't go through (zero balance / API error) — closeLiveOrder
+          // already alerted. Leave it tracked (skip eviction this cycle) so
+          // the next cycle retries rather than abandoning the balance.
+          delete pos.exitPrice;
+          continue;
+        }
+        pos.statusChangedAt = now; // restart grace period from the real close
+        changed = true;
+        continue; // let the normal eviction window run from here next cycle
+      }
+
       const changedAt = pos.statusChangedAt || pos.alertedAt || 0;
       if (now - changedAt >= termDelay) {
         console.log(`  🗑  ${pos.base} (${pos.status}) past eviction window → removed`);

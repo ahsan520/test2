@@ -498,10 +498,23 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
 
     const alreadyTracked = Object.values(positions).some(p =>
       p.base === base && p.assetType === 'crypto' && !p.liveOrder?.closedAt
-      && !['stopped', 'tp2_hit'].includes(p.status)
-      && !(p.status === 'tp1_hit' && p.exitPrice)
+      && (
+        // Non-terminal tracking (normal case): still watching/tp1/exiting.
+        (!['stopped', 'tp2_hit'].includes(p.status) && !(p.status === 'tp1_hit' && p.exitPrice))
+        // Terminal-but-unsold: status says 'stopped'/'tp2_hit' but the
+        // liveOrder was never actually closed (no closedAt) — e.g.
+        // alert-runner.js's watchlist-style stop check stamped the status
+        // without ever calling closeLiveOrder(). Treating this as "already
+        // tracked" prevents re-adopting the same still-real MEXC balance as
+        // a brand-new position every cycle (which reset alertedAt/stop and
+        // caused an infinite fake-stop/re-adopt loop, spamming STOP HIT
+        // alerts every ~5min while the real coin sat unsold). Leaving it
+        // tracked here means monitorPositions()/closeLiveOrder() gets the
+        // next real chance to actually sell it instead.
+        || (['stopped', 'tp2_hit'].includes(p.status) && p.liveOrder?.mode === 'live' && !p.liveOrder?.closedAt)
+      )
     );
-    if (alreadyTracked) continue; // bot-bought or already adopted — leave it
+    if (alreadyTracked) continue; // bot-bought, already adopted, or stopped-but-unsold — leave it
 
     const entry = (market.symbols || {})[bareSym];
     if (!entry || entry.assetType !== 'crypto') {

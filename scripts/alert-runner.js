@@ -921,6 +921,21 @@ async function checkPositions(state) {
   for (const [sym, pos] of entries) {
     if (pos.status === 'stopped' || pos.status === 'tp2_hit') continue;
 
+    // ── Live positions are owned exclusively by position-monitor.js ──────
+    // monitorPositions() (called from leaderboard-decider.js, same
+    // decide-mode job, runs BEFORE this) is the only code path that calls
+    // closeLiveOrder() and places a real MEXC sell. This checker has no
+    // such call — it only sends a Telegram notice and stamps
+    // status='stopped'. For a live-order position that's a lie: it marks
+    // the position terminal (and, via adoptManualHoldings' alreadyTracked
+    // check excluding 'stopped', immediately eligible for re-adoption next
+    // cycle) without ever actually selling the real exchange balance —
+    // producing an infinite adopt → fake-stop → re-adopt loop that spams
+    // "STOP HIT" alerts every ~5min while the real position sits unsold.
+    // Skip live-held positions entirely here; monitorPositions() already
+    // covers their stop/T1/T2 with a real sell attached.
+    if (pos.liveOrder?.mode === 'live' && !pos.liveOrder?.closedAt) continue;
+
     const isBull    = pos.dir === 'bull' || pos.dir !== 'bear';
     if (!isBull) continue;
 
