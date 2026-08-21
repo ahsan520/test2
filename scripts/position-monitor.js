@@ -690,7 +690,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
         changed = true;
 
         closedOutcomes.push({
-          base: pos.base, pair: pos.base + (pos.assetType === 'crypto' ? 'USDT' : ''),
+          base: pos.base,
+          entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (pos.assetType === 'crypto' ? 'USDT' : ''),
           outcome: 'stale_live_closed', score: pos.score, spikeScore: pos.spikeScore,
           pnlPct: parseFloat(pnlPct.toFixed(2)) || 0, closedAt: now,
         });
@@ -772,7 +773,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       changed = true;
       logAudit('stop_hit', { sym, price, stop, entry, pnlPct, closeReason: closeResult.reason });
       closedOutcomes.push({
-        base: pos.base, pair: pos.base + (isCrypto ? 'USDT' : ''),
+        base: pos.base,
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (isCrypto ? 'USDT' : ''),
         outcome: 'stopped', score: pos.score, spikeScore: pos.spikeScore,
         pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
       });
@@ -807,7 +809,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       changed = true;
       logAudit('tp2_hit', { sym, price, t2, entry, pnlPct, closeReason: closeResult.reason });
       closedOutcomes.push({
-        base: pos.base, pair: pos.base + (isCrypto ? 'USDT' : ''),
+        base: pos.base,
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (isCrypto ? 'USDT' : ''),
         outcome: 'tp2_hit', score: pos.score, spikeScore: pos.spikeScore,
         pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
       });
@@ -865,7 +868,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       changed             = true;
       logAudit('tp1_hit_sell', { sym, price, t1, liveConv, liveBullConf, pnlPct, closeReason: closeResult.reason });
       closedOutcomes.push({
-        base: pos.base, pair: pos.base + (isCrypto ? 'USDT' : ''),
+        base: pos.base,
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (isCrypto ? 'USDT' : ''),
         outcome: 'tp1_hit', score: pos.score, spikeScore: pos.spikeScore,
         pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
       });
@@ -941,7 +945,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
           pos.exitAlertedAt   = now;
           changed             = true;
           closedOutcomes.push({
-            base: pos.base, pair: pos.base + 'USDT',
+            base: pos.base,
+            entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + 'USDT',
             outcome: pi.action === 'EMERGENCY_EXIT' ? 'emergency_exit' : 'pi_exit',
             score: pos.score, spikeScore: pos.spikeScore,
             pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
@@ -981,7 +986,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
             if (!closeResult.closed) { delete pos.exitPrice; continue; }
             pos.status = 'exiting'; pos.statusChangedAt = now; pos.exitAlertedAt = now; changed = true;
             closedOutcomes.push({
-              base: pos.base, pair: pos.base + 'USDT', outcome: 'pi_exit',
+              base: pos.base,
+              entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + 'USDT', outcome: 'pi_exit',
               score: pos.score, spikeScore: pos.spikeScore, pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
             });
             continue;
@@ -1054,7 +1060,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
         changed              = true;
 
         closedOutcomes.push({
-          base: pos.base, pair: pos.base + (isCrypto ? 'USDT' : ''),
+          base: pos.base,
+          entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (isCrypto ? 'USDT' : ''),
           outcome: 'profit_protection', score: pos.score, spikeScore: pos.spikeScore,
           pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
         });
@@ -1140,7 +1147,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       changed             = true;
 
       closedOutcomes.push({
-        base: pos.base, pair: pos.base + (pos.assetType === 'crypto' ? 'USDT' : ''),
+        base: pos.base,
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null, pair: pos.base + (pos.assetType === 'crypto' ? 'USDT' : ''),
         outcome: 'exit_score', score: pos.score, spikeScore: pos.spikeScore,
         pnlPct: parseFloat(pnlPct) || 0, closedAt: now,
       });

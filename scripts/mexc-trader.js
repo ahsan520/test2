@@ -354,6 +354,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 
       closedOutcomes.push({
         base, pair: base + 'USDT',
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null,
         outcome: wasHoldingT1 ? 'rotation_t1_downgrade' : 'rotation', score: pos.score, spikeScore: pos.spikeScore,
         pnlPct, closedAt: Date.now(),
       });
@@ -753,11 +754,21 @@ async function executeAutoBuys({
     }
   }
 
-  const perPickUsd = effectiveExecStrategy === 'topN' && picks.length > 1
+  const basePerPickUsd = effectiveExecStrategy === 'topN' && picks.length > 1
     ? Math.floor((totalUsd / picks.length) * 100) / 100 // floor, not round — slices must never sum above totalUsd
     : totalUsd;
 
-  console.log(`  ⚡  Exec strategy: ${effectiveExecStrategy} (${effectiveSizeMode === 'percent' ? effectiveSizePct + '%' : '$' + effectiveUsdSize}) — ${picks.length} pick(s) @ $${perPickUsd} each`);
+  // ── Scout entries (leaderboard-decider.js: entry.scoutBuy) get sized
+  // down to BUY_SCOUT_SIZE_PCT of the normal slice ──
+  // These cleared the trigger gate at TRIGGERING rather than confirmed
+  // BREAKOUT — earlier/less confirmed than a normal buy, so the position
+  // size reflects that instead of committing full size to an unconfirmed
+  // setup. No automatic top-up to full size if it later confirms BREAKOUT
+  // (deliberately — that's a separate decision once scout-entry win-rate
+  // data exists in symbol-history.json to justify it).
+  const BUY_SCOUT_SIZE_PCT = parseFloat(process.env.BUY_SCOUT_SIZE_PCT || '30');
+
+  console.log(`  ⚡  Exec strategy: ${effectiveExecStrategy} (${effectiveSizeMode === 'percent' ? effectiveSizePct + '%' : '$' + effectiveUsdSize}) — ${picks.length} pick(s) @ $${basePerPickUsd} each`);
 
   if (!tradeState.tradingEnabled) {
     console.log(`  🚫  Auto-trade blocked — trading paused via Telegram /pause`);
@@ -768,6 +779,10 @@ async function executeAutoBuys({
   for (const { a: pick } of picks) {
     const pos    = positions[pick.sym];
     const symbol = pick.pair.replace(/[^A-Z]/g, '') + (pick.pair.includes('USDT') ? '' : 'USDT');
+    const isScout   = pick.entry?.scoutBuy === true;
+    const perPickUsd = isScout
+      ? parseFloat((basePerPickUsd * (BUY_SCOUT_SIZE_PCT / 100)).toFixed(2))
+      : basePerPickUsd;
 
     // Re-count AFTER each buy — topN must not exceed effectiveMaxLive
     // even if rotation just freed some slots at the start of this cycle.
@@ -798,7 +813,7 @@ async function executeAutoBuys({
     }
 
     if (effectiveTradeMode === 'paper') {
-      console.log(`  📝  PAPER BUY — ${symbol} $${perPickUsd} USDT`);
+      console.log(`  📝  PAPER BUY${isScout ? ' (SCOUT)' : ''} — ${symbol} $${perPickUsd} USDT`);
       pos.liveOrder = {
         mode: 'paper', buyAt: Date.now(), usdSize: perPickUsd,
         qty: perPickUsd / (pick.levels ? parseFloat(pick.levels.entry) : pick.price),
@@ -818,6 +833,17 @@ async function executeAutoBuys({
       // v15 design doc — capture the entry snapshot Position Intelligence
       // compares against every cycle for this position's whole lifetime.
       pos.entrySnapshot = buildEntrySnapshot(pick.entry || {}, marketState);
+      // Freeze the trigger/entry-timing state AT THE MOMENT OF BUY — these
+      // fields on `entry`/`d` get recomputed fresh every cycle, so without
+      // capturing them here they'd just reflect "whatever the last cycle
+      // before close happened to look like" by the time a position closes,
+      // not what actually justified the entry. Carried through to
+      // symbol-history.json on close (see closedOutcomes.push sites) so
+      // win-rate can be measured by entry timing (BREAKOUT vs TRIGGERING
+      // vs RETEST+TRIGGERING) instead of guessing whether buying earlier
+      // (before full breakout confirmation) is actually worth the risk.
+      pos.entryTriggerStatus = pick.entry?.triggerStatus ?? null;
+      pos.entryStateAtBuy    = pick.entry?.entryState ?? null;
       logAudit('mexc_paper_buy', { sym: symbol, usdSize: perPickUsd, fillPrice: pos.liveOrder.fillPrice });
       recordTradeOpen(pos, {
         mode: 'paper', orderId: pos.liveOrder.buyOrderId,
@@ -826,13 +852,14 @@ async function executeAutoBuys({
       await pushTradeLogToGitHub(loadTradeLog());
       if (effectiveSizeMode === 'percent') adjustPaperBalance(-perPickUsd);
       await sendTelegram(
-        `📝 *PAPER BUY* — ${pick.pair.replace('USDT','')} $${perPickUsd} USDT @ ~$${pos.liveOrder.fillPrice.toFixed(6)}\n` +
+        `📝 *PAPER BUY${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} $${perPickUsd} USDT @ ~$${pos.liveOrder.fillPrice.toFixed(6)}\n` +
         `  Strategy: ${effectiveExecStrategy === 'topN' ? `top${picks.length} split` : 'top 1'}\n` +
+        (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
         `  _Paper mode — no real order placed. Set TRADE\\_MODE=live to trade for real._`
       );
     } else {
       // Live mode — real MEXC market buy
-      console.log(`  ⚡  LIVE BUY — ${symbol} $${perPickUsd} USDT via MEXC...`);
+      console.log(`  ⚡  LIVE BUY${isScout ? ' (SCOUT)' : ''} — ${symbol} $${perPickUsd} USDT via MEXC...`);
       try {
         const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, symbol, perPickUsd);
         pos.liveOrder = {
@@ -855,6 +882,10 @@ async function executeAutoBuys({
         // v15 design doc — capture the entry snapshot Position Intelligence
         // compares against every cycle for this position's whole lifetime.
         pos.entrySnapshot = buildEntrySnapshot(pick.entry || {}, marketState);
+        // See the paper-buy branch above for why this is frozen here
+        // rather than read fresh at close time.
+        pos.entryTriggerStatus = pick.entry?.triggerStatus ?? null;
+        pos.entryStateAtBuy    = pick.entry?.entryState ?? null;
         logAudit('mexc_live_buy', { sym: symbol, usdSize: perPickUsd, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId, estimated: buy.estimated, entryPrice: pos.entryPrice, stop: pos.stop });
         recordTradeOpen(pos, {
           mode: 'live', orderId: buy.orderId,
@@ -865,10 +896,11 @@ async function executeAutoBuys({
         await pushTradeLogToGitHub(loadTradeLog());
 
         await sendTelegram(
-          `⚡ *LIVE BUY PLACED* — ${pick.pair.replace('USDT','')} — ${utc}\n` +
+          `⚡ *LIVE BUY PLACED${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} — ${utc}\n` +
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated — MEXC did not report a fill qty)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
           `  Size: $${perPickUsd} USDT  Order ID: \`${buy.orderId}\`\n` +
           (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length} split ($${effectiveUsdSize} ÷ ${picks.length})\n` : '') +
+          (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
           `  🛡 Watched by the 15-min software stop check.\n` +
           `  Stop/T2 exits will close this position automatically.\n` +
           (buy.estimated ? `  ⚠️ _MEXC didn't confirm a fill quantity yet — verify the actual holding on MEXC matches before trusting auto-sells._\n` : '') +

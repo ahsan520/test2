@@ -41,6 +41,26 @@ import { executeTradeCycle, adoptManualHoldings } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
 
+// ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
+// confirmation) — see the trigger-gate block below for the full rationale.
+// Off by default; each threshold is independently overridable via repo
+// Variables so this can be tuned/disabled without a code change.
+const BUY_SCOUT_ENABLE       = (process.env.BUY_SCOUT_ENABLE || 'false') === 'true';
+const BUY_SCOUT_SIZE_PCT     = parseFloat(process.env.BUY_SCOUT_SIZE_PCT || '30'); // % of normal per-pick size
+const BUY_SCOUT_MIN_BULLCONF = parseFloat(process.env.BUY_SCOUT_MIN_BULLCONF || '7'); // stricter than normal EARLY BUY bar — earlier entry, so demand more structural confirmation elsewhere
+const BUY_SCOUT_MIN_WHALE    = parseFloat(process.env.BUY_SCOUT_MIN_WHALE    || '60');
+
+// Extra structural bar for a scout entry, on top of everything already
+// required to reach this point in the candidate loop (LB_MIN_SCORE, 4H
+// persistence, Market Intelligence gate, entryOkForBuy's CHASING/HIGH
+// SHOCK exclusion via the caller). A scout buy is inherently less
+// confirmed than a normal BUY (one of volume/CVD/BTC is still missing at
+// TRIGGERING) — this asks for stronger whale/bullConf backing to
+// compensate, same logic as buy-intelligence.js's own quality floor.
+function entryOkForScout(entry) {
+  return (entry.bullConf || 0) >= BUY_SCOUT_MIN_BULLCONF && (entry.whale?.score || 0) >= BUY_SCOUT_MIN_WHALE;
+}
+
 const LB_MIN_SCORE       = parseInt(process.env.LB_MIN_SCORE       || '9');
 const LB_BULL_CONF_MIN   = parseInt(process.env.LB_BULL_CONF_MIN   || '5');
 const LB_COOLDOWN_MIN    = parseInt(process.env.LB_COOLDOWN_MIN    || '60');
@@ -682,13 +702,34 @@ async function main() {
       // is handled inside the Entry Quality Check itself (FAILED_BREAKOUT).
       const retestTriggerOk = entry.entryState === 'RETEST' &&
         (entry.triggerStatus === 'BREAKOUT' || entry.triggerStatus === 'TRIGGERING');
+
+      // ── Scout entry — opt-in, smaller-size buy at TRIGGERING ────────────
+      // Structurally-qualified candidate whose 5m trigger is TRIGGERING
+      // (setup confirmed, one of volume/CVD/BTC confirmation still
+      // missing) but entryState ISN'T RETEST (so the exception above
+      // doesn't already cover it). Off by default — BUY_SCOUT_ENABLE must
+      // be explicitly turned on. Unlike the RETEST exception (full size),
+      // this is deliberately reduced-size (executeAutoBuys reads
+      // entry.scoutBuy to size it at BUY_SCOUT_SIZE_PCT) since it's
+      // earlier/less confirmed than even the RETEST case. Purpose: capture
+      // some of the early move on a real breakout while capping the cost
+      // of a stall — measure via entryTriggerStatus/entryStateAtBuy on
+      // symbol-history.json before ever widening this further.
+      const scoutTriggerOk = BUY_SCOUT_ENABLE && !retestTriggerOk &&
+        entry.triggerStatus === 'TRIGGERING' && entryOkForScout(entry);
+      if (scoutTriggerOk) entry.scoutBuy = true;
+
       if (!isCapBuyForTrigger && entry.triggerStatus != null &&
-          entry.triggerStatus !== 'BREAKOUT' && entry.triggerStatus !== 'FAILED' && !retestTriggerOk) {
+          entry.triggerStatus !== 'BREAKOUT' && entry.triggerStatus !== 'FAILED' &&
+          !retestTriggerOk && !scoutTriggerOk) {
         console.log(`  ⏳  ${pair} — trigger not confirmed yet (${entry.triggerStatus}, score ${entry.triggerScore ?? '—'}) — setup qualifies, waiting for 5m breakout confirmation`);
         continue;
       }
       if (retestTriggerOk && entry.triggerStatus === 'TRIGGERING') {
         console.log(`  ✅  ${pair} — entryState=RETEST with TRIGGERING trigger (score ${entry.triggerScore ?? '—'}) — allowed via RETEST exception`);
+      }
+      if (scoutTriggerOk) {
+        console.log(`  🔎  ${pair} — TRIGGERING (score ${entry.triggerScore ?? '—'}), entryState=${entry.entryState} — allowed as reduced-size SCOUT buy (BUY_SCOUT_SIZE_PCT=${BUY_SCOUT_SIZE_PCT}%)`);
       }
 
       // ── BTC condition (row 8 of the Entry Quality Check) ──
