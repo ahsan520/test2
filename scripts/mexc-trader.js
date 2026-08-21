@@ -27,7 +27,7 @@ import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
-  loadTradeLog, recordTradeOpen, pushTradeLogToGitHub, hasOpenTradeLogEntry,
+  loadTradeLog, recordTradeOpen, recordTradeClose, pushTradeLogToGitHub, hasOpenTradeLogEntry,
   loadPaperBalance, adjustPaperBalance,
 } from './job-state.js';
 
@@ -556,6 +556,33 @@ export async function executeSTPriorityRotation({
 
       if (isLiveCrypto && !closeResult.closed) {
         delete pos.exitPrice;
+
+        // ── zero_balance is NOT a sell failure — it means there was
+        // nothing real to sell in the first place ──
+        // A tracked position whose real exchange balance already reads 0
+        // (sold manually outside the bot, or a prior partial close that
+        // didn't fully update tracking — same root cause
+        // monitorPositions' staleZeroBalanceStrikes guards against on the
+        // normal monitor cycle) must not block this buy. ST priority
+        // already treats "sell everything else" as unconditional, so
+        // there's no reason to wait out a multi-cycle strike counter here
+        // the way the normal path does — close the stale tracking entry
+        // immediately (recording it in the trade log so the Journal still
+        // shows it closed, not just vanishing) and continue to the BUY.
+        if (closeResult.reason === 'zero_balance') {
+          console.log(`  ℹ️  ST15 rotation — ${pos.base} tracked but exchange balance is 0 (stale entry) — closing tracking, NOT blocking the ${base} BUY`);
+          pos.status              = 'stopped';
+          pos.statusChangedAt     = Date.now();
+          pos.liveOrder.closedAt      = Date.now();
+          pos.liveOrder.exitFillPrice = pos.liveOrder.fillPrice; // real exit price unknown — not a bot-tracked sell
+          recordTradeClose(pos, `st15_priority_rotation_stale_zero_balance — ${event.id}`, { qty: pos.liveOrder.qty, fillPrice: pos.liveOrder.exitFillPrice });
+          await pushTradeLogToGitHub(loadTradeLog());
+          logAudit('st15_stale_position_cleared', { base: pos.base, eventId: event.id });
+          await sendTelegram(`🔍 *ST15 ROTATION — STALE POSITION CLOSED* — ${pos.base}: exchange balance already 0 (sold outside the bot) — closed tracking, no sell needed. Not blocking the ${base} buy.`);
+          changed = true;
+          continue; // does NOT set sellFailed — buy proceeds
+        }
+
         sellFailed = true;
         console.log(`  🛑  ST15 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}`);
         continue;
