@@ -425,6 +425,16 @@ jobs:
           BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
           BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.18' }}
           BTC_TRIGGER_MOMENTUM_FLOOR_PCT:  ${{ vars.BTC_TRIGGER_MOMENTUM_FLOOR_PCT || '-0.5' }}
+          # ── Scout entry (leaderboard-decider.js) — opt-in, reduced-size
+          # buy at TRIGGERING instead of waiting for full BREAKOUT
+          # confirmation. Off by default (BUY_SCOUT_ENABLE=false) — flip on
+          # once symbol-history.json has enough entryTriggerStatus/
+          # entryStateAtBuy rows to judge whether earlier entries are
+          # actually worth the extra false-breakout risk.
+          BUY_SCOUT_ENABLE:        ${{ vars.BUY_SCOUT_ENABLE || 'false' }}
+          BUY_SCOUT_SIZE_PCT:      ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
+          BUY_SCOUT_MIN_BULLCONF:  ${{ vars.BUY_SCOUT_MIN_BULLCONF || '7' }}
+          BUY_SCOUT_MIN_WHALE:     ${{ vars.BUY_SCOUT_MIN_WHALE || '60' }}
 
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
