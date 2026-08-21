@@ -27,7 +27,7 @@ import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
-  loadTradeLog, recordTradeOpen, pushTradeLogToGitHub,
+  loadTradeLog, recordTradeOpen, pushTradeLogToGitHub, hasOpenTradeLogEntry,
   loadPaperBalance, adjustPaperBalance,
 } from './job-state.js';
 
@@ -581,6 +581,22 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
     };
     logAudit('manual_position_adopted', { sym, base, qty: bal.free, entryPrice: adoptionPrice, priceSource, currentMarketPrice: entry.price, stop: levels.stop });
     changed = true;
+
+    // ── Dedupe guard — see hasOpenTradeLogEntry() in job-state.js ──
+    // positions.json (this cycle's local checkout) says this coin isn't
+    // tracked, which is what triggered adoption above — but the PERMANENT
+    // trade log may disagree if a previous cycle's positions.json push lost
+    // a race and got silently dropped (see putGitHubContent's retry, and
+    // the note on decide's ~5min cadence overlapping with the Cloudflare
+    // Worker trigger). If the trade log already shows this exact sym+mode
+    // as 'open', this is that same still-open holding being re-seen, not a
+    // new buy — refresh the tracking record (already done above, keeps
+    // stop/T1/T2 current) but don't log a second row or re-alert.
+    if (hasOpenTradeLogEntry(sym, 'live')) {
+      console.log(`  ♻️  ${base} — already has an OPEN trade-log entry for ${sym}; positions.json was stale (likely a lost push race) — re-tracking without duplicating the log row or alert`);
+      logAudit('manual_adoption_dedup_skipped', { sym, base, qty: bal.free });
+      continue;
+    }
 
     recordTradeOpen(positions[sym], {
       mode: 'live', orderId: positions[sym].liveOrder.buyOrderId,

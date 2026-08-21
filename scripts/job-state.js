@@ -210,6 +210,21 @@ export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize })
   return log;
 }
 
+// ── Dedupe guard for MANUAL_ADOPTED re-adoption ──────────────────────────
+// Second line of defense behind the positions.json push-retry above: even
+// with that fixed, adoptManualHoldings() shouldn't blindly trust an empty/
+// stale local positions.json is the truth. Before logging a fresh
+// MANUAL_ADOPTED trade-log row, check whether the PERMANENT trade log
+// (never evicted, unlike positions.json) already has an 'open' row for
+// this exact symbol+mode — if so, this is almost certainly the same
+// still-open holding being re-seen after a lost write, not a new buy, and
+// logging it again would just duplicate the row in the GUI's API Trades
+// panel and pollute the win-rate/PnL totals.
+export function hasOpenTradeLogEntry(sym, mode) {
+  const log = loadTradeLog();
+  return log.some(t => t.sym === sym && t.mode === mode && t.status === 'open');
+}
+
 // Called when Position Intelligence auto-executes a REDUCE_25/REDUCE_50
 // partial sell. Unlike recordTradeClose (which closes the ORIGINAL open
 // row and is meant to be called exactly once per position), this APPENDS a
@@ -276,6 +291,46 @@ export function recordTradeClose(pos, reason, sell = {}) {
   return log;
 }
 
+// ── Shared GitHub Contents API push, with 409-conflict retry ───────────────
+// Every state file pushed to GitHub (positions/trade-log/audit/heartbeat/
+// live-balances) can lose a race against another concurrent job run — decide
+// runs every ~5 min (fetch every 5 min, decide 2 min after each fetch), tight
+// enough for a scheduled run and a Cloudflare Worker-dispatched run to land
+// close together (see pushHeartbeatToGitHub's original note on this exact
+// race). A losing PUT gets back 409 (sha mismatch); without a retry that
+// write is silently dropped — logged only as a console warning — and
+// whatever state it represented never lands. For positions.json specifically,
+// a dropped write is how a manual-holding adoption gets "forgotten": the
+// next run's checkout still shows the coin as untracked, so
+// adoptManualHoldings() re-adopts it and logs a second "MANUAL POSITION
+// ADOPTED" trade-log row for a balance that was only ever bought once.
+//
+// One retry against a freshly refetched sha resolves the vast majority of
+// races — a second overlap in the same few-hundred-ms window is rare enough
+// not to need more than one retry (matches the original heartbeat pattern
+// this was extracted from).
+async function putGitHubContent(apiUrl, headers, branch, body) {
+  const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
+  if (getRes.ok) body.sha = (await getRes.json()).sha || undefined;
+  else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
+
+  let putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+
+  if (!putRes.ok && putRes.status === 409) {
+    const getRes2 = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
+    if (getRes2.ok) {
+      body.sha = (await getRes2.json()).sha || undefined;
+      putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+    }
+  }
+
+  if (!putRes.ok) {
+    const e = await putRes.json().catch(() => ({}));
+    throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
+  }
+  return putRes;
+}
+
 // ── Push trade-log.json to GitHub so the GUI's API Trades panel can read
 // the full permanent history (same pattern as pushPositionsToGitHub) ──
 export async function pushTradeLogToGitHub(tradeLog) {
@@ -298,23 +353,11 @@ export async function pushTradeLogToGitHub(tradeLog) {
   };
 
   try {
-    let sha = null;
-    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (getRes.ok) sha = (await getRes.json()).sha || null;
-    else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
-
-    const body = {
+    await putGitHubContent(apiUrl, headers, branch, {
       message: `chore: trade log update (${tradeLog.length} trades) [skip ci]`,
       content: Buffer.from(JSON.stringify(tradeLog, null, 2)).toString('base64'),
       branch,
-    };
-    if (sha) body.sha = sha;
-
-    const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-    if (!putRes.ok) {
-      const e = await putRes.json().catch(() => ({}));
-      throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
-    }
+    });
     console.log(`[trade-log-push] ✓ ${tradeLog.length} trade(s) on record`);
     logAudit('trade_log_pushed', { count: tradeLog.length });
   } catch (e) {
@@ -368,23 +411,11 @@ export async function pushAuditLogToGitHub(logs) {
   };
 
   try {
-    let sha = null;
-    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (getRes.ok) sha = (await getRes.json()).sha || null;
-    else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
-
-    const body = {
+    await putGitHubContent(apiUrl, headers, branch, {
       message: `chore: audit log update (${logs.length} entries) [skip ci]`,
       content: Buffer.from(JSON.stringify(logs, null, 2)).toString('base64'),
       branch,
-    };
-    if (sha) body.sha = sha;
-
-    const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-    if (!putRes.ok) {
-      const e = await putRes.json().catch(() => ({}));
-      throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
-    }
+    });
     console.log(`[audit-push] ✓ ${logs.length} entr${logs.length === 1 ? 'y' : 'ies'} pushed`);
   } catch (e) {
     // Deliberately NOT calling logAudit here — a failure to push the audit
@@ -419,23 +450,11 @@ export async function pushLiveBalancesToGitHub(balances) {
   };
 
   try {
-    let sha = null;
-    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (getRes.ok) sha = (await getRes.json()).sha || null;
-    else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
-
-    const body = {
+    await putGitHubContent(apiUrl, headers, branch, {
       message: `chore: live balances snapshot (${balances.length} asset(s)) [skip ci]`,
       content: Buffer.from(JSON.stringify(snapshot, null, 2)).toString('base64'),
       branch,
-    };
-    if (sha) body.sha = sha;
-
-    const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-    if (!putRes.ok) {
-      const e = await putRes.json().catch(() => ({}));
-      throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
-    }
+    });
     console.log(`[live-balances-push] ✓ ${balances.length} asset(s) pushed`);
     logAudit('live_balances_pushed', { count: balances.length });
   } catch (e) {
@@ -465,23 +484,11 @@ export async function pushPositionsToGitHub(positions) {
   };
 
   try {
-    let sha = null;
-    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (getRes.ok) sha = (await getRes.json()).sha || null;
-    else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
-
-    const body = {
+    await putGitHubContent(apiUrl, headers, branch, {
       message: `chore: positions update (${Object.keys(positions).length} open) [skip ci]`,
       content: Buffer.from(JSON.stringify(positions, null, 2)).toString('base64'),
       branch,
-    };
-    if (sha) body.sha = sha;
-
-    const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-    if (!putRes.ok) {
-      const e = await putRes.json().catch(() => ({}));
-      throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
-    }
+    });
     console.log(`[positions-push] ✓ ${Object.keys(positions).length} position(s) pushed`);
     logAudit('positions_pushed', { count: Object.keys(positions).length });
   } catch (e) {
@@ -529,36 +536,11 @@ export async function pushHeartbeatToGitHub(lastRunAt) {
   };
 
   try {
-    let sha = null;
-    const getRes = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (getRes.ok) sha = (await getRes.json()).sha || null;
-    else if (getRes.status !== 404) throw new Error(`GET ${getRes.status}`);
-
-    const body = {
+    await putGitHubContent(apiUrl, headers, branch, {
       message: `chore: heartbeat ${new Date(lastRunAt).toISOString()} [skip ci]`,
       content: Buffer.from(JSON.stringify({ lastRunAt }, null, 2)).toString('base64'),
       branch,
-    };
-    if (sha) body.sha = sha;
-
-    let putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-
-    // Lost a race with another concurrent run (e.g. a scheduled decide run
-    // and a Cloudflare Worker-dispatched decide run landing at the same
-    // time — see alerts.yml concurrency group notes) — refetch sha, retry once.
-    if (!putRes.ok && putRes.status === 409) {
-      const getRes2 = await fetch(`${apiUrl}?ref=${encodeURIComponent(branch)}`, { headers });
-      if (getRes2.ok) {
-        const j2 = await getRes2.json();
-        body.sha = j2.sha || undefined;
-        putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-      }
-    }
-
-    if (!putRes.ok) {
-      const e = await putRes.json().catch(() => ({}));
-      throw new Error(`PUT ${putRes.status} ${e.message || ''}`);
-    }
+    });
     console.log(`[heartbeat-push] ✓ recorded ${new Date(lastRunAt).toISOString()}`);
   } catch (e) {
     console.warn(`[heartbeat-push] ⚠ ${e.message}`);
