@@ -702,9 +702,13 @@ export async function executeSTPriorityRotation({
         `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._`
       );
     } else {
-      console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${sym} $${ST15_PRIORITY_USD_SIZE} USDT via MEXC...`);
+      console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${pair} $${ST15_PRIORITY_USD_SIZE} USDT via MEXC...`);
       try {
-        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, sym, ST15_PRIORITY_USD_SIZE);
+        // NOTE: MEXC's REST API wants the bare pair ("TAOUSDT"), not the
+        // TradingView-style prefixed `sym` ("BINANCE:TAOUSDT") used as the
+        // internal positions[] tracking key — passing `sym` here caused
+        // every ST15 live buy to fail with "Invalid symbol" (HTTP 400).
+        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, ST15_PRIORITY_USD_SIZE);
         positions[sym].liveOrder = {
           mode: 'live', buyAt: now, usdSize: ST15_PRIORITY_USD_SIZE,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
