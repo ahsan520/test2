@@ -565,7 +565,21 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
     positions[sym] = {
       sym, base, assetType: 'crypto',
       exchangePrefix: entry.exchangePrefix, session: entry.session,
-      setup: evald.setup.label, dir: evald.setup.label === 'SHORT SETUP' ? 'bear' : 'bull',
+      // dir is ALWAYS 'bull' here — this is a MEXC SPOT adoption of a REAL
+      // owned balance, which can only ever be a long position (spot has no
+      // short-selling). evald.setup.label ('SHORT SETUP' etc.) describes
+      // the CURRENT signal direction, not what's actually held — using it
+      // to set dir was wrong: position-monitor.js's stop/T1/T2 hit checks
+      // are all gated on `pos.dir !== 'bear'` and there is NO bear-side
+      // equivalent anywhere in the codebase (this bot never shorts), so a
+      // position tagged dir:'bear' silently loses ALL price-based stop-loss
+      // and take-profit protection forever — it can only ever exit via
+      // rotation, manual-sell detection, or staleness eviction. This is
+      // exactly what happened to XMR: it got re-adopted here (its original
+      // bot-buy tracking was lost, most likely to a positions.json push
+      // race — see the dedup-guard note below) while its live signal had
+      // turned bearish, tagging it dir:'bear' and disabling its stop.
+      setup: evald.setup.label, dir: 'bull',
       alertedAt: Date.now(), holdLockUntil: 0,
       entryPrice: parseFloat(levels.entry), stop: parseFloat(levels.stop),
       t1: parseFloat(levels.t1), t2: parseFloat(levels.t2),

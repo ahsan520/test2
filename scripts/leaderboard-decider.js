@@ -831,7 +831,17 @@ async function main() {
       exchangePrefix: entry.exchangePrefix,
       session:        entry.session,
       setup:          evald.setup.label,
-      dir:            evald.setup.label === 'SHORT SETUP' ? 'bear' : 'bull',
+      // Always 'bull' — SKIP_SETUPS already filters 'SHORT SETUP' out of
+      // this buy loop above, so this ternary was dead in practice, but it's
+      // also just wrong: this bot only ever holds MEXC SPOT longs (no
+      // shorting), and position-monitor.js's stop/T1/T2 checks are gated
+      // on `pos.dir !== 'bear'` with NO bear-side equivalent anywhere — so
+      // dir:'bear' silently disables stop-loss/take-profit for that
+      // position forever. Hardcoded here to stay correct even if the
+      // SKIP_SETUPS gate above ever changes. (Same fix applied to the
+      // manual-holding adoption path in mexc-trader.js, which had no such
+      // gate and was the actual live bug — see the comment there.)
+      dir:            'bull',
       alertedAt:      now,
       holdLockUntil:  now + LB_HOLD_LOCK * 60000,
       entryPrice:     levels ? parseFloat(levels.entry) : entry.price,

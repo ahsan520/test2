@@ -406,6 +406,51 @@ async function fetchBinance(urlPath, { useMirror = true } = {}) {
   throw lastErr || new Error('all Binance endpoints failed');
 }
 
+// ── XMR routes to Kraken, unconditionally — NOT a Binance-failure fallback ──
+// Binance delisted all XMR pairs on 2024-02-20. Its ticker/klines endpoints
+// still resolve for "XMRUSDT" with a 200 and no error code — they just
+// silently serve frozen pre-delisting data forever, so the normal
+// try/catch fallback logic in fetchBinance() never catches this (nothing
+// throws). This file was missing the Kraken routing that leaderboard-
+// scanner.js and js/api.js already apply for XMR — meaning fetchCryptoTicker/
+// fetchCrypto4h/fetchCryptoDaily below were silently feeding checkPositions()
+// (the stop/T1/T2 check for ALL open positions.json entries, including real
+// live MEXC trades) a stale/wrong XMR price every cycle. Same fix, same
+// unconditional (not fallback) routing, applied here.
+const BINANCE_DELISTED = new Set(['XMRUSDT']);
+const KRAKEN_PAIR       = { 'XMRUSDT': 'XMRUSD' };
+const KRAKEN_SPOT       = 'https://api.kraken.com';
+const KRAKEN_INTERVAL_MIN = { '15m': 15, '4h': 240, '1d': 1440 };
+
+async function fetchKrakenDepthAR(kPair, count) {
+  const d = await fetchJSON(`${KRAKEN_SPOT}/0/public/Depth?pair=${kPair}&count=${count}`);
+  if (d?.error?.length) throw new Error(`Kraken depth: ${d.error.join(', ')}`);
+  const row = Object.values(d?.result || {})[0];
+  if (!row) throw new Error(`Kraken: no depth result for ${kPair}`);
+  return { bids: row.bids || [], asks: row.asks || [] };
+}
+
+async function fetchKrakenTickerAR(kPair) {
+  const d = await fetchJSON(`${KRAKEN_SPOT}/0/public/Ticker?pair=${kPair}`);
+  if (d?.error?.length) throw new Error(`Kraken ticker: ${d.error.join(', ')}`);
+  const row = Object.values(d?.result || {})[0];
+  if (!row) throw new Error(`Kraken: no ticker result for ${kPair}`);
+  const lastPrice = parseFloat(row.c?.[0]);
+  const openPrice  = parseFloat(row.o);
+  return { price: lastPrice, chgPct: openPrice > 0 ? ((lastPrice - openPrice) / openPrice) * 100 : 0 };
+}
+
+async function fetchKrakenKlinesAR(kPair, interval) {
+  const mins = KRAKEN_INTERVAL_MIN[interval];
+  const d = await fetchJSON(`${KRAKEN_SPOT}/0/public/OHLC?pair=${kPair}&interval=${mins}`);
+  if (d?.error?.length) throw new Error(`Kraken OHLC(${interval}): ${d.error.join(', ')}`);
+  const rows = Object.entries(d?.result || {}).find(([k]) => k !== 'last')?.[1];
+  if (!rows) throw new Error(`Kraken: no OHLC result for ${kPair} @ ${interval}`);
+  // Normalized to Binance kline shape: [time, open, high, low, close, volume]
+  // — the only indices (1/4/5) fetchCrypto4h/fetchCryptoDaily below read.
+  return rows.map(c => [c[0], c[1], c[2], c[3], c[4], c[6]]);
+}
+
 // RSI calculation (mirrors v8 calcRSI)
 function calcRSI(closes, p = 14) {
   if (!closes || closes.length < p + 1) return null;
@@ -428,6 +473,7 @@ function calcRSI(closes, p = 14) {
 // ════════════════════════════════════════════════════
 async function fetchCryptoTicker(pair) {
   try {
+    if (BINANCE_DELISTED.has(pair)) return await fetchKrakenTickerAR(KRAKEN_PAIR[pair]);
     const d = await fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`);
     return { price: parseFloat(d.lastPrice), chgPct: parseFloat(d.priceChangePercent) };
   } catch (e) {
@@ -438,7 +484,9 @@ async function fetchCryptoTicker(pair) {
 
 async function fetchCrypto4h(pair) {
   try {
-    const k = await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`);
+    const k = BINANCE_DELISTED.has(pair)
+      ? (await fetchKrakenKlinesAR(KRAKEN_PAIR[pair], '4h')).slice(-50)
+      : await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`);
     if (!Array.isArray(k) || k.length < 5) return null;
     const closes = k.map(c => parseFloat(c[4]));
     const vols   = k.map(c => parseFloat(c[5]));
@@ -459,7 +507,9 @@ async function fetchCrypto4h(pair) {
 
 async function fetchCryptoDaily(pair) {
   try {
-    const k = await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`);
+    const k = BINANCE_DELISTED.has(pair)
+      ? (await fetchKrakenKlinesAR(KRAKEN_PAIR[pair], '1d')).slice(-14)
+      : await fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`);
     if (!Array.isArray(k) || k.length < 7) return null;
     const closes = k.map(c => parseFloat(c[4]));
     const vols   = k.map(c => parseFloat(c[5]));
@@ -1398,12 +1448,18 @@ async function scoreCryptoSymbol(pair) {
     // GitHub runners as of 2026-07-23. The two openInterest fapi calls
     // that used to be here were dead code anyway: oiDiv below is derived
     // purely from fr + chg (see below), never actually read those values.
+    // XMR — unconditional Kraken routing, same reasoning as fetchCryptoTicker
+    // above (Binance silently serves frozen pre-delisting data for XMRUSDT,
+    // never throws, so the normal fallback pattern here would never catch it).
+    const useKraken = BINANCE_DELISTED.has(pair);
+    const kPair = KRAKEN_PAIR[pair];
+
     const [ticker, k15r, k4r, kDr, depr, bybitr] = await Promise.allSettled([
-      fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=60`),
-      fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
-      fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
+      useKraken ? fetchKrakenTickerAR(kPair)               : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
+      useKraken ? fetchKrakenKlinesAR(kPair, '15m')        : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
+      useKraken ? fetchKrakenKlinesAR(kPair, '4h')         : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=60`),
+      useKraken ? fetchKrakenKlinesAR(kPair, '1d')         : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),
+      useKraken ? fetchKrakenDepthAR(kPair, 20)            : fetchBinance(`/api/v3/depth?symbol=${pair}&limit=20`),
       fetchBybitTicker(pair),
     ]);
 
@@ -1415,17 +1471,20 @@ async function scoreCryptoSymbol(pair) {
       return null;
     }
 
-    const k15  = v(k15r) || [];
-    const k4   = v(k4r)  || [];
-    const kD   = v(kDr)  || [];
+    // Kraken ticker returns {price, chgPct} already (fetchKrakenTickerAR);
+    // Binance's raw 24hr response uses {lastPrice, priceChangePercent} as
+    // strings — normalize both to the same numeric shape below.
+    const price = useKraken ? t.price   : parseFloat(t.lastPrice);
+    const chg   = useKraken ? t.chgPct  : parseFloat(t.priceChangePercent);
+
+    const k15  = (useKraken ? v(k15r)?.slice(-60) : v(k15r)) || [];
+    const k4   = (useKraken ? v(k4r)?.slice(-60)  : v(k4r))  || [];
+    const kD   = (useKraken ? v(kDr)?.slice(-14)  : v(kDr))  || [];
     const dep  = v(depr);
     const bybit = v(bybitr);
     if (bybitr.status === 'rejected') {
       console.log(`  ⚠  scoreCryptoSymbol: Bybit funding-rate fetch failed for ${pair}: ${bybitr.reason?.message}`);
     }
-
-    const price = parseFloat(t.lastPrice);
-    const chg   = parseFloat(t.priceChangePercent);
 
     // Vol shock: last 15m candle vol vs avg of previous 4
     const recentVols = k15.slice(-5).map(c => parseFloat(c[5]));
