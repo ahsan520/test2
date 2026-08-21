@@ -37,7 +37,7 @@ import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
 import { monitorPositions, reconcileTrackedLiveBalances } from './position-monitor.js';
-import { executeTradeCycle, adoptManualHoldings } from './mexc-trader.js';
+import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
 
@@ -446,6 +446,46 @@ async function main() {
       savePositions(positions);
       await pushPositionsToGitHub(positions);
     }
+  }
+
+  // ══════════════════════════════════════════════════════
+  // STEP 1.7 — 15m Supertrend Priority Execution (Priority-0)
+  // Per the "15m Supertrend Priority Execution" dev-team note: a confirmed
+  // closed-15m Supertrend RED→GREEN cross (detected in market-fetcher.js,
+  // persisted as a PENDING st15Event on the symbol's market-data.json
+  // entry) rotates existing positions into the new candidate, bypassing
+  // every STRATEGY gate below (grade, conv, whale, EQC, cooldown, Top-N,
+  // etc.) — but not TRADE_MODE/kill-switch/credentials/no-trade-list/
+  // duplicate-holding/balance/concurrency-cap, and never buys after an
+  // unconfirmed sell. Runs independently of, and BEFORE, the buy scan —
+  // an ST event can execute on a cycle where the normal scan (below) finds
+  // nothing, and does not wait on the stale-market-data gate that blocks
+  // new BUYs further down (this event is priced off the same market-data.json
+  // this whole run already loaded, same as everything else this cycle).
+  // ══════════════════════════════════════════════════════
+  const stPriorityOutcomes = [];
+  const stResult = await executeSTPriorityRotation({
+    market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+    utc: new Date().toUTCString().slice(17, 22) + ' UTC',
+    closedOutcomes: stPriorityOutcomes,
+  });
+  // Always persist — event status transitions (PENDING → EXECUTING →
+  // EXECUTED/SELL_FAILED/BUY_FAILED/etc.) must survive even on an early
+  // return further down (e.g. the stale-data guard just below), so the
+  // same event is never re-attempted next cycle.
+  saveMarketData(market);
+  if (stResult.changed) {
+    savePositions(positions);
+    await pushPositionsToGitHub(positions);
+  }
+  if (stPriorityOutcomes.length) {
+    let stHist = loadHistory();
+    stHist.push(...stPriorityOutcomes);
+    const cutoff = Date.now() - HISTORY_RETENTION_DAYS * 86_400_000;
+    stHist = stHist.filter(e => e.closedAt >= cutoff);
+    if (stHist.length > HISTORY_MAX_ROWS) stHist = stHist.slice(stHist.length - HISTORY_MAX_ROWS);
+    saveHistory(stHist);
+    logAudit('history_recorded', { rows: stPriorityOutcomes.length, totalKept: stHist.length, source: 'st15_priority' });
   }
 
   // ══════════════════════════════════════════════════════

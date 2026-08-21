@@ -449,6 +449,273 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   return { changed, rotationCandidates };
 }
 
+// ── 15m Supertrend Priority Execution (Priority-0) ──
+// Per the "15m Supertrend Priority Execution" dev-team note: a confirmed
+// closed-15m Supertrend RED→GREEN cross (detected in leaderboard-scanner.js/
+// market-fetcher.js, persisted as a PENDING st15Event on the symbol's
+// market-data.json entry) gets the highest trading priority and rotates
+// the existing crypto position(s) into the new candidate — bypassing every
+// STRATEGY-qualification gate (grade, conv, whale, watch count, 5m
+// breakout, CVD/volume confirmation, Entry Quality Check, BUY/EARLY BUY
+// signal, Top-N ranking, normal cooldown/rotation qualification).
+//
+// It does NOT bypass execution-safety controls: TRADE_MODE off stays off,
+// the Telegram /pause kill-switch, MEXC credentials, no-trade-symbol list,
+// duplicate-holding check, live concurrency cap, or SELL-must-be-confirmed-
+// before-BUY. Runs independently of, and before, the normal buy scan in
+// leaderboard-decider.js — an ST event can execute on a cycle where the
+// normal scan finds nothing at all.
+//
+// Deliberately reuses the SAME closeLiveOrder() safe-close path rotation
+// already uses (position-monitor.js) rather than a second sell
+// implementation, and mirrors executeAutoBuys' paper/live buy branches —
+// this is the same execution machinery, just with strategy gates skipped
+// and sell-then-buy sequencing enforced explicitly.
+const ST15_ENABLE            = (process.env.ST15_ENABLE ?? 'true') === 'true';
+const ST15_PRIORITY_USD_SIZE = parseFloat(process.env.ST15_PRIORITY_USD_SIZE || process.env.TRADE_USD_SIZE || '25');
+
+export async function executeSTPriorityRotation({
+  market, positions, tradeState, effectiveTradeMode, effectiveMaxLive, utc, closedOutcomes,
+}) {
+  let changed = false;
+  if (!ST15_ENABLE) return { changed };
+  if (effectiveTradeMode === 'off') return { changed };       // TRADE_MODE off remains off — no exception
+  if (!tradeState.tradingEnabled) return { changed };          // Telegram /pause kill-switch
+
+  const pending = Object.entries(market.symbols || {})
+    .filter(([, e]) => e.assetType === 'crypto' && e.st15Event?.status === 'PENDING')
+    .map(([pair, e]) => ({ pair, entry: e, event: e.st15Event }));
+
+  if (!pending.length) return { changed };
+
+  // Deterministic order if two symbols cross the same cycle — earliest
+  // detected first (§12 acceptance test: "Two symbols cross together").
+  pending.sort((x, y) => new Date(x.event.detectedAt) - new Date(y.event.detectedAt));
+
+  for (const { pair, entry, event } of pending) {
+    const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
+    const sym  = buildSymKey(pair);
+
+    // Mark EXECUTING immediately — narrows (does not eliminate; this repo
+    // relies on the Cloudflare Worker's overlap-prevention for the rest,
+    // same as every other job here) the window where a second overlapping
+    // run could re-pick up the same PENDING event.
+    event.status = 'EXECUTING';
+
+    if (isNoTradeSymbol(pair)) {
+      event.status = 'SKIPPED_NO_TRADE';
+      logAudit('st15_skipped', { pair, id: event.id, reason: 'no_trade_symbol' });
+      continue;
+    }
+    if (effectiveTradeMode === 'live' && (!MEXC_API_KEY || !MEXC_API_SECRET)) {
+      event.status = 'ERROR';
+      logAudit('st15_error', { pair, id: event.id, reason: 'missing_api_credentials' });
+      await sendTelegram(`🚨 *ST15 CROSS — ${base}* — MEXC API credentials not configured. Event marked ERROR, will not retry automatically.`);
+      continue;
+    }
+
+    // Already held → no-op per §6 of the dev note: validate and mark handled.
+    const existingKey = Object.keys(positions).find(k =>
+      positions[k].base === base && positions[k].assetType === 'crypto'
+      && !positions[k].liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(positions[k].status)
+    );
+    if (existingKey) {
+      event.status = 'NOOP_ALREADY_HELD';
+      logAudit('st15_noop', { pair, id: event.id, reason: 'already_held' });
+      await sendTelegram(`ℹ️ *ST15 CROSS — ${base}* — already held, no rotation needed. Event marked handled.`);
+      continue;
+    }
+
+    console.log(`  🟣  ST15_CROSS_UP — ${pair} [${event.id}] — Priority-0 execution starting`);
+    logAudit('st15_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
+    await sendTelegram(
+      `🟣 *HIGH PRIORITY — 15m SUPERTREND CROSS UP* — ${base}USDT — ${utc}\n` +
+      `  Price: $${event.close}  15m Supertrend: $${event.supertrend}  Cross distance: +${event.distancePct}%\n` +
+      `  Candle: ${event.candleTime}\n` +
+      `  Event: \`${event.id}\`\n` +
+      `  🔓 Normal BUY conditions bypassed — safety checks in progress…`
+    );
+
+    // ── SELL every other currently-held crypto position (tracked AND, in
+    // live mode, any untracked real MEXC balance) — never the ST target ──
+    const sellAlerts = [];
+    let sellFailed = false;
+
+    const trackedToSell = Object.entries(positions).filter(([, p]) =>
+      p.assetType === 'crypto' && p.base !== base
+      && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
+      && !['stopped', 'tp2_hit'].includes(p.status)
+    );
+
+    for (const [key, pos] of trackedToSell) {
+      const mData       = (market.symbols || {})[pos.base + 'USDT'];
+      const marketPrice = parseFloat(mData?.d?.p || pos.entryPrice || 0);
+      pos.exitPrice = marketPrice;
+      const closeResult = await closeLiveOrder(pos, `ST15 priority rotation — ${event.id}`, sellAlerts, effectiveTradeMode);
+      const isLiveCrypto = pos.liveOrder?.mode === 'live';
+
+      if (isLiveCrypto && !closeResult.closed) {
+        delete pos.exitPrice;
+        sellFailed = true;
+        console.log(`  🛑  ST15 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}`);
+        continue;
+      }
+      const finalExitPrice = pos.liveOrder?.exitFillPrice || marketPrice;
+      const pnlPct = pos.entryPrice > 0
+        ? parseFloat(((finalExitPrice - pos.entryPrice) / pos.entryPrice * 100).toFixed(2)) : 0;
+
+      closedOutcomes.push({
+        base: pos.base, pair: pos.base + 'USDT',
+        entryTriggerStatus: pos.entryTriggerStatus ?? null, entryStateAtBuy: pos.entryStateAtBuy ?? null,
+        outcome: 'st15_priority_rotation', score: pos.score, spikeScore: pos.spikeScore,
+        pnlPct, closedAt: Date.now(),
+      });
+      pos.status          = 'stopped';
+      pos.statusChangedAt = Date.now();
+      pos.exitPrice       = finalExitPrice;
+      pos.rotatedOut      = true;
+      changed = true;
+    }
+
+    // Live mode only — sweep any REAL MEXC balance with no positions.json
+    // entry at all (bought manually outside the bot), same as normal
+    // rotation's untracked branch, so it can't silently block freeing
+    // balance for the ST buy below.
+    if (effectiveTradeMode === 'live' && !sellFailed) {
+      let balances = [];
+      try { balances = await mexcGetAllBalances(MEXC_API_KEY, MEXC_API_SECRET); }
+      catch (e) { console.log(`  ⚠️  ST15: couldn't fetch MEXC balances (${e.message}) — skipping untracked sweep`); }
+
+      for (const bal of balances) {
+        const balBase = bal.asset;
+        if (balBase === base || QUOTE_ASSETS.has(balBase) || isNoTradeSymbol(balBase + 'USDT')) continue;
+        const alreadyTracked = Object.values(positions).some(p => p.base === balBase && p.assetType === 'crypto' && !p.liveOrder?.closedAt);
+        if (alreadyTracked) continue; // handled by the tracked loop above
+
+        const untrackedSym = balBase + 'USDT';
+        const mPrice = parseFloat((market.symbols || {})[untrackedSym]?.d?.p || 0);
+        try {
+          const step    = await getBaseSizePrecision(untrackedSym);
+          const sellQty = floorToStep(bal.free, step);
+          const estNotional = bal.free * mPrice;
+          if (mPrice > 0 && bal.free > 0 && estNotional < MIN_SELL_NOTIONAL_USDT) {
+            logAudit('st15_sell_skipped_dust', { sym: untrackedSym, reason: 'st15_priority_untracked', freeQty: bal.free, estNotional });
+            continue; // dust — leave on exchange, doesn't block the buy
+          }
+          if (sellQty <= 0) continue;
+          const sell = await mexcMarketSell(MEXC_API_KEY, MEXC_API_SECRET, untrackedSym, sellQty);
+          logAudit('st15_sell_untracked', { sym: untrackedSym, qty: sellQty, fillPrice: sell.fillPrice, orderId: sell.orderId, eventId: event.id });
+          await sendTelegram(`🟢 *ST15 ROTATION SELL (untracked)* — closed ${sellQty} ${balBase} @ $${sell.fillPrice.toFixed(6)} on MEXC to fund the ${base} priority buy.`);
+          changed = true;
+        } catch (e) {
+          if (/minimum transaction volume/i.test(e.message || '')) {
+            logAudit('st15_sell_skipped_dust', { sym: untrackedSym, reason: 'st15_priority_untracked', error: e.message });
+            continue;
+          }
+          logAudit('st15_sell_untracked_failed', { sym: untrackedSym, error: e.message, eventId: event.id });
+          await sendTelegram(`🚨 *ST15 ROTATION SELL FAILED (untracked)* — ${balBase}: ${e.message} — CLOSE MANUALLY on MEXC. ${base} priority BUY continuing regardless (this balance wasn't required for it).`);
+        }
+      }
+    }
+
+    for (const m of sellAlerts) await sendTelegram(m);
+
+    if (sellFailed) {
+      event.status = 'SELL_FAILED';
+      logAudit('st15_sell_failed', { pair, id: event.id });
+      await sendTelegram(`🚨 *ST15 CROSS — SELL FAILED* — ${base}: could not confirm sale of an existing position — BUY ABORTED. Event left for manual review, will not retry automatically.`);
+      continue; // never buy after an unconfirmed sell
+    }
+
+    // ── Live concurrency cap — still an account/infra-level control, same
+    // class as balance/lot-size, not a strategy gate the note lists as
+    // bypassed. Selling everything above should already have freed a slot;
+    // this is a fallback in case a sell above was legitimately skipped
+    // (e.g. dust) rather than failed. ──
+    if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
+      event.status = 'BLOCKED_MAX_LIVE';
+      logAudit('st15_blocked_max_live', { pair, id: event.id });
+      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — still at ${effectiveMaxLive}/${effectiveMaxLive} live trade cap after rotation sells — BUY skipped this cycle.`);
+      continue;
+    }
+
+    // ── BUY the ST candidate ──
+    const now   = Date.now();
+    const shock = entry?.d?.shock ?? 1;
+    positions[sym] = {
+      sym, base, assetType: 'crypto', exchangePrefix: entry.exchangePrefix || 'BINANCE', session: '24/7',
+      setup: 'ST15 PRIORITY', dir: 'bull',
+      alertedAt: now, holdLockUntil: now, // no hold-lock delay for a priority execution
+      entryPrice: 0, stop: 0, t1: 0, t2: 0, // resynced to the real fill just below
+      score: entry.conv ?? null, spikeScore: shock,
+      exitAlertedAt: null, tier1AlertedAt: null,
+      status: 'watching',
+      source: 'st15_priority_v1',
+      scoreSource: 'st15_cross',
+      st15EventId: event.id,
+    };
+
+    if (effectiveTradeMode === 'paper') {
+      const fillPrice = parseFloat(entry?.d?.p || event.close || 0);
+      const qty        = fillPrice > 0 ? ST15_PRIORITY_USD_SIZE / fillPrice : 0;
+      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: ST15_PRIORITY_USD_SIZE, qty, fillPrice, buyOrderId: `PAPER_ST15_${now}` };
+      const lvl = recalcLevelsFromFill(fillPrice, shock);
+      if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
+      positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
+      positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
+      positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
+      logAudit('st15_paper_buy', { sym, id: event.id, usdSize: ST15_PRIORITY_USD_SIZE, fillPrice });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: ST15_PRIORITY_USD_SIZE });
+      await pushTradeLogToGitHub(loadTradeLog());
+      if (process.env.TRADE_SIZE_MODE === 'percent') adjustPaperBalance(-ST15_PRIORITY_USD_SIZE);
+      changed = true;
+      event.status = 'EXECUTED';
+      await sendTelegram(
+        `📝 *ST15 PRIORITY PAPER BUY* — ${base} $${ST15_PRIORITY_USD_SIZE} USDT @ ~$${fillPrice.toFixed(6)}\n` +
+        `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._`
+      );
+    } else {
+      console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${sym} $${ST15_PRIORITY_USD_SIZE} USDT via MEXC...`);
+      try {
+        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, sym, ST15_PRIORITY_USD_SIZE);
+        positions[sym].liveOrder = {
+          mode: 'live', buyAt: now, usdSize: ST15_PRIORITY_USD_SIZE,
+          qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
+        };
+        const lvl = recalcLevelsFromFill(buy.fillPrice, shock);
+        if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
+        positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
+        positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
+        positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
+        logAudit('st15_live_buy', { sym, id: event.id, usdSize: ST15_PRIORITY_USD_SIZE, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: ST15_PRIORITY_USD_SIZE });
+        await pushTradeLogToGitHub(loadTradeLog());
+        changed = true;
+        event.status = 'EXECUTED';
+        await sendTelegram(
+          `⚡ *ST15 PRIORITY LIVE BUY* — ${base} — ${utc}\n` +
+          `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
+          `  Size: $${ST15_PRIORITY_USD_SIZE} USDT  Order ID: \`${buy.orderId}\`\n` +
+          `  Event \`${event.id}\` marked EXECUTED.\n` +
+          `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
+          `  _Send /pause to halt further auto-buys_`
+        );
+      } catch (e) {
+        delete positions[sym]; // no phantom tracking entry — mirrors executeAutoBuys' live-buy-failed cleanup
+        event.status = 'BUY_FAILED';
+        logAudit('st15_live_buy_failed', { sym, id: event.id, error: e.message });
+        await sendTelegram(
+          `🚨 *ST15 PRIORITY BUY FAILED* — ${base}: ${e.message}\n` +
+          `  Rotation SELL already completed — you may be holding extra USDT with no new position.\n` +
+          `  Event marked BUY_FAILED, will not retry automatically. Check MEXC manually.`
+        );
+      }
+    }
+  }
+
+  return { changed };
+}
+
 // ── Adopts manually-bought MEXC holdings into bot tracking ──
 // A coin bought directly on MEXC (outside the bot) has no positions.json
 // entry, no bot-placed stop, and is invisible to monitorPositions' T1/T2/

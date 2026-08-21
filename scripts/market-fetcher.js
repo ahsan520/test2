@@ -76,6 +76,36 @@ function logAudit(action, details = {}) {
   fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2));
 }
 
+// ── 15m Supertrend Priority Execution — event detection/dedupe ──
+// Per the dev-team note: detect the cross HERE (Job A, every 5 min, using
+// only closed 15m candles — calcSupertrend in leaderboard-scanner.js
+// already filters out any still-forming candle), persist a stable
+// per-symbol event, and let Job B (leaderboard-decider.js) consume it
+// exactly once. A stable idempotency key (candle open time, not
+// detection time) means re-fetching the SAME closed candle across
+// multiple 5-min cycles never creates a second event, and never
+// overwrites one Job B has already started consuming (status !== PENDING).
+function buildST15Event(prev, st15, base) {
+  const prevEvent = prev?.st15Event || null;
+  if (!st15) return prevEvent;      // fetch/data issue this cycle — carry forward whatever existed
+  if (!st15.crossUp) return prevEvent; // no fresh cross this cycle — carry forward (Job B may still be consuming a pending one)
+
+  const idTime = st15.lastClosedCandle.replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  const id = `ST15-${base}-${idTime}`;
+  if (prevEvent && prevEvent.id === id) return prevEvent; // same candle already recorded — never overwrite (status may already be non-PENDING)
+
+  return {
+    id,
+    type:         'ST15_CROSS_UP',
+    detectedAt:   new Date().toISOString(),
+    candleTime:   st15.lastClosedCandle,
+    close:        st15.close,
+    supertrend:   st15.value,
+    distancePct:  st15.distancePct,
+    status:       'PENDING',
+  };
+}
+
 // ── Build/update a market-data.json entry ──
 // Maintains peak shock/obi since Job B last consumed + reset them.
 function buildEntry(r, prev, now, session) {
@@ -120,6 +150,15 @@ function buildEntry(r, prev, now, session) {
   // reaching into r.d, matching how signal/entryState are already exposed.
   const trigger = r.d?.trigger || null;
 
+  // ── 15m Supertrend Priority Execution — surfaced top-level (crypto only,
+  // matching r.assetType==='crypto' gate calcSupertrend is invoked under)
+  // so leaderboard-decider.js/mexc-trader.js read it the same way they
+  // already read triggerStatus/entryState, without reaching into d.
+  const st15Base  = r.pair.replace('USDT', '').replace(/\.\w+$/, '');
+  const st15Event = r.assetType === 'crypto'
+    ? buildST15Event(prev, r.d?.supertrend15m, st15Base)
+    : (prev?.st15Event || null);
+
   return {
     pair:           r.pair,
     price:          r.price,
@@ -141,6 +180,8 @@ function buildEntry(r, prev, now, session) {
     breakoutLevel:      trigger?.breakoutLevel ?? null,
     triggerReasons:     trigger?.triggerReasons ?? [],
     btcTriggerOk:       trigger?.btcTriggerOk ?? null,
+    supertrend15m:  r.d?.supertrend15m || null,   // { value, direction, previousDirection, crossUp, close, lastClosedCandle, distancePct }
+    st15Event,                                     // Priority-0 event — PENDING until leaderboard-decider.js/mexc-trader.js consume it
     bullConf:       r.bullConf,
     bullChecks:     r.bullChecks,
     whale:          r.whale,

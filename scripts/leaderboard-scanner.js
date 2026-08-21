@@ -356,6 +356,97 @@ function calcCVD(k15m) {
   return { trend: netBias >= 0 ? 'up' : 'down', strength: parseFloat(Math.abs(netBias).toFixed(3)) };
 }
 
+// ── 15m Supertrend(period,multiplier) — closed candles only ──────────────
+// Per the "15m Supertrend Priority Execution" dev-team note: this is a
+// SEPARATE entry-timing signal from calcConviction/calcSpikeTrigger above,
+// consumed by leaderboard-decider.js as a Priority-0 execution path (an
+// independent gate that bypasses normal strategy qualification, not a
+// score input) — never folded into d.conv/calcConviction. Standard
+// Supertrend: ATR(period) (Wilder-smoothed) sets basic upper/lower bands
+// around the (high+low)/2 midpoint; the "sticky" final bands only ever
+// tighten toward price (never widen back out) until price actually closes
+// through the opposite band, at which point direction flips. The dev note
+// explicitly requires CLOSED candles only — never the still-forming last
+// candle — so a still-forming bar is dropped here based on its own open
+// time + the interval length, rather than trusting array position (k15's
+// last element is the CURRENTLY forming candle whenever Job A's fetch
+// lands mid-candle, which is most of the time on a 5-min fetch cadence
+// against 15m candles).
+const ST15_INTERVAL_MS = 15 * 60 * 1000;
+function calcSupertrend(k15, period = 10, multiplier = 3) {
+  if (!k15 || !k15.length) return null;
+  const nowMs  = Date.now();
+  const closed = k15.filter(c => (parseInt(c[0], 10) + ST15_INTERVAL_MS) <= nowMs);
+  const n = closed.length;
+  // Needs period bars to seed ATR, plus 2 more closed bars so a
+  // previous-vs-current direction comparison (the cross itself) is
+  // possible.
+  if (n < period + 2) return null;
+
+  const highs  = closed.map(c => parseFloat(c[2]));
+  const lows   = closed.map(c => parseFloat(c[3]));
+  const closes = closed.map(c => parseFloat(c[4]));
+
+  const tr = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    tr[i] = i === 0
+      ? highs[i] - lows[i]
+      : Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+  }
+
+  const atr = new Array(n).fill(null);
+  let seed = 0;
+  for (let i = 0; i < period; i++) seed += tr[i];
+  atr[period - 1] = seed / period; // Wilder seed = simple average of first `period` TRs
+  for (let i = period; i < n; i++) atr[i] = (atr[i - 1] * (period - 1) + tr[i]) / period;
+
+  const upperBand = new Array(n).fill(null);
+  const lowerBand = new Array(n).fill(null);
+  const st        = new Array(n).fill(null);
+  const dir       = new Array(n).fill(null); // 'BULL' | 'BEAR'
+
+  for (let i = period - 1; i < n; i++) {
+    if (atr[i] == null) continue;
+    const mid         = (highs[i] + lows[i]) / 2;
+    const basicUpper  = mid + multiplier * atr[i];
+    const basicLower  = mid - multiplier * atr[i];
+    const prevUpper   = upperBand[i - 1];
+    const prevLower   = lowerBand[i - 1];
+    const prevClose   = closes[i - 1];
+
+    // Sticky bands — only move toward price, except when price closes
+    // through the opposite band (standard Supertrend behavior).
+    upperBand[i] = (prevUpper != null && basicUpper >= prevUpper && prevClose <= prevUpper) ? prevUpper : basicUpper;
+    lowerBand[i] = (prevLower != null && basicLower <= prevLower && prevClose >= prevLower) ? prevLower : basicLower;
+
+    if (i === period - 1) {
+      dir[i] = closes[i] >= upperBand[i] ? 'BULL' : 'BEAR';
+    } else {
+      const prevDir = dir[i - 1];
+      dir[i] = prevDir === 'BULL'
+        ? (closes[i] < lowerBand[i] ? 'BEAR' : 'BULL')
+        : (closes[i] > upperBand[i] ? 'BULL' : 'BEAR');
+    }
+    st[i] = dir[i] === 'BULL' ? lowerBand[i] : upperBand[i];
+  }
+
+  const last = n - 1, prev = n - 2;
+  if (dir[last] == null || dir[prev] == null || st[last] == null) return null;
+
+  const crossUp = dir[prev] === 'BEAR' && dir[last] === 'BULL';
+  const stVal   = st[last];
+  return {
+    period, multiplier,
+    value:              parseFloat(stVal.toFixed(8)),
+    direction:          dir[last],
+    previousDirection:  dir[prev],
+    crossUp,
+    close:              closes[last],
+    lastClosedCandle:   new Date(parseInt(closed[last][0], 10)).toISOString(),
+    distancePct:        stVal > 0 ? parseFloat((((closes[last] - stVal) / stVal) * 100).toFixed(3)) : 0,
+  };
+}
+
 function calcOBI(depth) {
   if (!depth) return 0;
   const bidVol = (depth.bids || []).slice(0, 10).reduce((s, b) => s + parseFloat(b[1]), 0);
@@ -803,6 +894,18 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
 
     const d = { p: price, chg, chg4h, shock, r15, r1h, r4h, emaTrend, bias4h, biasDay, cvdTrend, cvdStrength: cvdCalc.strength, obi, fr, oiDiv };
     d.conv = calcConviction(d);
+
+    // ── 15m Supertrend Priority Execution (dev-team note) — entry-timing
+    // signal, independent of conv/calcConviction above. market-fetcher.js
+    // reads d.supertrend15m to detect a fresh closed-candle RED→GREEN
+    // cross and persist a Priority-0 event; leaderboard-decider.js/
+    // mexc-trader.js consume it. period/multiplier configurable per the
+    // note's "make them environment-configurable and backtestable".
+    d.supertrend15m = calcSupertrend(
+      k15,
+      parseInt(process.env.ST15_PERIOD || '10', 10),
+      parseFloat(process.env.ST15_MULTIPLIER || '3')
+    );
 
     const setup     = getSetupMode(d);
     const whale     = calcWhaleScore(d);
