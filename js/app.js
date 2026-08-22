@@ -1240,6 +1240,42 @@ function _mdTriggerCell(e) {
   }
 }
 
+// ── ST15 cell — reads the server-computed Supertrend(15m) priority-event
+// state exactly as persisted by market-fetcher.js/mexc-trader.js (dev-team
+// note: "15m Supertrend Priority Execution") — no client-side
+// recomputation, so this can never disagree with what the decider actually
+// acted on. An event (st15Event) always takes priority over the bare
+// direction reading (supertrend15m) when both are present, since the event
+// is what actually happened/is happening; the bare direction is shown only
+// when there's no event on record (BULL/BEAR with no cross yet, or a
+// cross that already happened on a much older candle and was superseded).
+function _mdSt15Cell(e) {
+  const ev = e.st15Event;
+  const st = e.supertrend15m;
+  if (ev) {
+    const title = `${ev.id || ''} · candle ${ev.candleTime || ''} · +${ev.distancePct ?? '—'}% above ST` + (ev.detail ? ` · ${ev.detail}` : '');
+    switch (ev.status) {
+      case 'EXECUTED':          return { label: '🟣 EXECUTED',      color: _MD_GREEN_FULL, title };
+      case 'EXECUTING':
+      case 'PENDING':            return { label: '🟡 PENDING',       color: 'var(--accent)', title };
+      case 'SELL_FAILED':        return { label: '🚨 SELL FAILED',   color: _MD_DEEP_RED, title };
+      case 'BUY_FAILED':         return { label: '🚨 BUY FAILED',    color: _MD_DEEP_RED, title };
+      case 'BLOCKED_MAX_LIVE':   return { label: '🚫 MAX LIVE',      color: _MD_DEEP_RED, title };
+      case 'NOOP_ALREADY_HELD':  return { label: 'ℹ️ ALREADY HELD',  color: 'var(--text-dim)', title };
+      case 'SKIPPED_NO_TRADE':   return { label: '⛔ NO-TRADE',      color: 'var(--text-dim)', title };
+      case 'ERROR':               return { label: '🚨 ERROR',         color: _MD_DEEP_RED, title };
+      default:                    return { label: ev.status || '—',  color: 'var(--text-dim)', title };
+    }
+  }
+  if (!st) return { label: '—', color: 'var(--text-dim)', title: '' };
+  const title = `ST ${st.value ?? '—'} · ${st.distancePct ?? '—'}% from close · last closed candle ${st.lastClosedCandle || '—'}`;
+  return st.direction === 'BULL'
+    ? { label: `▲ BULL`, color: 'var(--bull)', title }
+    : st.direction === 'BEAR'
+      ? { label: `▼ BEAR`, color: 'var(--bear)', title }
+      : { label: '—', color: 'var(--text-dim)', title };
+}
+
 // ── Market Data: click-to-sort on every column header ───────────────────────
 // Categorical columns (bias, OI DIV, CVD, OI MOM) get ranked rather than
 // alphabetized — "BULL 4H" should sort above "BEAR 4H", not below it just
@@ -1294,14 +1330,35 @@ const _MD_SORT_ACCESSORS = {
   // → persisted top-level as e.triggerStatus/e.triggerScore by market-fetcher.js).
   // Rank so BREAKOUT sorts above TRIGGERING above SETUP, FAILED sinks lowest;
   // within a tier, higher triggerScore sorts first.
+  // ST15 Priority Execution (dev-team note) — e.st15Event / e.supertrend15m
+  // are persisted directly onto the market-data.json entry by
+  // market-fetcher.js/mexc-trader.js, no client recompute needed. Rank an
+  // in-flight/executed event above a mere BULL direction reading above a
+  // BEAR reading, so anything with a live or completed cross sorts to the
+  // top; ties within a tier break on distancePct (how far above/below the
+  // ST line, i.e. conviction of the cross).
+  st15: e => {
+    const ev = e.st15Event;
+    const evRank = ev ? (_MD_ST15_STATUS_RANK[ev.status] ?? 1) : 0;
+    if (evRank > 0) return evRank * 1000 + (ev.distancePct ?? 0);
+    const dirRank = e.supertrend15m?.direction === 'BULL' ? 1 : e.supertrend15m?.direction === 'BEAR' ? 0 : -1;
+    return dirRank * 100 + (e.supertrend15m?.distancePct ?? 0) / 100;
+  },
   trigger:  e => (_MD_TRIGGER_RANK[e.triggerStatus] ?? 1) * 1000 + (e.triggerScore ?? 0),
 };
 
 const _MD_TRIGGER_RANK = { FAILED: 0, WAIT: 1, SETUP: 1, TRIGGERING: 2, BREAKOUT: 3 };
+// Executed/in-flight ranks above a blocked/failed/skipped outcome, which
+// ranks above no event at all (handled as evRank 0, outside this map).
+const _MD_ST15_STATUS_RANK = {
+  EXECUTED: 4, EXECUTING: 3, PENDING: 3,
+  SELL_FAILED: 2, BUY_FAILED: 2, BLOCKED_MAX_LIVE: 2,
+  NOOP_ALREADY_HELD: 1, SKIPPED_NO_TRADE: 1, ERROR: 1,
+};
 
 // [header label, sort key] — order here IS the column order rendered.
 const _MD_COLUMNS = [
-  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['TRIGGER', 'trigger'], ['24H%', 'chg'],
+  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['TRIGGER', 'trigger'], ['ST15', 'st15'], ['24H%', 'chg'],
   ['CONV', 'conv'], ['BULLCONF', 'bullConf'], ['WHALE', 'whale'], ['SHOCK', 'shock'],
   ['RSI15', 'rsi15'], ['4H BIAS', 'bias4h'], ['DAILY BIAS', 'biasDay'], ['OI DIV', 'oiDiv'],
   ['CVD', 'cvd'], ['OI MOM', 'oiMom'], ['HIST (30D)', 'hist'], ['POSITION', 'position'],
@@ -1402,7 +1459,7 @@ function renderMarketData() {
   }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="18" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="19" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
     return;
   }
 
@@ -1413,6 +1470,7 @@ function renderMarketData() {
     const sig = _classifySignal(e); // computed once — reused for the SIGNAL cell AND the row tint below, so they can never disagree
     const rowTint = _mdRowTint(sig.color);
     const trig = _mdTriggerCell(e);
+    const st15 = _mdSt15Cell(e);
     const biText = bi && bi.penalty > 0
       ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
       : bi ? '<span style="color:var(--bull)">clean</span>' : '<span style="color:var(--text-dim)">—</span>';
@@ -1436,6 +1494,7 @@ function renderMarketData() {
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${sig.color}" title="${(bi?.reasons || []).join(' · ') || ''}">${sig.label}</td>
       <td style="font-size:9px;color:${trig.color}" title="${trig.title}">${trig.label}</td>
+      <td style="font-size:9px;color:${st15.color}" title="${st15.title}">${st15.label}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
       <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}" title="${e.buyIntelPenalty > 0 ? `raw ${e.rawConv} − ${e.buyIntelPenalty} penalty = ${e.conv}` : ''}">${e.conv ?? '—'}${e.buyIntelPenalty > 0 ? ` <span style="color:var(--text-dim);font-weight:400">(${e.rawConv})</span>` : ''}</td>
       <td style="font-size:9px;color:${_mdColorBullConf(e.bullConf)}">${e.bullConf != null ? e.bullConf + '/10' : '—'}</td>
