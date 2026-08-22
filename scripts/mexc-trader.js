@@ -189,7 +189,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   // Requires a current price from market.symbols to evaluate; if
   // unavailable, this guard has no opinion (falls through to the other
   // guards) rather than blocking or allowing by default.
-  const ROTATION_SELL_MIN_NET_PNL_PCT = parseFloat(process.env.ROTATION_SELL_MIN_NET_PNL_PCT || process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
+  const ROTATION_SELL_MIN_NET_PNL_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
   const currentlyAtOrAboveBuy = (base, pos) => {
     const buyPrice = pos?.liveOrder?.fillPrice;
     if (!buyPrice) return null; // no opinion — no buy price on record to compare against
@@ -594,11 +594,9 @@ export async function executeSTPriorityRotation({
     // principle the normal executeRotation() applies via its Guard 2 above
     // — simpler here since ST15 doesn't need the other rotation guards
     // (min-hold, momentum, stagnation), just this one. ST15_MIN_PROFIT_PCT
-    // defaults to the SAME 0.2% ROTATION_SELL_MIN_NET_PNL_PCT/
-    // ROTATION_MIN_PROFIT_PCT normal rotation already uses — one
-    // consistent minimum-profit threshold across normal rotation, ST5,
-    // and ST15 sells, rather than ST15/ST5 silently using a stricter
-    // "strictly above buy price, 0% margin" rule normal rotation doesn't.
+    // reads the SAME ROTATION_MIN_PROFIT_PCT (default 0.2%) normal
+    // rotation and ST5 use — one repo Variable controls the minimum-profit
+    // threshold everywhere, no separate ST15_MIN_PROFIT_PCT Variable.
     //
     // A protected (still-underwater) position is simply left alone — if
     // that leaves no live-trade capacity for the ST buy, the concurrency-
@@ -608,12 +606,7 @@ export async function executeSTPriorityRotation({
     let sellFailed = false;
     const protectedPositions = [];
 
-    const ST15_MIN_PROFIT_PCT = parseFloat(
-      process.env.ST15_MIN_PROFIT_PCT
-      || process.env.ROTATION_SELL_MIN_NET_PNL_PCT
-      || process.env.ROTATION_MIN_PROFIT_PCT
-      || '0.2'
-    );
+    const ST15_MIN_PROFIT_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
@@ -950,10 +943,9 @@ export async function executeST5PriorityRotation({
     // principle the normal executeRotation() applies via its Guard 2 above
     // — simpler here since ST5 doesn't need the other rotation guards
     // (min-hold, momentum, stagnation), just this one. ST5_MIN_PROFIT_PCT
-    // defaults to the SAME 0.2% ROTATION_SELL_MIN_NET_PNL_PCT/
-    // ROTATION_MIN_PROFIT_PCT normal rotation already uses — one
-    // consistent minimum-profit threshold across normal rotation, ST5,
-    // and ST15 sells.
+    // reads the SAME ROTATION_MIN_PROFIT_PCT (default 0.2%) normal
+    // rotation and ST15 use — one repo Variable controls the minimum-profit
+    // threshold everywhere, no separate ST5_MIN_PROFIT_PCT Variable.
     //
     // A protected (still-underwater) position is simply left alone — if
     // that leaves no live-trade capacity for the ST buy, the concurrency-
@@ -963,12 +955,7 @@ export async function executeST5PriorityRotation({
     let sellFailed = false;
     const protectedPositions = [];
 
-    const ST5_MIN_PROFIT_PCT = parseFloat(
-      process.env.ST5_MIN_PROFIT_PCT
-      || process.env.ROTATION_SELL_MIN_NET_PNL_PCT
-      || process.env.ROTATION_MIN_PROFIT_PCT
-      || '0.2'
-    );
+    const ST5_MIN_PROFIT_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
