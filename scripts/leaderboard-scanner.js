@@ -373,10 +373,11 @@ function calcCVD(k15m) {
 // lands mid-candle, which is most of the time on a 5-min fetch cadence
 // against 15m candles).
 const ST15_INTERVAL_MS = 15 * 60 * 1000;
-function calcSupertrend(k15, period = 10, multiplier = 3) {
+const ST5_INTERVAL_MS  = 5  * 60 * 1000;
+function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTERVAL_MS) {
   if (!k15 || !k15.length) return null;
   const nowMs  = Date.now();
-  const closed = k15.filter(c => (parseInt(c[0], 10) + ST15_INTERVAL_MS) <= nowMs);
+  const closed = k15.filter(c => (parseInt(c[0], 10) + intervalMs) <= nowMs);
   const n = closed.length;
   // Needs period bars to seed ATR, plus 2 more closed bars so a
   // previous-vs-current direction comparison (the cross itself) is
@@ -898,13 +899,33 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     // ── 15m Supertrend Priority Execution (dev-team note) — entry-timing
     // signal, independent of conv/calcConviction above. market-fetcher.js
     // reads d.supertrend15m to detect a fresh closed-candle RED→GREEN
-    // cross and persist a Priority-0 event; leaderboard-decider.js/
+    // cross and persist a Priority-1 (P1) event; leaderboard-decider.js/
     // mexc-trader.js consume it. period/multiplier configurable per the
     // note's "make them environment-configurable and backtestable".
     d.supertrend15m = calcSupertrend(
       k15,
       parseInt(process.env.ST15_PERIOD || '10', 10),
-      parseFloat(process.env.ST15_MULTIPLIER || '3')
+      parseFloat(process.env.ST15_MULTIPLIER || '3'),
+      ST15_INTERVAL_MS
+    );
+
+    // ── 5m Supertrend Priority Execution (Priority-0 / P0) ──
+    // Same mechanism as the 15m version above, one timeframe down — a
+    // fresh 5m RED→GREEN cross is the earliest, least-lagging structural
+    // signal in this pipeline and per the dev-team doc takes priority over
+    // BOTH the 15m cross (P1) and the normal WATCH/EARLY BUY + BREAKOUT/
+    // TRIGGERING candidate path (P2). Reuses k5 — already fetched above
+    // for calcSpikeTrigger's short-timeframe trigger confirmation, no new
+    // API call needed. market-fetcher.js reads d.supertrend5m to detect
+    // the fresh crossUp and persist a PENDING st5Event; only a genuine
+    // fresh cross creates an event (a candle that's simply still BULL from
+    // last cycle has crossUp=false), so a persistent bullish ST5 state
+    // does not generate repeated P0 buys.
+    d.supertrend5m = calcSupertrend(
+      k5,
+      parseInt(process.env.ST5_PERIOD || '10', 10),
+      parseFloat(process.env.ST5_MULTIPLIER || '3'),
+      ST5_INTERVAL_MS
     );
 
     const setup     = getSetupMode(d);

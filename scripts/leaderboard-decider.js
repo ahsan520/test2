@@ -37,7 +37,7 @@ import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
 import { monitorPositions, reconcileTrackedLiveBalances } from './position-monitor.js';
-import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation } from './mexc-trader.js';
+import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
 
@@ -481,7 +481,37 @@ async function main() {
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 1.7 — 15m Supertrend Priority Execution (Priority-0)
+  // STEP 1.6 — 5m Supertrend Priority Execution (Priority-0 / P0)
+  // Highest-priority buy path — see mexc-trader.js executeST5PriorityRotation
+  // for the full rationale. Runs BEFORE the 15m/P1 pass just below, so a
+  // symbol with both a fresh 5m and 15m cross pending in the same cycle
+  // gets bought via P0 (this pass); P1 then sees the resulting position
+  // and marks its own pending event NOOP_ALREADY_HELD rather than
+  // double-buying. Same persistence/history pattern as the P1 block.
+  // ══════════════════════════════════════════════════════
+  const st5PriorityOutcomes = [];
+  const st5Result = await executeST5PriorityRotation({
+    market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+    utc: new Date().toUTCString().slice(17, 22) + ' UTC',
+    closedOutcomes: st5PriorityOutcomes,
+  });
+  saveMarketData(market);
+  if (st5Result.changed) {
+    savePositions(positions);
+    await pushPositionsToGitHub(positions);
+  }
+  if (st5PriorityOutcomes.length) {
+    let st5Hist = loadHistory();
+    st5Hist.push(...st5PriorityOutcomes);
+    const cutoff = Date.now() - HISTORY_RETENTION_DAYS * 86_400_000;
+    st5Hist = st5Hist.filter(e => e.closedAt >= cutoff);
+    if (st5Hist.length > HISTORY_MAX_ROWS) st5Hist = st5Hist.slice(st5Hist.length - HISTORY_MAX_ROWS);
+    saveHistory(st5Hist);
+    logAudit('history_recorded', { rows: st5PriorityOutcomes.length, totalKept: st5Hist.length, source: 'st5_priority' });
+  }
+
+  // ══════════════════════════════════════════════════════
+  // STEP 1.7 — 15m Supertrend Priority Execution (Priority-1 / P1)
   // Per the "15m Supertrend Priority Execution" dev-team note: a confirmed
   // closed-15m Supertrend RED→GREEN cross (detected in market-fetcher.js,
   // persisted as a PENDING st15Event on the symbol's market-data.json
@@ -494,6 +524,7 @@ async function main() {
   // nothing, and does not wait on the stale-market-data gate that blocks
   // new BUYs further down (this event is priced off the same market-data.json
   // this whole run already loaded, same as everything else this cycle).
+  // Runs AFTER the P0/ST5 pass above — see that block's comment for why.
   // ══════════════════════════════════════════════════════
   const stPriorityOutcomes = [];
   const stResult = await executeSTPriorityRotation({
@@ -704,6 +735,39 @@ async function main() {
 
     if (evald.conv < LB_MIN_SCORE)          continue;
     if (SKIP_SETUPS.has(evald.setup.label)) continue;
+
+    // ── P2 signal-type gate (dev-team "Buy Priority / Rotation / Sell
+    // Intelligence" doc) ──────────────────────────────────────────────
+    // Previously nothing here checked evald.signal at all — only the
+    // numeric conv score above. signal-evaluator.js's AVOID/WEAK/FALLING
+    // KNIFE branches are reachable with a high conv score in some
+    // combinations (e.g. FALLING KNIFE's bias4h==='BEAR' branch doesn't
+    // require conv<=0), so a candidate whose signal actively says "don't
+    // buy this" could still reach the Entry Quality Check and beyond on
+    // conv alone. Explicit allowlist closes that gap: only BUY, EARLY BUY,
+    // and WATCH are P2-eligible signal types. CAP BUY is exempt — it's
+    // already the deliberate extreme-shock exception to every other
+    // STRATEGY qualification gate here (bull confirmation, trigger status,
+    // impulseExhaustion/breakoutDistance in the Entry Quality Check), so
+    // it shouldn't be blocked by a signal classification that doesn't
+    // account for an extreme-shock event in the first place.
+    const isCapBuyEarly = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
+    const P2_ELIGIBLE_SIGNALS = new Set(['BUY', 'EARLY BUY', 'WATCH']);
+    if (!isCapBuyEarly && !P2_ELIGIBLE_SIGNALS.has(evald.signal)) {
+      console.log(`  ⏭  ${pair} signal=${evald.signal} — not P2-eligible (AVOID/WEAK/FALLING KNIFE never buy, regardless of conv)`);
+      continue;
+    }
+    // "P2 rejects WATCH/EARLY BUY + SETUP" — belt-and-suspenders on top of
+    // the triggerStatus gate further below (which already blocks non-
+    // BREAKOUT/TRIGGERING triggers for every signal type); this catches
+    // the specific WATCH/EARLY BUY + entryState=SETUP combo explicitly,
+    // in case triggerStatus and entryState ever disagree (e.g. stale
+    // trigger data lagging a fresh entryState read). CAP BUY exempt for
+    // the same reason as above.
+    if (!isCapBuyEarly && (evald.signal === 'WATCH' || evald.signal === 'EARLY BUY') && entry.entryState === 'SETUP') {
+      console.log(`  ⏭  ${pair} signal=${evald.signal} + entryState=SETUP — rejected, too early (P2 requires BREAKOUT/TRIGGERING)`);
+      continue;
+    }
 
     // 4H trend persistence gate — applies to EVERY buy candidate,
     // independent of BTC regime state. bull4hCount is maintained by

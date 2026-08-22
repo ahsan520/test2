@@ -44,7 +44,16 @@ const LB_STALE_LIVE_HRS  = parseFloat(process.env.LB_STALE_LIVE_HRS  || '3');
 // not zeroBalanceStrikes) since the two checks run independently and
 // shouldn't reset each other's progress.
 const STALE_ZERO_BALANCE_STRIKE_LIMIT = parseInt(process.env.LB_STALE_ZERO_BALANCE_STRIKES || '2');
-const LB_HOLD_LOCK       = parseInt(process.env.LB_HOLD_LOCK       || '20');
+// ── Sell Intelligence age gate (dev-team "Buy Priority / Rotation / Sell
+// Intelligence" doc): "Normal Sell Intelligence can act after 5 minutes;
+// hard stop is never blocked by age." SELL_MIN_POSITION_AGE_MIN is the
+// dedicated var for that — falls back to LB_HOLD_LOCK if unset, so an
+// existing repo Variable for LB_HOLD_LOCK keeps working exactly as before.
+// This only ever gates section 5b/5c/6 below (Position Intelligence,
+// Profit Intelligence, CVD/OI/FR/RSI exit score) — section 4
+// (price-based stop/T1/T2 exits) runs BEFORE this gate and is never
+// delayed by it, matching "hard stop is never blocked by age" exactly.
+const SELL_MIN_POSITION_AGE_MIN = parseInt(process.env.SELL_MIN_POSITION_AGE_MIN || process.env.LB_HOLD_LOCK || '5');
 const LB_EXIT_CVD_CYCLES = parseInt(process.env.LB_EXIT_CVD_CYCLES || '3');
 const LB_EXIT_SCORE_MIN  = parseInt(process.env.LB_EXIT_SCORE_MIN  || '3');
 
@@ -520,7 +529,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
   } = cfg;
   const now           = Date.now();
   const staleMs       = LB_STALE_WATCH_HRS * 60 * 60 * 1000;
-  const holdLockMs    = LB_HOLD_LOCK * 60 * 1000;
+  const holdLockMs    = SELL_MIN_POSITION_AGE_MIN * 60 * 1000;
   let   changed       = false;
   const telegramAlerts = [];
   const closedOutcomes = []; // rows for symbol-history.json — win/loss record per closed position
