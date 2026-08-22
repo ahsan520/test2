@@ -38,6 +38,19 @@ const EMERGENCY_EXIT_LEVEL    = parseFloat(process.env.SELL_EMERGENCY_EXIT_LEVEL
 const USE_MARKET_REGIME       = (process.env.SELL_USE_MARKET_REGIME    || 'true') !== 'false';
 const REQUIRE_BTC_RECOVERY    = (process.env.SELL_REQUIRE_BTC_RECOVERY || 'true') !== 'false';
 
+// ── Breakout-failure boost — dev-team note "Sell Intelligence / Leaderboard
+// Decider" (UPDATED), written up after the UNI incident (bought on a
+// BREAKOUT reclaim, chopped back under that exact level, hit the fixed
+// stop 20 min later with no intelligence exit in between). The generic
+// thesis/confidence composite above never explicitly checks "did price
+// re-fall below the specific level this position was entered on" — it can
+// stay numerically mild (a soft conv/whale dip) even while the actual
+// breakout has already fully round-tripped. This is additive, not a
+// standalone trigger — see the PDF's explicit rule: "Breakout weakening
+// only ⇒ WARNING, not an immediate sell." It only pushes exitProbability,
+// so REDUCE/EXIT still needs the other signals to be non-trivial too.
+const BREAKOUT_FAIL_BOOST     = parseFloat(process.env.SELL_BREAKOUT_FAIL_BOOST || '18');
+
 // ── Staleness nudge ──────────────────────────────────────────────────
 // Everything above requires real thesis deterioration or falling-knife
 // momentum to move exitProbability. A position that's neither winning
@@ -111,6 +124,11 @@ export function buildEntrySnapshot(entry, marketState = {}) {
     btcRiskScore:    marketState.btcRiskScore ?? null,
     breadthScore:    marketState.breadth?.score ?? null,
     marketRegime:    marketState.marketRegime || null,
+    // Captured for the breakout-failure check below — the exact level and
+    // trigger status this position was entered on, so a live re-fall below
+    // it can be detected precisely rather than inferred from score alone.
+    triggerStatus:   d.trigger?.triggerStatus ?? null,
+    breakoutLevel:   d.trigger?.breakoutLevel ?? null,
   };
 }
 
@@ -259,11 +277,22 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
 
   const recovery = detectRecovery(symbolState?.history, RECOVERY_WAIT_MIN);
 
+  // ── Breakout-failure check — see BREAKOUT_FAIL_BOOST comment above.
+  // Only meaningful when the position was actually entered on a breakout
+  // reclaim/imminent-trigger read AND the level was captured at entry
+  // (older positions bought before this field existed simply won't have
+  // snap.breakoutLevel, and this stays false/no-op for them). ──
+  const enteredOnBreakout = snap.triggerStatus === 'BREAKOUT' || snap.triggerStatus === 'TRIGGERING';
+  const currentPrice = currentEntry?.price ?? null;
+  const breakoutFailed = enteredOnBreakout && snap.breakoutLevel != null && currentPrice != null && currentPrice < snap.breakoutLevel;
+
   // ── Exit Probability — composite of the three signals above ──
   let exitProbability =
       fallingKnifeScore * 0.45 +
       clamp(thesisDrop, 0, 100) * 0.35 +
       confidenceDecay * 0.20;
+
+  if (breakoutFailed) exitProbability += BREAKOUT_FAIL_BOOST;
 
   // Market-regime awareness: a RISK_OFF regime raises exit probability
   // slightly (broad conditions working against the position); RISK_ON
@@ -291,8 +320,8 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   if (thesisDrop > THESIS_INVALIDATE_SCORE) {
     return {
       action: 'EXIT',
-      reason: `Thesis invalidated: entry score ${snap.thesisScore} → current ${currentThesisScore} (drop ${thesisDrop.toFixed(0)} > ${THESIS_INVALIDATE_SCORE})`,
-      fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk,
+      reason: `Thesis invalidated: entry score ${snap.thesisScore} → current ${currentThesisScore} (drop ${thesisDrop.toFixed(0)} > ${THESIS_INVALIDATE_SCORE})${breakoutFailed ? ' — price also back below entry breakout level' : ''}`,
+      fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk, breakoutFailed,
       positionAgeMin: ageMin, recovery, isStaleAndFlat,
     };
   }
@@ -301,8 +330,8 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   if (confidenceDecay > CONFIDENCE_DECAY_MAX && fallingKnifeScore > PARTIAL_EXIT_LEVEL1) {
     return {
       action: 'REDUCE_50',
-      reason: `Confidence decay ${confidenceDecay}% > ${CONFIDENCE_DECAY_MAX}% with falling-knife ${fallingKnifeScore}`,
-      fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk,
+      reason: `Confidence decay ${confidenceDecay}% > ${CONFIDENCE_DECAY_MAX}% with falling-knife ${fallingKnifeScore}${breakoutFailed ? ' — price also back below entry breakout level' : ''}`,
+      fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, exitProbability, dynamicPositionRisk, breakoutFailed,
       positionAgeMin: ageMin, recovery, isStaleAndFlat,
     };
   }
@@ -314,12 +343,12 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   else if (dynamicPositionRisk >= PARTIAL_EXIT_LEVEL1)  action = 'REDUCE_25';
 
   const reason = action === 'HOLD'
-    ? `dynamicPositionRisk ${dynamicPositionRisk} below ${PARTIAL_EXIT_LEVEL1} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}`
-    : `dynamicPositionRisk ${dynamicPositionRisk} ≥ ${action === 'EMERGENCY_EXIT' ? EMERGENCY_EXIT_LEVEL : action === 'REDUCE_50' ? PARTIAL_EXIT_LEVEL2 : PARTIAL_EXIT_LEVEL1}${recoveryConfirmed ? ' (recovery softened but not enough)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}`;
+    ? `dynamicPositionRisk ${dynamicPositionRisk} below ${PARTIAL_EXIT_LEVEL1} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}${breakoutFailed ? ` (breakout-fail boost +${BREAKOUT_FAIL_BOOST} applied, still below threshold)` : ''}`
+    : `dynamicPositionRisk ${dynamicPositionRisk} ≥ ${action === 'EMERGENCY_EXIT' ? EMERGENCY_EXIT_LEVEL : action === 'REDUCE_50' ? PARTIAL_EXIT_LEVEL2 : PARTIAL_EXIT_LEVEL1}${recoveryConfirmed ? ' (recovery softened but not enough)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}${breakoutFailed ? ` (breakout-fail boost +${BREAKOUT_FAIL_BOOST} applied — price back below entry breakout level)` : ''}`;
 
   return {
     action, reason,
-    fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay,
+    fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, breakoutFailed,
     exitProbability, dynamicPositionRisk, positionAgeMin: ageMin, recovery, isStaleAndFlat,
   };
 }

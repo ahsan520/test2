@@ -918,6 +918,7 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
           fallingKnifeScore: pi.fallingKnifeScore, thesisDrop: pi.thesisDrop,
           confidenceDecay: pi.confidenceDecay, exitProbability: pi.exitProbability,
           dynamicPositionRisk: pi.dynamicPositionRisk, recovery: pi.recovery,
+          breakoutFailed: pi.breakoutFailed || false,
           noSnapshotFallback: pi.noSnapshotFallback || false,
           evaluatedAt: now,
         };
