@@ -594,9 +594,11 @@ export async function executeSTPriorityRotation({
     // principle the normal executeRotation() applies via its Guard 2 above
     // — simpler here since ST15 doesn't need the other rotation guards
     // (min-hold, momentum, stagnation), just this one. ST15_MIN_PROFIT_PCT
-    // defaults to 0 — "strictly above buy price" — set it >0 to also clear
-    // round-trip fees/slippage before a sell is allowed, same idea as
-    // ROTATION_SELL_MIN_NET_PNL_PCT.
+    // defaults to the SAME 0.2% ROTATION_SELL_MIN_NET_PNL_PCT/
+    // ROTATION_MIN_PROFIT_PCT normal rotation already uses — one
+    // consistent minimum-profit threshold across normal rotation, ST5,
+    // and ST15 sells, rather than ST15/ST5 silently using a stricter
+    // "strictly above buy price, 0% margin" rule normal rotation doesn't.
     //
     // A protected (still-underwater) position is simply left alone — if
     // that leaves no live-trade capacity for the ST buy, the concurrency-
@@ -606,7 +608,12 @@ export async function executeSTPriorityRotation({
     let sellFailed = false;
     const protectedPositions = [];
 
-    const ST15_MIN_PROFIT_PCT = parseFloat(process.env.ST15_MIN_PROFIT_PCT || '0');
+    const ST15_MIN_PROFIT_PCT = parseFloat(
+      process.env.ST15_MIN_PROFIT_PCT
+      || process.env.ROTATION_SELL_MIN_NET_PNL_PCT
+      || process.env.ROTATION_MIN_PROFIT_PCT
+      || '0.2'
+    );
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
@@ -943,9 +950,10 @@ export async function executeST5PriorityRotation({
     // principle the normal executeRotation() applies via its Guard 2 above
     // — simpler here since ST5 doesn't need the other rotation guards
     // (min-hold, momentum, stagnation), just this one. ST5_MIN_PROFIT_PCT
-    // defaults to 0 — "strictly above buy price" — set it >0 to also clear
-    // round-trip fees/slippage before a sell is allowed, same idea as
-    // ROTATION_SELL_MIN_NET_PNL_PCT.
+    // defaults to the SAME 0.2% ROTATION_SELL_MIN_NET_PNL_PCT/
+    // ROTATION_MIN_PROFIT_PCT normal rotation already uses — one
+    // consistent minimum-profit threshold across normal rotation, ST5,
+    // and ST15 sells.
     //
     // A protected (still-underwater) position is simply left alone — if
     // that leaves no live-trade capacity for the ST buy, the concurrency-
@@ -955,7 +963,12 @@ export async function executeST5PriorityRotation({
     let sellFailed = false;
     const protectedPositions = [];
 
-    const ST5_MIN_PROFIT_PCT = parseFloat(process.env.ST5_MIN_PROFIT_PCT || '0');
+    const ST5_MIN_PROFIT_PCT = parseFloat(
+      process.env.ST5_MIN_PROFIT_PCT
+      || process.env.ROTATION_SELL_MIN_NET_PNL_PCT
+      || process.env.ROTATION_MIN_PROFIT_PCT
+      || '0.2'
+    );
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
