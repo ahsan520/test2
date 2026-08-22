@@ -53,9 +53,9 @@
     "t2": 0.7007,
     "score": 8,
     "spikeScore": 1.9381362488052563,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787363273414,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "peak",
     "recommended": false,
@@ -67,31 +67,36 @@
       "fillPrice": 0.661,
       "buyOrderId": "MANUAL_ADOPTED_1787361186197",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__719663034443685888036",
+      "exitFillPrice": 0.6626,
+      "closedAt": 1787363274625
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold",
-      "fallingKnifeScore": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "no entry snapshot — falling-knife-only score 3 below 75 threshold",
+      "fallingKnifeScore": 3,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 3,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787362981175
+      "evaluatedAt": 1787363273414
     },
     "highestPnLSeen": 1.06,
-    "lastR15": 76.2,
+    "lastR15": 69.2,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.00% below tier A give-back 0.5%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +1.06% (tier A) → now +0.45%, gave back 0.61% ≥ 0.5% with weakening momentum [RSI rolling over (76→69)]",
       "highestPnLSeen": 1.06,
-      "drawdownFromPeak": 0,
+      "drawdownFromPeak": 0.6100000000000001,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1787362981175
-    }
+      "evaluatedAt": 1787363273414
+    },
+    "exitPrice": 0.664,
+    "statusChangedAt": 1787363273414
   }
 }
