@@ -173,6 +173,13 @@ jobs:
           LB_MIN_SCORE:       ${{ vars.LB_MIN_SCORE || '6' }}
           LB_BULL_CONF_MIN:   ${{ vars.LB_BULL_CONF_MIN || '5' }}
           LB_COOLDOWN_MIN:    ${{ vars.LB_COOLDOWN_MIN || '60' }}
+          # Dedicated cooldown after a STOP-LOSS specifically (separate
+          # timer from LB_COOLDOWN_MIN above) — blocks a fresh buy alert
+          # on that exact symbol for this many minutes after it stops out,
+          # regardless of whether a new signal re-qualifies sooner. Added
+          # after two UNI stop-outs 65 min apart (just past the 60-min
+          # LB_COOLDOWN_MIN) on the same reclaimed breakout level.
+          LB_STOP_COOLDOWN_MIN: ${{ vars.LB_STOP_COOLDOWN_MIN || '90' }}
           LB_HOLD_LOCK:       ${{ vars.LB_HOLD_LOCK || '20' }}
           LB_EXIT_CVD_CYCLES: ${{ vars.LB_EXIT_CVD_CYCLES || vars.LB_CVD_CYCLES || '3' }}
           LB_EXIT_SCORE_MIN:  ${{ vars.LB_EXIT_SCORE_MIN || '3' }}
@@ -312,13 +319,21 @@ jobs:
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
           SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
           SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
-          SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '15' }}
+          SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '5' }}
           SELL_RECOVERY_WAIT_MIN:      ${{ vars.SELL_RECOVERY_WAIT_MIN || '10' }}
           SELL_PARTIAL_EXIT_LEVEL1:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL1 || '50' }}
           SELL_PARTIAL_EXIT_LEVEL2:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL2 || '70' }}
           SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
           SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
           SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
+          # How much a confirmed "price fell back below the exact breakout
+          # level this position was bought on" adds to exitProbability — see
+          # position-intelligence.js's breakoutFailed block. Additive, not a
+          # standalone trigger (dev-team note: "breakout weakening only" ⇒
+          # WARNING, not an immediate sell) — it only pushes the composite
+          # score, so REDUCE/EXIT still requires the OTHER signals (falling
+          # knife, thesis drop, confidence decay) to be non-trivial too.
+          SELL_BREAKOUT_FAIL_BOOST:    ${{ vars.SELL_BREAKOUT_FAIL_BOOST || '18' }}
           # ── Profit Intelligence Engine (profit-intelligence.js) ──
           # Independent sell reason — protects unrealized profit giving
           # itself back, separate from Position Intelligence above (which
