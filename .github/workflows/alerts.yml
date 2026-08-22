@@ -1,17 +1,34 @@
 name: Alpha Terminal Alert Runner
 
 on:
-  # Cron fully disabled — Cloudflare Worker is the unconditional primary
-  # scheduler now (fetch every 5 min, decide 2 min after each fetch, see
-  # DEPLOY.md). This workflow is triggered entirely via workflow_dispatch
-  # calls from that Worker (and manually, when needed) — no GitHub-side
-  # schedule left to race, double-fire, or drift out of sync with it.
+  # Re-enabled as a native fallback (2026-08-22) — the Cloudflare Worker is
+  # still the PRIMARY scheduler, but if it's ever down/failing, GitHub's own
+  # cron now keeps fetch/decide/full running so market-data.json doesn't go
+  # stale silently. The "Determine run mode" step and the concurrency.group
+  # expression below already branch on these exact three schedule strings
+  # (that scaffolding was left in place when the schedule itself was
+  # disabled) — this simply reconnects it, nothing else changes.
+  # If the Worker is healthy, this just means fetch/decide/full runs twice
+  # (once from the Worker's dispatch, once from this cron) — harmless,
+  # concurrency.group + the staleness/cooldown gates downstream already
+  # handle duplicate/overlapping runs safely.
+  schedule:
+    - cron: '*/5 * * * *'        # fetch  — every 5 min
+    - cron: '2-59/5 * * * *'     # decide — 2 min after each fetch tick
+    - cron: '31 * * * *'         # full   — hourly overnight/watchlist scan
   workflow_dispatch:
     inputs:
       dry_run:
         description: 'Dry run (no Telegram messages)'
         required: false
-        default: 'false'
+        # Was the quoted STRING 'false' — invalid for type: boolean (schema
+        # expects an actual boolean literal here). This is a documented
+        # GitHub Actions gotcha that causes workflow_dispatch calls made via
+        # the REST API (exactly how the Cloudflare Worker triggers this
+        # workflow) to fail/mis-resolve, and can make GitHub fall back to
+        # showing the raw file path instead of the workflow's `name:` in the
+        # Actions UI — matches what you were seeing.
+        default: false
         type: boolean
       mode:
         description: 'Run mode (manual runs only — scheduled runs pick this automatically)'
