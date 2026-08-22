@@ -815,11 +815,18 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
 
     const [ticker, k5m, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
       useKraken ? fetchKrakenTicker(krakenPair)                    : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
-      // 5m candles — short-timeframe trigger confirmation only (calcSpikeTrigger
-      // in buy-intelligence.js). Distinct from this job's ~5min RUN CADENCE:
-      // running every 5 minutes does not mean the bot has 5-minute candle
-      // data unless it's actually fetched, per the dev-team pre-spike note.
-      useKraken ? fetchKrakenOHLC(krakenPair, '5m', 20)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=5m&limit=20`),
+      // 5m candles — short-timeframe trigger confirmation (calcSpikeTrigger
+      // in buy-intelligence.js) AND the 5m Supertrend/ST5 P0 calc below
+      // (calcSupertrend needs >= ST5_PERIOD+2 CLOSED candles, default 12).
+      // Bumped from limit=20 to limit=60 (matching the 15m fetch) — 20 only
+      // leaves ~19 closed bars after dropping the still-forming one, which
+      // is enough on paper (19 >= 12) but left almost no margin for any
+      // gap/short-return from the exchange; 60 gives the same safety
+      // cushion ST15 already has. Distinct from this job's ~5min RUN
+      // CADENCE: running every 5 minutes does not mean the bot has
+      // 5-minute candle data unless it's actually fetched, per the
+      // dev-team pre-spike note.
+      useKraken ? fetchKrakenOHLC(krakenPair, '5m', 60)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=5m&limit=60`),
       useKraken ? fetchKrakenOHLC(krakenPair, '15m', 60)           : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
       useKraken ? fetchKrakenOHLC(krakenPair, '1h', 30)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
       useKraken ? fetchKrakenOHLC(krakenPair, '4h', 50)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
@@ -909,6 +916,19 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
       ST15_INTERVAL_MS
     );
 
+    // ── Diagnostic logging — same rationale as the ST5 block below.
+    if (!d.supertrend15m) {
+      if (k15m.status === 'rejected') {
+        console.log(`  ⚠  ${pair} ST15 null — k15m fetch REJECTED: ${k15m.reason?.message || k15m.reason}`);
+      } else if (!k15 || !k15.length) {
+        console.log(`  ⚠  ${pair} ST15 null — k15 fetch returned no candles`);
+      } else {
+        const st15Period = parseInt(process.env.ST15_PERIOD || '10', 10);
+        const closedCount = k15.filter(c => (parseInt(c[0], 10) + ST15_INTERVAL_MS) <= Date.now()).length;
+        console.log(`  ⚠  ${pair} ST15 null — k15 raw=${k15.length} closed=${closedCount} need>=${st15Period + 2}`);
+      }
+    }
+
     // ── 5m Supertrend Priority Execution (Priority-0 / P0) ──
     // Same mechanism as the 15m version above, one timeframe down — a
     // fresh 5m RED→GREEN cross is the earliest, least-lagging structural
@@ -927,6 +947,23 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
       parseFloat(process.env.ST5_MULTIPLIER || '3'),
       ST5_INTERVAL_MS
     );
+
+    // ── Diagnostic logging — ST5 was silently returning null for every
+    // symbol with no visibility into why (fetch failure vs insufficient
+    // closed candles vs something else). This surfaces the actual cause
+    // in the Action run log the next time it happens, instead of only
+    // showing up as an empty "—" in the GUI's ST5 column.
+    if (!d.supertrend5m) {
+      if (k5m.status === 'rejected') {
+        console.log(`  ⚠  ${pair} ST5 null — k5m fetch REJECTED: ${k5m.reason?.message || k5m.reason}`);
+      } else if (!k5 || !k5.length) {
+        console.log(`  ⚠  ${pair} ST5 null — k5 fetch returned no candles`);
+      } else {
+        const st5Period = parseInt(process.env.ST5_PERIOD || '10', 10);
+        const closedCount = k5.filter(c => (parseInt(c[0], 10) + ST5_INTERVAL_MS) <= Date.now()).length;
+        console.log(`  ⚠  ${pair} ST5 null — k5 raw=${k5.length} closed=${closedCount} need>=${st5Period + 2}`);
+      }
+    }
 
     const setup     = getSetupMode(d);
     const whale     = calcWhaleScore(d);
