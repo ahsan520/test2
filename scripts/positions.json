@@ -120,23 +120,23 @@
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 6
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     },
     "highestPnLSeen": 0.88,
-    "lastR15": 61.9,
+    "lastR15": 64.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.52% ≥ 0.3% but momentum not yet weak — holding, letting it run",
+      "reason": "drawdown 0.21% below tier B give-back 0.3%",
       "highestPnLSeen": 0.88,
-      "drawdownFromPeak": 0.52,
+      "drawdownFromPeak": 0.20999999999999996,
       "tier": "B",
       "giveBack": 0.3,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     }
   },
   "BINANCE:XRPUSDT": {
@@ -205,22 +205,22 @@
     "entryStateAtBuy": "BREAKOUT",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 20 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 15,
-      "confidenceDecay": 13,
-      "exitProbability": 20,
-      "dynamicPositionRisk": 20,
+      "reason": "dynamicPositionRisk 28 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 28,
+      "confidenceDecay": 25,
+      "exitProbability": 28,
+      "dynamicPositionRisk": 28,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 6
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     },
     "highestPnLSeen": 0,
-    "lastR15": 51.7,
+    "lastR15": 53.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.00% below 0.4% floor — not evaluated yet",
@@ -228,7 +228,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     }
   },
   "BINANCE:XMRUSDT": {
@@ -259,20 +259,20 @@
     "caution": false,
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold",
-      "fallingKnifeScore": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "no entry snapshot — falling-knife-only score 3 below 75 threshold",
+      "fallingKnifeScore": 3,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 3,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     },
     "highestPnLSeen": 0.16,
-    "lastR15": 53.6,
+    "lastR15": 52.7,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.16% below 0.4% floor — not evaluated yet",
@@ -280,7 +280,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787426547654
+      "evaluatedAt": 1787426850595
     }
   },
   "BINANCE:AAVEUSDT": {
@@ -299,9 +299,9 @@
     "t2": 134.53,
     "score": 8,
     "spikeScore": 2.0164104563061858,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787426850595,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -316,7 +316,10 @@
       "qty": 12.951,
       "fillPrice": 126.85989035595706,
       "buyOrderId": "C02__719927192791728130036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__719929698427002882036",
+      "exitFillPrice": 125.93393946413404,
+      "closedAt": 1787426852204
     },
     "entrySnapshot": {
       "at": 1787426254832,
@@ -346,6 +349,24 @@
       "breakoutLevel": 127.27
     },
     "entryTriggerStatus": "TRIGGERING",
-    "entryStateAtBuy": "RETEST"
+    "entryStateAtBuy": "RETEST",
+    "lastPI": {
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 81 → current 18 (drop 63 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 34,
+      "thesisDrop": 63,
+      "confidenceDecay": 38,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "breakoutFailed": true,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1787426850595
+    },
+    "exitPrice": 125.98,
+    "statusChangedAt": 1787426850595
   }
 }
