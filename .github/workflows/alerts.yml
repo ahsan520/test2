@@ -355,7 +355,11 @@ jobs:
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
           SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
           SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
-          SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '5' }}
+          # SELL_MIN_POSITION_AGE_MIN already defined above (near
+          # ROTATION_SELL_MIN_NET_PNL_PCT) — GitHub's workflow parser
+          # rejects duplicate env keys outright ("Invalid workflow file...
+          # already defined"), which is what was breaking every dispatch.
+          # Removed the duplicate here; same expression/value either way.
           SELL_RECOVERY_WAIT_MIN:      ${{ vars.SELL_RECOVERY_WAIT_MIN || '10' }}
           SELL_PARTIAL_EXIT_LEVEL1:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL1 || '50' }}
           SELL_PARTIAL_EXIT_LEVEL2:    ${{ vars.SELL_PARTIAL_EXIT_LEVEL2 || '70' }}
