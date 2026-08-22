@@ -536,16 +536,52 @@ export async function executeSTPriorityRotation({
       `  🔓 Normal BUY conditions bypassed — safety checks in progress…`
     );
 
-    // ── SELL every other currently-held crypto position (tracked AND, in
-    // live mode, any untracked real MEXC balance) — never the ST target ──
+    // ── SELL every other currently-held crypto position that's currently
+    // ABOVE its own buy price (tracked AND, in live mode, any untracked
+    // real MEXC balance — untracked has no buy-price record to compare
+    // against, so it's swept unconditionally same as before) — never the
+    // ST target itself.
+    //
+    // ST15 is Priority-0 for STRATEGY qualification (grade/conv/cooldown/
+    // momentum/etc. — see the big comment above this function), but that
+    // was never meant to force realizing a loss on an unrelated held
+    // position just to fund this buy. That's the exact same "never let
+    // rotation lock in a loss on a position that hasn't hit its own stop"
+    // principle the normal executeRotation() applies via its Guard 2 above
+    // — simpler here since ST15 doesn't need the other rotation guards
+    // (min-hold, momentum, stagnation), just this one. ST15_MIN_PROFIT_PCT
+    // defaults to 0 — "strictly above buy price" — set it >0 to also clear
+    // round-trip fees/slippage before a sell is allowed, same idea as
+    // ROTATION_MIN_PROFIT_PCT.
+    //
+    // A protected (still-underwater) position is simply left alone — if
+    // that leaves no live-trade capacity for the ST buy, the concurrency-
+    // cap check further down reports it and skips the buy this cycle
+    // rather than forcing a sell.
     const sellAlerts = [];
     let sellFailed = false;
+    const protectedPositions = [];
 
-    const trackedToSell = Object.entries(positions).filter(([, p]) =>
-      p.assetType === 'crypto' && p.base !== base
-      && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
-      && !['stopped', 'tp2_hit'].includes(p.status)
-    );
+    const ST15_MIN_PROFIT_PCT = parseFloat(process.env.ST15_MIN_PROFIT_PCT || '0');
+    const isAboveBuyPrice = (pos, curPrice) => {
+      const buyPrice = pos?.liveOrder?.fillPrice;
+      if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
+      return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + ST15_MIN_PROFIT_PCT / 100);
+    };
+
+    const trackedToSell = Object.entries(positions).filter(([, p]) => {
+      const eligible = p.assetType === 'crypto' && p.base !== base
+        && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
+        && !['stopped', 'tp2_hit'].includes(p.status);
+      if (!eligible) return false;
+      const curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
+      if (!isAboveBuyPrice(p, curPrice)) {
+        protectedPositions.push(p.base);
+        logAudit('st15_rotation_sell_protected', { base: p.base, eventId: event.id, buyPrice: p.liveOrder?.fillPrice, curPrice });
+        return false;
+      }
+      return true;
+    });
 
     for (const [key, pos] of trackedToSell) {
       const mData       = (market.symbols || {})[pos.base + 'USDT'];
@@ -661,8 +697,13 @@ export async function executeSTPriorityRotation({
     // (e.g. dust) rather than failed. ──
     if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
       event.status = 'BLOCKED_MAX_LIVE';
-      logAudit('st15_blocked_max_live', { pair, id: event.id });
-      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — still at ${effectiveMaxLive}/${effectiveMaxLive} live trade cap after rotation sells — BUY skipped this cycle.`);
+      logAudit('st15_blocked_max_live', { pair, id: event.id, protectedPositions });
+      await sendTelegram(
+        `🚫 *ST15 CROSS — ${base}* — still at ${effectiveMaxLive}/${effectiveMaxLive} live trade cap after rotation sells — BUY skipped this cycle.\n` +
+        (protectedPositions.length
+          ? `  🛡 _${protectedPositions.join(', ')} kept — currently at/below buy price, not sold at a loss. Will retry once a slot frees up._`
+          : '')
+      );
       continue;
     }
 
@@ -699,7 +740,8 @@ export async function executeSTPriorityRotation({
       event.status = 'EXECUTED';
       await sendTelegram(
         `📝 *ST15 PRIORITY PAPER BUY* — ${base} $${ST15_PRIORITY_USD_SIZE} USDT @ ~$${fillPrice.toFixed(6)}\n` +
-        `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._`
+        `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._` +
+        (protectedPositions.length ? `\n  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._` : '')
       );
     } else {
       console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${pair} $${ST15_PRIORITY_USD_SIZE} USDT via MEXC...`);
@@ -729,6 +771,7 @@ export async function executeSTPriorityRotation({
           `  Size: $${ST15_PRIORITY_USD_SIZE} USDT  Order ID: \`${buy.orderId}\`\n` +
           `  Event \`${event.id}\` marked EXECUTED.\n` +
           `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
+          (protectedPositions.length ? `  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._\n` : '') +
           `  _Send /pause to halt further auto-buys_`
         );
       } catch (e) {
