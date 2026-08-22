@@ -40,6 +40,7 @@ import { monitorPositions, reconcileTrackedLiveBalances } from './position-monit
 import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
+import { checkSTAlignment } from './st-alignment-check.js';
 
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
@@ -934,6 +935,29 @@ async function main() {
         console.log(`  🛑  ${pair} — Entry Quality Check FAILED — ${summary}`);
         logAudit('entry_quality_blocked', { pair, blockers: eq.blockers.map(b => b.code) });
         continue;
+      }
+
+      // ══════════════════════════════════════════════════════════════════
+      // ST5/ST15 ALIGNMENT — per the "P0/P1/P2 WATCH + ST Alignment" dev
+      // doc (§3-§4, §8): a SEPARATE timing/confirmation layer on top of the
+      // Entry Quality Check above, not a conviction-score weight. Reads the
+      // CURRENT ST5/ST15 direction (no fresh cross required — that's P0/P1's
+      // job, STEP 1.6/1.7 above) to reduce falling-knife and
+      // premature-transition entries in the frequent P2 engine. CAP BUY is
+      // exempt for the same reason it's exempt everywhere else in this
+      // block — it's a deliberate extreme-shock exception to normal
+      // qualification, not a candidate this timing layer is meant to judge.
+      // See st-alignment-check.js for the full per-combination reasoning.
+      if (!isCapBuyForTrigger) {
+        const stAlign = checkSTAlignment(entry);
+        if (!stAlign.pass) {
+          console.log(`  📉  ${pair} — ST alignment blocked (ST5:${stAlign.st5Dir ?? '—'}/ST15:${stAlign.st15Dir ?? '—'}) — ${stAlign.reason}`);
+          logAudit('st_alignment_blocked', { pair, alignment: stAlign.alignment, st5Dir: stAlign.st5Dir, st15Dir: stAlign.st15Dir });
+          continue;
+        }
+        if (stAlign.alignment !== 'STRONG') {
+          console.log(`  ✅  ${pair} — ST alignment ${stAlign.alignment} (ST5:${stAlign.st5Dir}/ST15:${stAlign.st15Dir}) — ${stAlign.reason}`);
+        }
       }
     }
 

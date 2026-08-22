@@ -1697,6 +1697,27 @@ async function executeAutoBuys({
           `  _Raise TRADE_MAX_CONCURRENT_LIVE if you want more concurrent positions._`
         );
       }
+
+      // Crypto-only cleanup — leaderboard-decider.js already created this
+      // positions[pick.sym] "watching" tracking entry (entryPrice/stop/
+      // t1/t2 set) BEFORE mexc-trader ran, on the assumption the buy alert
+      // would be followed by a real MEXC buy this same cycle. When
+      // mexc-trader itself is the reason no buy happened — the symbol is on
+      // MEXC_NO_TRADE_SYMBOLS, or TRADE_MAX_CONCURRENT_LIVE was already hit
+      // — that tracking entry must not be left behind. `pos?.liveOrder`
+      // being set is deliberately excluded here: that's the idempotency-
+      // guard reason, meaning this is a REAL previously-bought holding, not
+      // an unfilled watching entry — must never delete that. Exit-
+      // monitoring doesn't distinguish "actually holding this" from "was
+      // tracked, never bought", and would otherwise go on to watch price
+      // against a phantom entryPrice/stop and eventually fire a real
+      // stop-loss/T1 alert for a coin never actually bought. Mirrors the
+      // identical cleanup already done in the live-buy-failure catch block
+      // below, for the same underlying reason.
+      if (pick.entry?.assetType === 'crypto' && !pos?.liveOrder
+          && (isNoTradeSymbol(pick.pair) || liveLock >= effectiveMaxLive)) {
+        delete positions[pick.sym];
+      }
       continue;
     }
 
