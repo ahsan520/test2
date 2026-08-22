@@ -17,7 +17,7 @@
     "spikeScore": 0.35043665367554777,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-GALA-20260822T222000Z",
@@ -28,7 +28,10 @@
       "qty": 415698.46,
       "fillPrice": 0.0019432835780531876,
       "buyOrderId": "C02__719974965427752960036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__719978751756005376036",
+      "exitFillPrice": 0.0019480723589401798,
+      "closedAt": 1787438547417
     },
     "entrySnapshot": {
       "at": 1787437644797,
@@ -85,7 +88,10 @@
       "tier": "C",
       "giveBack": 0.2,
       "evaluatedAt": 1787438544523
-    }
+    },
+    "exitPrice": 0.0019480723589401798,
+    "statusChangedAt": 1787438548616,
+    "rotatedOut": true
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -174,5 +180,66 @@
       "giveBack": null,
       "evaluatedAt": 1787438544523
     }
+  },
+  "BINANCE:TAOUSDT": {
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST5 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1787438549666,
+    "holdLockUntil": 1787438549666,
+    "entryPrice": 223.31,
+    "stop": 221.08,
+    "t1": 230.01,
+    "t2": 236.71,
+    "score": 0,
+    "spikeScore": 0.3849171850408927,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st5_priority_v1",
+    "scoreSource": "st5_cross",
+    "st5EventId": "ST5-TAO-20260822T222500Z",
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1787438549666,
+      "usdSize": 1212.94,
+      "qty": 5.431,
+      "fillPrice": 223.31,
+      "buyOrderId": "C02__719978765412659202036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1787438550829,
+      "price": 223.3,
+      "conv": 0,
+      "whaleScore": 70,
+      "bullConfCount": 8,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": true,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "LEAN BULL",
+      "cvdTrend": "up",
+      "thesisScore": 51,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "SETUP",
+      "breakoutLevel": 229
+    },
+    "entryTriggerStatus": "SETUP",
+    "entryStateAtBuy": "ST5_CROSS_UP"
   }
 }
