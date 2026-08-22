@@ -1,49 +1,11 @@
 name: Alpha Terminal Alert Runner
 
 on:
-  # Restored as a safety net alongside the Cloudflare Worker (see
-  # DEPLOY.md). This used to be fully disabled because a single shared
-  # concurrency group let a queued `decide` run get silently superseded by
-  # the next `fetch` dispatch (see the concurrency block below) — decide
-  # would just never execute, no error. That's now fixed by keying the
-  # concurrency group off mode, so fetch/decide/full each get their own
-  # queue and can no longer bump each other. With that fix in place, native
-  # cron running alongside the Worker is redundant-safe rather than racy:
-  # worst case is a wasted extra run that queues behind/after the Worker's
-  # dispatch in the same mode's group, or gets caught by
-  # leaderboard-decider.js's own staleness gate.
-  #
-  # This restores the same effective cadence the Worker already runs so
-  # the two sources reinforce each other instead of one being a silent
-  # single point of failure (as happened when a Worker account went dark
-  # with nothing picking up the slack).
-  schedule:
-    # Job A — market data fetch only. Offset to :04/:09/:14… — 4 minutes
-    # after Cloudflare's fetch tick (:00/:05/:10…). This gap is what the
-    # staleness check (FETCH_STALE_THRESHOLD_MIN, default 4) relies on: if
-    # CF's fetch succeeded, market-data.json is <4min old by the time this
-    # lands, so this run skips as a no-op duplicate. If CF's fetch failed
-    # or didn't fire, data is stale and this actually runs — genuine
-    # backstop, not a race.
-    - cron: '4-59/5 * * * *'     # :04, :09, :14 …
-
-    # Job B — leaderboard buy decision + position tracker sell-side check.
-    # Offset to :01/:06/:11… — 4 minutes after Cloudflare's decide tick
-    # (:02/:07/:12…, i.e. :02 + 4 wraps to :01 next 5-min block). Same
-    # staleness logic as fetch above, checked against heartbeat.json.
-    - cron: '1-59/5 * * * *'     # :01, :06, :11 …
-
-    # Hourly full-scan — watchlist signal/overnight rules. DISABLED (see
-    # commented cron below) but left in place, not deleted, so it's a
-    # one-line uncomment to bring back rather than having to reconstruct
-    # it. While disabled, mode=full only runs via manual dispatch (Actions
-    # tab → Run workflow → mode: full).
-    # - cron: '31 * * * *'       # :31 past every hour
-
-  # Also triggered via workflow_dispatch — both by the Cloudflare Worker
-  # (which always passes mode=fetch or mode=decide explicitly) and by
-  # manual runs from the Actions tab (pick any mode below) to test
-  # fetch/decide/full independently of either scheduler's timing.
+  # Cron fully disabled — Cloudflare Worker is the unconditional primary
+  # scheduler now (fetch every 5 min, decide 2 min after each fetch, see
+  # DEPLOY.md). This workflow is triggered entirely via workflow_dispatch
+  # calls from that Worker (and manually, when needed) — no GitHub-side
+  # schedule left to race, double-fire, or drift out of sync with it.
   workflow_dispatch:
     inputs:
       dry_run:
@@ -52,7 +14,7 @@ on:
         default: 'false'
         type: boolean
       mode:
-        description: 'Run mode'
+        description: 'Run mode (manual runs only — scheduled runs pick this automatically)'
         required: false
         default: 'full'
         type: choice
@@ -68,18 +30,17 @@ concurrency:
   # Why this matters: with a single shared group, GitHub Actions cancels
   # older *queued* (not yet started) runs whenever a newer run queues
   # behind the same group — cancel-in-progress:false only protects a run
-  # that's already EXECUTING, not ones waiting in line. Both native cron
-  # AND the Cloudflare Worker fire mode=fetch every ~5 min and mode=decide
-  # 2 min after — without separate groups, a queued decide run could get
-  # superseded by the next fetch dispatch before it ever ran — decide
-  # silently never executes, no error, market-data.json just keeps aging
-  # past the point decide needed it. (Observed: fetch data >30min stale,
-  # decide hadn't run.)
+  # that's already EXECUTING, not ones waiting in line. Since the
+  # Cloudflare Worker safety net (see DEPLOY.md) unconditionally fires
+  # mode=fetch every ~17 min AND conditionally fires mode=decide on the
+  # same tick, a queued decide run could get superseded by the next
+  # fetch dispatch before it ever ran — decide silently never executes,
+  # no error, market-data.json just keeps aging past the point decide
+  # needed it. (Observed: fetch data >30min stale, decide hadn't run.)
   #
   # Splitting the group by mode means a queued decide can only ever be
-  # superseded by another decide, never bumped by an unrelated fetch —
-  # whether that fetch came from cron or from the Worker.
-  group: alert-runner-${{ github.event.schedule == '1-59/5 * * * *' && 'decide' || (github.event.schedule == '4-59/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
+  # superseded by another decide, never bumped by an unrelated fetch.
+  group: alert-runner-${{ github.event.schedule == '2-59/5 * * * *' && 'decide' || (github.event.schedule == '*/5 * * * *' && 'fetch' || (github.event.schedule == '31 * * * *' && 'full' || (inputs.mode || 'manual'))) }}
   cancel-in-progress: false
 
 permissions:
@@ -97,29 +58,31 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: scripts
+        run: npm install
+
       # ── Determine run mode ──────────────────────────────────────────────
-      # 4-59/5     → fetch   (market-fetcher.js — Job A, data only; 4min after CF's fetch)
-      # 1-59/5     → decide  (leaderboard-decider.js + positions check — Job B; 4min after CF's decide)
-      # :31 hourly → full    (DISABLED — cron commented out above; this branch
-      #              is harmless dead code unless that cron gets re-enabled)
+      # */5        → fetch   (market-fetcher.js — Job A, data only)
+      # 2,19,36,53 → decide  (leaderboard-decider.js + positions check — Job B)
+      # :15 hourly → full    (alert-runner.js full watchlist/overnight scan)
       # workflow_dispatch    → whatever the "mode" input says (default: full)
       #
       # NOTE: github.event.schedule tells us exactly which cron string
       # triggered this run, so there's no ambiguity even when two schedules
-      # coincide. A workflow_dispatch call (Worker or manual) has no
-      # github.event.schedule, so it falls through to inputs.mode.
-      #
-      # Moved ahead of Node setup/npm install deliberately — this and the
-      # staleness check below are both cheap (no deps needed, just bash +
-      # the system node binary already on the runner image), so a run
-      # that's about to skip never pays for `npm install` at all.
+      # coincide.
       - name: Determine run mode
         id: mode
         run: |
           SCHEDULE="${{ github.event.schedule }}"
-          if [ "$SCHEDULE" = "4-59/5 * * * *" ]; then
+          if [ "$SCHEDULE" = "*/5 * * * *" ]; then
             VALUE="fetch"
-          elif [ "$SCHEDULE" = "1-59/5 * * * *" ]; then
+          elif [ "$SCHEDULE" = "2-59/5 * * * *" ]; then
             VALUE="decide"
           elif [ "$SCHEDULE" = "31 * * * *" ]; then
             VALUE="full"
@@ -131,10 +94,33 @@ jobs:
           echo "value=$VALUE" >> "$GITHUB_OUTPUT"
           echo "Resolved mode: $VALUE (schedule: '${SCHEDULE:-manual}')"
 
+      # ── Write env.js with real credentials (runtime only — never committed) ──
+      # This file is written to disk for GitHub Pages to serve to the browser.
+      # It is reset to blanks BEFORE any git commit so secrets never enter git history.
+      - name: Write env.js (runtime credentials)
+        env:
+          GH_PAT:             ${{ secrets.GH_PAT }}
+          GH_REPO:            ${{ vars.GH_REPO || 'ahsan520/test2' }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          printf "// Auto-generated by GitHub Actions — DO NOT edit manually.\n" > scripts/env.js
+          printf "// Reset to blanks before every git commit — secrets never enter git history.\n" >> scripts/env.js
+          printf "// NOTE: AV_API_KEY / GNEWS_API_KEY are intentionally NOT written here.\n" >> scripts/env.js
+          printf "// Those are server-side-only secrets used by sentiment-fetcher.js /\n" >> scripts/env.js
+          printf "// general-news-fetcher.js, which write their results to committed JSON\n" >> scripts/env.js
+          printf "// files (sentiment-data.json / general-news-data.json) for the browser\n" >> scripts/env.js
+          printf "// to read. This file is wiped before every commit anyway, so a browser\n" >> scripts/env.js
+          printf "// key here would never actually reach GitHub Pages.\n" >> scripts/env.js
+          printf "window.__GH_PAT    = '%s';\n" "$GH_PAT"             >> scripts/env.js
+          printf "window.__GH_REPO   = '%s';\n" "$GH_REPO"            >> scripts/env.js
+          printf "window.__TG_TOKEN  = '%s';\n" "$TELEGRAM_BOT_TOKEN" >> scripts/env.js
+          printf "window.__TG_CHAT   = '%s';\n" "$TELEGRAM_CHAT_ID"   >> scripts/env.js
+          echo "✓ env.js written"
+          echo "  GH_PAT:  $([ -n "$GH_PAT"             ] && echo '✓' || echo '✗ MISSING')"
+          echo "  TG:      $([ -n "$TELEGRAM_BOT_TOKEN"  ] && echo '✓' || echo '✗ MISSING')"
+
       # ── Ensure tracking files exist ──
-      # Moved ahead of npm install — the staleness check right after this
-      # needs market-data.json/heartbeat.json to exist, and this step is
-      # pure bash, no deps required.
       - name: Ensure tracking files exist
         run: |
           if [ ! -f scripts/positions.json ]; then
@@ -170,111 +156,8 @@ jobs:
             echo "Created empty general-news-data.json"
           fi
 
-          if [ ! -f scripts/heartbeat.json ]; then
-            echo '{"lastRunAt":0}' > scripts/heartbeat.json
-            echo "Created empty heartbeat.json"
-          fi
-
-      # ── Staleness check — skip fetch/decide if already fresh ────────────
-      # Same idea as the Cloudflare Worker's own staleness check, but done
-      # here once, so it applies uniformly no matter which trigger fired
-      # this run (native cron, the CF fetch Worker, the CF decide Worker,
-      # or a manual dispatch). Whichever source runs first for a given
-      # tick does the work and writes fresh data; whichever source's
-      # trigger lands after it sees fresh data and skips — same pattern
-      # the CF decide Worker already uses against heartbeat.json, just
-      # centralized instead of duplicated per-trigger-source.
-      #
-      # Only applies to mode=fetch and mode=decide. full/positions/manual
-      # runs always execute — they're not part of the fetch/decide race
-      # this exists to de-duplicate.
-      #
-      # Uses the runner image's pre-installed system `node` — deliberately
-      # BEFORE the "Set up Node.js" / "Install dependencies" steps, so a
-      # skip here means those two (the actually expensive ones — network
-      # install, package resolution) never run at all.
-      - name: Check staleness (skip if another trigger already covered this tick)
-        # DISABLED — the Cloudflare Worker already handles this via its own
-        # threshold (DECIDE_THRESHOLD_MIN in wrangler.toml), so this yml-side
-        # check is redundant right now. Left fully intact below, not deleted
-        # — flip this back to `if: steps.mode.outputs.value == ...` (or just
-        # delete this line) to re-enable later if the Worker-side threshold
-        # ever gets removed or this ever needs to be the primary check again.
-        if: false
-        id: staleness
-        run: |
-          MODE="${{ steps.mode.outputs.value }}"
-          NOW_MS=$(( $(date +%s) * 1000 ))
-
-          if [ "$MODE" = "fetch" ]; then
-            THRESHOLD_MIN="${{ vars.FETCH_STALE_THRESHOLD_MIN || '2' }}"
-            LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/market-data.json')).fetchedAt||0)}catch(e){console.log(0)}")
-          elif [ "$MODE" = "decide" ]; then
-            THRESHOLD_MIN="${{ vars.DECIDE_STALE_THRESHOLD_MIN || '2' }}"
-            LAST_MS=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('scripts/heartbeat.json')).lastRunAt||0)}catch(e){console.log(0)}")
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Mode '$MODE' is not fetch/decide — staleness check doesn't apply, running normally."
-            exit 0
-          fi
-
-          AGE_MIN=$(( (NOW_MS - LAST_MS) / 60000 ))
-          echo "mode=$MODE lastRecordedAt=${LAST_MS}ms age=${AGE_MIN}min threshold=${THRESHOLD_MIN}min"
-
-          if [ "$LAST_MS" != "0" ] && [ "$AGE_MIN" -le "$THRESHOLD_MIN" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "✓ Already fresh (${AGE_MIN}min old, threshold ${THRESHOLD_MIN}min) — another trigger covered this tick, skipping duplicate run. Node setup / npm install / pipeline all skip too."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Stale (${AGE_MIN}min old, threshold ${THRESHOLD_MIN}min) or no prior record — running."
-          fi
-
-      # ── Everything below only runs if we're NOT skipping ─────────────────
-      - name: Set up Node.js
-        if: steps.staleness.outputs.skip != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install dependencies
-        if: steps.staleness.outputs.skip != 'true'
-        working-directory: scripts
-        run: npm install
-
-      # ── Write env.js with real credentials (runtime only — never committed) ──
-      # This file is written to disk for GitHub Pages to serve to the browser.
-      # It is reset to blanks BEFORE any git commit so secrets never enter git history.
-      - name: Write env.js (runtime credentials)
-        if: steps.staleness.outputs.skip != 'true'
-        env:
-          GH_PAT:             ${{ secrets.GH_PAT }}
-          GH_REPO:            ${{ vars.GH_REPO || 'ahsan520/test2' }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          printf "// Auto-generated by GitHub Actions — DO NOT edit manually.\n" > scripts/env.js
-          printf "// Reset to blanks before every git commit — secrets never enter git history.\n" >> scripts/env.js
-          printf "// NOTE: AV_API_KEY / GNEWS_API_KEY are intentionally NOT written here.\n" >> scripts/env.js
-          printf "// Those are server-side-only secrets used by sentiment-fetcher.js /\n" >> scripts/env.js
-          printf "// general-news-fetcher.js, which write their results to committed JSON\n" >> scripts/env.js
-          printf "// files (sentiment-data.json / general-news-data.json) for the browser\n" >> scripts/env.js
-          printf "// to read. This file is wiped before every commit anyway, so a browser\n" >> scripts/env.js
-          printf "// key here would never actually reach GitHub Pages.\n" >> scripts/env.js
-          printf "window.__GH_PAT    = '%s';\n" "$GH_PAT"             >> scripts/env.js
-          printf "window.__GH_REPO   = '%s';\n" "$GH_REPO"            >> scripts/env.js
-          printf "window.__TG_TOKEN  = '%s';\n" "$TELEGRAM_BOT_TOKEN" >> scripts/env.js
-          printf "window.__TG_CHAT   = '%s';\n" "$TELEGRAM_CHAT_ID"   >> scripts/env.js
-          echo "✓ env.js written"
-          echo "  GH_PAT:  $([ -n "$GH_PAT"             ] && echo '✓' || echo '✗ MISSING')"
-          echo "  TG:      $([ -n "$TELEGRAM_BOT_TOKEN"  ] && echo '✓' || echo '✗ MISSING')"
-
       # ── Run the resolved mode ──
-      # Skipped entirely if the staleness check above found this tick
-      # already covered by another trigger source. State files are
-      # untouched in that case, so the commit step below finds no diff
-      # and no-ops — nothing further needs to special-case a skip.
       - name: Run alert pipeline
-        if: steps.staleness.outputs.skip != 'true'
         working-directory: scripts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -287,20 +170,13 @@ jobs:
           ALERT_COOLDOWN_HOURS: ${{ vars.ALERT_COOLDOWN_HOURS || '1' }}
           DIGEST_MODE:        ${{ vars.DIGEST_MODE || 'true' }}
           DRY_RUN:            ${{ inputs.dry_run || vars.DRY_RUN || 'false' }}
-          LB_MIN_SCORE:       ${{ vars.LB_MIN_SCORE || '8' }}
+          LB_MIN_SCORE:       ${{ vars.LB_MIN_SCORE || '6' }}
           LB_BULL_CONF_MIN:   ${{ vars.LB_BULL_CONF_MIN || '5' }}
           LB_COOLDOWN_MIN:    ${{ vars.LB_COOLDOWN_MIN || '60' }}
-          LB_HOLD_LOCK:       ${{ vars.LB_HOLD_LOCK || '15' }}
+          LB_HOLD_LOCK:       ${{ vars.LB_HOLD_LOCK || '20' }}
           LB_EXIT_CVD_CYCLES: ${{ vars.LB_EXIT_CVD_CYCLES || vars.LB_CVD_CYCLES || '3' }}
           LB_EXIT_SCORE_MIN:  ${{ vars.LB_EXIT_SCORE_MIN || '3' }}
           LB_STALE_WATCH_HRS: ${{ vars.LB_STALE_WATCH_HRS || '24' }}
-          # Separate, much shorter threshold for LIVE positions specifically
-          # — the old 24h threshold also silently abandoned real MEXC
-          # positions without ever selling them (tracking got deleted, the
-          # exchange position stayed open, unmonitored). This closes that
-          # gap: a live position stale past this threshold gets a REAL
-          # sell order placed before its tracking is removed.
-          LB_STALE_LIVE_HRS: ${{ vars.LB_STALE_LIVE_HRS || '6' }}
           LB_ALLOW_PRE_MARKET: ${{ vars.LB_ALLOW_PRE_MARKET || 'false' }}
           LB_ALLOW_AH:        ${{ vars.LB_ALLOW_AH || 'false' }}
           LB_ALERT_STATE_TTL_HOURS: ${{ vars.LB_ALERT_STATE_TTL_HOURS || '6' }}
@@ -316,23 +192,32 @@ jobs:
           EXEC_STRATEGY:      ${{ vars.EXEC_STRATEGY || 'topN' }}
           EXEC_TOP_N_COUNT:   ${{ vars.EXEC_TOP_N_COUNT || '3' }}
           EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
-          ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '4' }}
-          ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.4' }}
-          # Stagnation override — waives rotation's own "flat = protected"
-          # guard for a position that's BOTH old enough to have had a real
-          # chance to move AND still sitting near its own fill price with
-          # no real movement. Only relevant if the position has also
-          # fallen off today's recommended list (Guard 3 still fully
-          # protects anything still genuinely liked, regardless of age).
-          ROTATION_STAGNATION_AGE_MIN:  ${{ vars.ROTATION_STAGNATION_AGE_MIN || '120' }}
-          ROTATION_STAGNATION_FLAT_PCT: ${{ vars.ROTATION_STAGNATION_FLAT_PCT || '0.3' }}
-          STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1.5' }}
+          ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
+          ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
+          # ── ST15 Priority Execution (dev-team note) — these were computed
+          # by mexc-trader.js/leaderboard-scanner.js from process.env with
+          # JS-side defaults, but were never actually wired into this
+          # workflow's env block, so any GitHub Variable set for them was
+          # silently ignored (the script only ever saw its own hardcoded
+          # default). Adding the passthrough here so ST15_* Variables set
+          # in repo settings actually reach the job.
+          ST15_ENABLE:          ${{ vars.ST15_ENABLE || 'true' }}
+          ST15_PERIOD:          ${{ vars.ST15_PERIOD || '10' }}
+          ST15_MULTIPLIER:      ${{ vars.ST15_MULTIPLIER || '3' }}
+          ST15_PRIORITY_USD_SIZE: ${{ vars.ST15_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
+          # Minimum % above buy price required before ST15 rotation will
+          # sell a held position to fund the new buy — '0' (default) means
+          # strictly above buy price, never at a loss; raise it to also
+          # clear round-trip fees/slippage, same idea as
+          # ROTATION_MIN_PROFIT_PCT above.
+          ST15_MIN_PROFIT_PCT:  ${{ vars.ST15_MIN_PROFIT_PCT || '0' }}
+          STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
           T1_ATR_MULT:        ${{ vars.T1_ATR_MULT || '0.5' }}
           T2_ATR_MULT:        ${{ vars.T2_ATR_MULT || '2' }}
           GUARD_BTC_BUY_GATE: ${{ vars.GUARD_BTC_BUY_GATE || 'true' }}
           BUY_BULL4H_COUNT_MIN: ${{ vars.BUY_BULL4H_COUNT_MIN || '1' }}
           BUY_REQUIRE_BULL4H_COUNT: ${{ vars.BUY_REQUIRE_BULL4H_COUNT || 'true' }}
-          BTC_ALPHA_BULL4H_COUNT_MIN: ${{ vars.BTC_ALPHA_BULL4H_COUNT_MIN || '1' }}
+          BTC_ALPHA_BULL4H_COUNT_MIN: ${{ vars.BTC_ALPHA_BULL4H_COUNT_MIN || '2' }}
           BTC_ALPHA_REQUIRE_BULL4H_COUNT: ${{ vars.BTC_ALPHA_REQUIRE_BULL4H_COUNT || 'true' }}
           BULL4H_COUNT_BEAR_VALUES: ${{ vars.BULL4H_COUNT_BEAR_VALUES || 'LEAN BEAR,BEAR 4H' }}
           # ── Buy Intelligence (buy-intelligence.js) — entry-timing checks,
@@ -341,55 +226,18 @@ jobs:
           # crypto-tuned (fast moves, 5-min fetch cadence) — much lower than
           # a stock-calibrated version would use.
           BUY_ENABLE_CHASE_CHECK:          ${{ vars.BUY_ENABLE_CHASE_CHECK || 'true' }}
-          BUY_CHASE_WARN_STREAK:           ${{ vars.BUY_CHASE_WARN_STREAK || '1' }}
-          BUY_CHASE_BLOCK_STREAK:          ${{ vars.BUY_CHASE_BLOCK_STREAK || '2' }}
-          # New — the chase check above is now RSI-aware (buy-intelligence.js):
-          # a green-candle streak only gets penalized once RSI confirms the
-          # move is actually overbought, so a fresh spike (RSI still has
-          # room) no longer eats the same penalty as an exhausted one with
-          # the same candle count. This falling-knife check is the natural
-          # counterpart on the downside — same streak mechanics, but on
-          # consecutive RED candles, catching a buy while price is still
-          # actively falling (not just "some % below a recent high", which
-          # the existing pullback check below already covers separately).
-          BUY_ENABLE_FALLING_KNIFE_CHECK:  ${{ vars.BUY_ENABLE_FALLING_KNIFE_CHECK || 'true' }}
-          BUY_FALLING_KNIFE_WARN_STREAK:   ${{ vars.BUY_FALLING_KNIFE_WARN_STREAK || '2' }}
-          BUY_FALLING_KNIFE_BLOCK_STREAK:  ${{ vars.BUY_FALLING_KNIFE_BLOCK_STREAK || '3' }}
-          # New — stock-calibrated equivalents (buy-intelligence.js's
-          # evaluateStockBuyReadiness), used by scoreStock() only. Crypto's
-          # own checks above are 15m-candle-calibrated; these are day-bar
-          # calibrated (a "2-candle streak" here means 2 whole trading
-          # days, and pullback %s are wider since equities routinely move
-          # 2-4% off a recent high without it meaning anything, unlike the
-          # tighter 0.5-1.0% that's meaningful for crypto).
-          BUY_STOCK_CHASE_WARN_STREAK:          ${{ vars.BUY_STOCK_CHASE_WARN_STREAK || '2' }}
-          BUY_STOCK_CHASE_BLOCK_STREAK:         ${{ vars.BUY_STOCK_CHASE_BLOCK_STREAK || '3' }}
-          BUY_STOCK_FALLING_KNIFE_WARN_STREAK:  ${{ vars.BUY_STOCK_FALLING_KNIFE_WARN_STREAK || '2' }}
-          BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK: ${{ vars.BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK || '3' }}
-          BUY_STOCK_RSI_HOT:                    ${{ vars.BUY_STOCK_RSI_HOT || '70' }}
-          BUY_STOCK_RSI_VHOT:                   ${{ vars.BUY_STOCK_RSI_VHOT || '80' }}
-          BUY_STOCK_RSI_CONFIRM_HOT:             ${{ vars.BUY_STOCK_RSI_CONFIRM_HOT || '70' }}
-          BUY_STOCK_PULLBACK_LOOKBACK:          ${{ vars.BUY_STOCK_PULLBACK_LOOKBACK || '5' }}
-          BUY_STOCK_PULLBACK_WARN_PCT:          ${{ vars.BUY_STOCK_PULLBACK_WARN_PCT || '2.0' }}
-          BUY_STOCK_PULLBACK_BLOCK_PCT:         ${{ vars.BUY_STOCK_PULLBACK_BLOCK_PCT || '4.0' }}
+          BUY_CHASE_WARN_STREAK:           ${{ vars.BUY_CHASE_WARN_STREAK || '2' }}
+          BUY_CHASE_BLOCK_STREAK:          ${{ vars.BUY_CHASE_BLOCK_STREAK || '3' }}
           BUY_ENABLE_RSI_EXTENSION_CHECK:  ${{ vars.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true' }}
-          BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '64' }}
-          BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '72' }}
-          BUY_RSI_1H_HOT:                  ${{ vars.BUY_RSI_1H_HOT || '62' }}
+          BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '70' }}
+          BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '78' }}
+          BUY_RSI_1H_HOT:                  ${{ vars.BUY_RSI_1H_HOT || '68' }}
           # Signal-quality/data-confidence floor — catches thin, low-conf
           # setups (e.g. IMX: bullConf 1/10, whale 35/100, still BUILDING)
           # that aren't chasing or RSI-extended, just genuinely weak.
           BUY_ENABLE_QUALITY_FLOOR:        ${{ vars.BUY_ENABLE_QUALITY_FLOOR || 'true' }}
-          BUY_QUALITY_MIN_BULLCONF:        ${{ vars.BUY_QUALITY_MIN_BULLCONF || '4' }}
-          BUY_QUALITY_MIN_WHALE:           ${{ vars.BUY_QUALITY_MIN_WHALE || '50' }}
-          # Previously missing from this workflow entirely — the repo Variable
-          # existed and was set to 'false' 5 days ago but had zero effect
-          # since the script never received it and fell back to its own
-          # hardcoded default ('true'). Now actually wired.
-          BUY_ENABLE_TOD_CHECK:            ${{ vars.BUY_ENABLE_TOD_CHECK || 'false' }}
-          BUY_TOD_PENALTY:                 ${{ vars.BUY_TOD_PENALTY || '1' }}
-          BUY_QUALITY_OFFHOURS_MIN_BULLCONF: ${{ vars.BUY_QUALITY_OFFHOURS_MIN_BULLCONF || '5' }}
-          BUY_QUALITY_OFFHOURS_MIN_WHALE:  ${{ vars.BUY_QUALITY_OFFHOURS_MIN_WHALE || '60' }}
+          BUY_QUALITY_MIN_BULLCONF:        ${{ vars.BUY_QUALITY_MIN_BULLCONF || '3' }}
+          BUY_QUALITY_MIN_WHALE:           ${{ vars.BUY_QUALITY_MIN_WHALE || '40' }}
           # Bad-history buy gate (leaderboard-decider.js) — a symbol with a
           # long consistent losing streak (e.g. AVAX bought twice in one
           # day, both thesis-invalidated within 90 min) is a strong signal;
@@ -400,42 +248,18 @@ jobs:
           BUY_HIST_GATE_SOFT_MIN_SAMPLE:   ${{ vars.BUY_HIST_GATE_SOFT_MIN_SAMPLE || '6' }}
           BUY_HIST_GATE_SOFT_MAX_WINRATE:  ${{ vars.BUY_HIST_GATE_SOFT_MAX_WINRATE || '0.20' }}
           BUY_HIST_GATE_SOFT_PENALTY:      ${{ vars.BUY_HIST_GATE_SOFT_PENALTY || '4' }}
-          # Same-day repeat-failure pause — catches a fast repeated
-          # failure pattern (e.g. AVAX: 3 losses in one day) the 30-day
-          # gate above is too slow to react to. Losses only, needs 2+
-          # within the window — a single loss never pauses, so a
-          # legitimate re-buy after a BTC-driven bounce stays unblocked.
-          BUY_SAMEDAY_FAIL_ENABLE:      ${{ vars.BUY_SAMEDAY_FAIL_ENABLE || 'true' }}
-          BUY_SAMEDAY_FAIL_COUNT:       ${{ vars.BUY_SAMEDAY_FAIL_COUNT || '2' }}
-          BUY_SAMEDAY_FAIL_WINDOW_HRS:  ${{ vars.BUY_SAMEDAY_FAIL_WINDOW_HRS || '4' }}
-          BUY_SAMEDAY_FAIL_PAUSE_HRS:   ${{ vars.BUY_SAMEDAY_FAIL_PAUSE_HRS || '3' }}
-          BUY_ENABLE_PULLBACK_CHECK:   ${{ vars.BUY_ENABLE_PULLBACK_CHECK || 'true' }}
-          BUY_PULLBACK_LOOKBACK:   ${{ vars.BUY_PULLBACK_LOOKBACK || '10' }}
-          BUY_PULLBACK_WARN_PCT:  ${{ vars.BUY_PULLBACK_WARN_PCT || '0.5%' }}
-          BUY_PULLBACK_BLOCK_PCT:      ${{ vars.BUY_PULLBACK_BLOCK_PCT || '1.0%' }}
-          # ── Pre-spike trigger (calcSpikeTrigger, buy-intelligence.js) —
-          # short-timeframe (5m) breakout/reclaim confirmation layered UNDER
-          # the candidate/setup checks above. Gates signal-evaluator.js's
-          # BUY path and leaderboard-decider.js's final candidate→alert step
-          # (see dev-team "Pre-Spike Detection, Trigger Confirmation" note).
-          BUY_ENABLE_SPIKE_TRIGGER:        ${{ vars.BUY_ENABLE_SPIKE_TRIGGER || 'true' }}
-          BUY_TRIGGER_LOOKBACK_15M:        ${{ vars.BUY_TRIGGER_LOOKBACK_15M || '12' }}
-          BUY_TRIGGER_BREAKOUT_BUFFER_PCT: ${{ vars.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15' }}
-          BUY_TRIGGER_NEAR_PCT:            ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.5' }}
-          BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
-          BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.18' }}
-          BTC_TRIGGER_MOMENTUM_FLOOR_PCT:  ${{ vars.BTC_TRIGGER_MOMENTUM_FLOOR_PCT || '-0.5' }}
-          # ── Scout entry (leaderboard-decider.js) — opt-in, reduced-size
-          # buy at TRIGGERING instead of waiting for full BREAKOUT
-          # confirmation. Off by default (BUY_SCOUT_ENABLE=false) — flip on
-          # once symbol-history.json has enough entryTriggerStatus/
-          # entryStateAtBuy rows to judge whether earlier entries are
-          # actually worth the extra false-breakout risk.
-          BUY_SCOUT_ENABLE:        ${{ vars.BUY_SCOUT_ENABLE || 'false' }}
-          BUY_SCOUT_SIZE_PCT:      ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
-          BUY_SCOUT_MIN_BULLCONF:  ${{ vars.BUY_SCOUT_MIN_BULLCONF || '7' }}
-          BUY_SCOUT_MIN_WHALE:     ${{ vars.BUY_SCOUT_MIN_WHALE || '60' }}
-
+          # Chase protects against buying too late into a pump; this
+          # protects against buying too early into a dump.
+          BUY_ENABLE_PULLBACK_CHECK:  ${{ vars.BUY_ENABLE_PULLBACK_CHECK || 'true' }}
+          BUY_PULLBACK_LOOKBACK:      ${{ vars.BUY_PULLBACK_LOOKBACK || '10' }}
+          BUY_PULLBACK_WARN_PCT:      ${{ vars.BUY_PULLBACK_WARN_PCT || '0.5' }}
+          BUY_PULLBACK_BLOCK_PCT:     ${{ vars.BUY_PULLBACK_BLOCK_PCT || '1.0' }}
+          # Time-of-Day check — evaluates whether an entry lands in the
+          # low-liquidity window (5:00 PM – 2:00 AM EST).
+          BUY_ENABLE_TOD_CHECK:               ${{ vars.BUY_ENABLE_TOD_CHECK || 'true' }}
+          BUY_TOD_PENALTY:                    ${{ vars.BUY_TOD_PENALTY || '1' }}
+          BUY_QUALITY_OFFHOURS_MIN_BULLCONF:  ${{ vars.BUY_QUALITY_OFFHOURS_MIN_BULLCONF || '5' }}
+          BUY_QUALITY_OFFHOURS_MIN_WHALE:     ${{ vars.BUY_QUALITY_OFFHOURS_MIN_WHALE || '60' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
@@ -465,37 +289,20 @@ jobs:
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
           GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.15' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_4H_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_4H_BULL || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL || 'false' }}
           GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS: ${{ vars.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '3' }}
-          # New — makes the Alpha Exception (BTC-bear, breadth, and
-          # risk-score paths, all three) actually sensitive to
-          # chase/RSI-extension/pullback/quality signals from
-          # buy-intelligence.js. Previously none of those had any
-          # representation in the exception's own checks, so a chasing
-          # or RSI-extended candidate with strong whale/volume/bullConf
-          # could clear the exception untouched by the entry-timing
-          # tightening below.
-          GUARD_ALPHA_MAX_BUYINTEL_PENALTY: ${{ vars.GUARD_ALPHA_MAX_BUYINTEL_PENALTY || '3' }}
           # ── Relative Strength vs BTC ──
           GUARD_BTC_RS_ENABLED: ${{ vars.GUARD_BTC_RS_ENABLED || 'true' }}
           GUARD_BTC_RS_MIN: ${{ vars.GUARD_BTC_RS_MIN || '2.0' }}
           # ── v15 Market Intelligence Engine (market-intelligence.js / market-state.json) ──
           MI_HISTORY_LEN: ${{ vars.MI_HISTORY_LEN || '4' }}
           # ── v15 Buy-side gate (market-guard.js: checkMarketIntelligenceGate) ──
-          BUY_BTC_RISK_MAX:             ${{ vars.BUY_BTC_RISK_MAX || '50' }}
-          # Relative-strength exception for the BTC risk-score block above
-          # — previously an unconditional hard block with no bypass at all
-          # (unlike the breadth check below, which already had one). A
-          # symbol proving real positive RS vs BTC (calcRelativeStrength)
-          # plus the same strength-exception quality bar used for breadth
-          # can now clear this block instead of being caught regardless of
-          # its own individual strength.
-          BUY_RISKSCORE_ALLOW_EXCEPTION: ${{ vars.BUY_RISKSCORE_ALLOW_EXCEPTION || 'true' }}
+          BUY_BTC_RISK_MAX:             ${{ vars.BUY_BTC_RISK_MAX || '60' }}
           BUY_DYNAMIC_BULL4H:           ${{ vars.BUY_DYNAMIC_BULL4H || 'true' }}
           BUY_REQUIRE_BREADTH:          ${{ vars.BUY_REQUIRE_BREADTH || 'true' }}
           BUY_MIN_BREADTH:              ${{ vars.BUY_MIN_BREADTH || '60' }}
@@ -504,16 +311,6 @@ jobs:
           SELL_ENABLE_INTELLIGENCE:    ${{ vars.SELL_ENABLE_INTELLIGENCE || 'true' }}
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
           SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
-          # Staleness nudge (position-intelligence.js) — neither Position
-          # Intelligence's own thesis checks nor Profit Intelligence (needs
-          # peak profit to ever engage) touch a position that's just
-          # sitting flat. This adds a modest exitProbability bump once a
-          # position is old enough and still genuinely flat, so pure
-          # stagnation eventually gets nudged toward an exit.
-          SELL_ENABLE_STALE_NUDGE:   ${{ vars.SELL_ENABLE_STALE_NUDGE || 'true' }}
-          SELL_STALE_NUDGE_AGE_MIN:  ${{ vars.SELL_STALE_NUDGE_AGE_MIN || '120' }}
-          SELL_STALE_NUDGE_FLAT_PCT: ${{ vars.SELL_STALE_NUDGE_FLAT_PCT || '0.2' }}
-          SELL_STALE_NUDGE_AMOUNT:   ${{ vars.SELL_STALE_NUDGE_AMOUNT || '15' }}
           SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
           SELL_MIN_POSITION_AGE_MIN:   ${{ vars.SELL_MIN_POSITION_AGE_MIN || '15' }}
           SELL_RECOVERY_WAIT_MIN:      ${{ vars.SELL_RECOVERY_WAIT_MIN || '10' }}
@@ -522,18 +319,6 @@ jobs:
           SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
           SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
           SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
-          # No-entry-snapshot fallback — manually adopted positions (source:
-          # manual_adopted, e.g. a balance bought directly on MEXC and picked
-          # up into tracking) never went through buildEntrySnapshot(), so
-          # thesis/confidence-decay comparisons can't run for them. This
-          # runs a falling-knife-only read instead (current market state
-          # only, no entry comparison needed), with a stricter bar than the
-          # normal ladder since a knife-only signal has no thesis/confidence
-          # corroboration.
-          SELL_NO_SNAPSHOT_FALLBACK:       ${{ vars.SELL_NO_SNAPSHOT_FALLBACK || 'true' }}
-          SELL_NO_SNAPSHOT_REDUCE25_LEVEL: ${{ vars.SELL_NO_SNAPSHOT_REDUCE25_LEVEL || '75' }}
-          SELL_NO_SNAPSHOT_REDUCE50_LEVEL: ${{ vars.SELL_NO_SNAPSHOT_REDUCE50_LEVEL || '85' }}
-          SELL_NO_SNAPSHOT_EXIT_LEVEL:     ${{ vars.SELL_NO_SNAPSHOT_EXIT_LEVEL || '92' }}
           # ── Profit Intelligence Engine (profit-intelligence.js) ──
           # Independent sell reason — protects unrealized profit giving
           # itself back, separate from Position Intelligence above (which
