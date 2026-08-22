@@ -217,12 +217,12 @@ jobs:
           EXEC_TOP_N_COUNT:   ${{ vars.EXEC_TOP_N_COUNT || '3' }}
           EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
-          # Renamed from ROTATION_MIN_PROFIT_PCT to match the dev-team "Buy
-          # Priority / Rotation / Sell Intelligence" doc's naming — same
-          # variable, same 0.2% default this workflow already used. Reads
-          # the old repo Variable name too, so nothing breaks if it's still
-          # set under the old name.
-          ROTATION_SELL_MIN_NET_PNL_PCT: ${{ vars.ROTATION_SELL_MIN_NET_PNL_PCT || vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
+          # Single source of truth for the minimum-profit-to-rotate
+          # threshold, read directly by normal rotation, ST5, and ST15 in
+          # mexc-trader.js (no more separate ROTATION_SELL_MIN_NET_PNL_PCT/
+          # ST5_MIN_PROFIT_PCT/ST15_MIN_PROFIT_PCT Variables — one value
+          # governs all three rotation paths).
+          ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
           # "Normal Sell Intelligence can act after 5 minutes; hard stop is
           # never blocked by age." Falls back to LB_HOLD_LOCK if unset —
           # see position-monitor.js for the exact gating (section 4, the
@@ -235,13 +235,6 @@ jobs:
           ST5_PERIOD:          ${{ vars.ST5_PERIOD || '10' }}
           ST5_MULTIPLIER:      ${{ vars.ST5_MULTIPLIER || '3' }}
           ST5_PRIORITY_USD_SIZE: ${{ vars.ST5_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
-          # Minimum % above buy price required before an ST5 rotation will
-          # sell a held position to fund the new buy. Falls back to the
-          # SAME 0.2% default as normal rotation (ROTATION_SELL_MIN_NET_PNL_PCT
-          # above) if unset — one consistent threshold across normal
-          # rotation, ST5, and ST15 sells unless you deliberately set this
-          # to something different.
-          ST5_MIN_PROFIT_PCT:  ${{ vars.ST5_MIN_PROFIT_PCT || vars.ROTATION_SELL_MIN_NET_PNL_PCT || vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
           # ── ST15 Priority Execution (dev-team note) — these were computed
           # by mexc-trader.js/leaderboard-scanner.js from process.env with
           # JS-side defaults, but were never actually wired into this
@@ -254,12 +247,6 @@ jobs:
           ST15_PERIOD:          ${{ vars.ST15_PERIOD || '10' }}
           ST15_MULTIPLIER:      ${{ vars.ST15_MULTIPLIER || '3' }}
           ST15_PRIORITY_USD_SIZE: ${{ vars.ST15_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
-          # Minimum % above buy price required before ST15 rotation will
-          # sell a held position to fund the new buy. Falls back to the
-          # SAME 0.2% default as normal rotation and ST5 above if unset —
-          # one consistent threshold across all three rotation paths
-          # unless you deliberately set this to something different.
-          ST15_MIN_PROFIT_PCT:  ${{ vars.ST15_MIN_PROFIT_PCT || vars.ROTATION_SELL_MIN_NET_PNL_PCT || vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
           STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
           T1_ATR_MULT:        ${{ vars.T1_ATR_MULT || '0.5' }}
           T2_ATR_MULT:        ${{ vars.T2_ATR_MULT || '2' }}
@@ -362,7 +349,7 @@ jobs:
           SELL_THESIS_INVALIDATE_SCORE: ${{ vars.SELL_THESIS_INVALIDATE_SCORE || '60' }}
           SELL_CONFIDENCE_DECAY_MAX:   ${{ vars.SELL_CONFIDENCE_DECAY_MAX || '35' }}
           # SELL_MIN_POSITION_AGE_MIN already defined above (near
-          # ROTATION_SELL_MIN_NET_PNL_PCT) — GitHub's workflow parser
+          # ROTATION_MIN_PROFIT_PCT) — GitHub's workflow parser
           # rejects duplicate env keys outright ("Invalid workflow file...
           # already defined"), which is what was breaking every dispatch.
           # Removed the duplicate here; same expression/value either way.
