@@ -816,18 +816,22 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     const [ticker, k5m, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
       useKraken ? fetchKrakenTicker(krakenPair)                    : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
       // 5m candles — short-timeframe trigger confirmation (calcSpikeTrigger
-      // in buy-intelligence.js) AND the 5m Supertrend/ST5 P0 calc below
-      // (calcSupertrend needs >= ST5_PERIOD+2 CLOSED candles, default 12).
-      // Bumped from limit=20 to limit=60 (matching the 15m fetch) — 20 only
-      // leaves ~19 closed bars after dropping the still-forming one, which
-      // is enough on paper (19 >= 12) but left almost no margin for any
-      // gap/short-return from the exchange; 60 gives the same safety
-      // cushion ST15 already has. Distinct from this job's ~5min RUN
-      // CADENCE: running every 5 minutes does not mean the bot has
-      // 5-minute candle data unless it's actually fetched, per the
-      // dev-team pre-spike note.
-      useKraken ? fetchKrakenOHLC(krakenPair, '5m', 60)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=5m&limit=60`),
-      useKraken ? fetchKrakenOHLC(krakenPair, '15m', 60)           : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=60`),
+      // in buy-intelligence.js) AND the 5m Supertrend/ST5 P0 calc below.
+      // limit=200 (not 60) — Wilder/RMA-smoothed ATR technically never
+      // fully "forgets" its seed value, it only decays it by a factor of
+      // (period-1)/period each bar. At period=10 that's roughly 0.5%
+      // residual seed influence still baked into the ATR after only 60
+      // bars — usually invisible, but enough to shift a bar's final
+      // upper/lower band by a hair, which is exactly enough to flip a
+      // genuinely-borderline crossUp determination one way when a
+      // longer-history calculation (e.g. TradingView's own Supertrend,
+      // which warms up over hundreds of bars) lands the other way. 200
+      // bars decays that residual to effectively 0% (<0.01%), which is
+      // what actually fixes "alert fired but the chart's own redline
+      // wasn't crossed" — not a formula bug, a warm-up-length bug.
+      useKraken ? fetchKrakenOHLC(krakenPair, '5m', 200)           : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=5m&limit=200`),
+      // Same reasoning, 15m timeframe — see the 5m comment above.
+      useKraken ? fetchKrakenOHLC(krakenPair, '15m', 200)          : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=15m&limit=200`),
       useKraken ? fetchKrakenOHLC(krakenPair, '1h', 30)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1h&limit=30`),
       useKraken ? fetchKrakenOHLC(krakenPair, '4h', 50)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=4h&limit=50`),
       useKraken ? fetchKrakenOHLC(krakenPair, '1d', 14)            : fetchBinance(`/api/v3/klines?symbol=${pair}&interval=1d&limit=14`),

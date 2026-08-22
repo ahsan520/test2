@@ -492,6 +492,7 @@ async function main() {
   const st5PriorityOutcomes = [];
   const st5Result = await executeST5PriorityRotation({
     market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+    effectiveSizeMode, effectiveSizePct,
     utc: new Date().toUTCString().slice(17, 22) + ' UTC',
     closedOutcomes: st5PriorityOutcomes,
   });
@@ -529,6 +530,7 @@ async function main() {
   const stPriorityOutcomes = [];
   const stResult = await executeSTPriorityRotation({
     market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+    effectiveSizeMode, effectiveSizePct,
     utc: new Date().toUTCString().slice(17, 22) + ' UTC',
     closedOutcomes: stPriorityOutcomes,
   });

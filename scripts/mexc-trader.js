@@ -491,8 +491,35 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 const ST15_ENABLE            = (process.env.ST15_ENABLE ?? 'true') === 'true';
 const ST15_PRIORITY_USD_SIZE = parseFloat(process.env.ST15_PRIORITY_USD_SIZE || process.env.TRADE_USD_SIZE || '25');
 
+// ── Shared sizing for ST5/ST15 priority buys ──
+// Mirrors executeAutoBuys' percent-mode sizing exactly (same balance
+// source, same MEXC_SIZING_BUFFER_PCT buffer) so a priority buy respects
+// TRADE_SIZE_PCT the same way a normal buy does, instead of always using
+// a fixed dollar amount regardless of TRADE_SIZE_MODE. Called AFTER the
+// rotation sells above have already completed, so the balance this reads
+// (live: fresh mexcFreeBalance call; paper: loadPaperBalance(), which
+// closeLiveOrder already credited with sell proceeds) reflects the
+// freshly-freed USDT from selling everything else — not the pre-rotation
+// balance. No market-guard sizeMult applied here, consistent with ST
+// priority not consulting the market guard at all (see the STEP 1.6/1.7
+// comments in leaderboard-decider.js for why).
+async function computeSTPriorityUsdSize({ effectiveTradeMode, effectiveSizeMode, effectiveSizePct, fallbackUsdSize, label }) {
+  if (effectiveSizeMode !== 'percent') return { totalUsd: fallbackUsdSize, balance: null };
+
+  const balance = effectiveTradeMode === 'live'
+    ? await mexcFreeBalance(MEXC_API_KEY, MEXC_API_SECRET, 'USDT')
+    : loadPaperBalance();
+  const SIZING_BUFFER_PCT = parseFloat(process.env.MEXC_SIZING_BUFFER_PCT || '1');
+  const bufferedPct = Math.max(0, effectiveSizePct - SIZING_BUFFER_PCT);
+  const totalUsd = parseFloat((balance * (bufferedPct / 100)).toFixed(2));
+  console.log(`  💰  ${label} sizing: ${bufferedPct}% of ${effectiveTradeMode} balance $${balance.toFixed(2)} (${effectiveSizePct}% target − ${SIZING_BUFFER_PCT}% buffer) = $${totalUsd}`);
+  return { totalUsd, balance };
+}
+
 export async function executeSTPriorityRotation({
-  market, positions, tradeState, effectiveTradeMode, effectiveMaxLive, utc, closedOutcomes,
+  market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+  effectiveSizeMode = 'usd', effectiveSizePct = 100,
+  utc, closedOutcomes,
 }) {
   let changed = false;
   if (!ST15_ENABLE) return { changed };
@@ -727,6 +754,18 @@ export async function executeSTPriorityRotation({
     // ── BUY the ST candidate ──
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
+
+    const { totalUsd: st15UsdSize } = await computeSTPriorityUsdSize({
+      effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
+      fallbackUsdSize: ST15_PRIORITY_USD_SIZE, label: 'ST15 priority',
+    });
+    if (st15UsdSize <= 0) {
+      event.status = 'BLOCKED_ZERO_BALANCE';
+      logAudit('st15_blocked_zero_balance', { pair, id: event.id });
+      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — $0 available after rotation sells (percent sizing) — BUY skipped this cycle.`);
+      continue;
+    }
+
     positions[sym] = {
       sym, base, assetType: 'crypto', exchangePrefix: entry.exchangePrefix || 'BINANCE', session: '24/7',
       setup: 'ST15 PRIORITY', dir: 'bull',
@@ -742,34 +781,34 @@ export async function executeSTPriorityRotation({
 
     if (effectiveTradeMode === 'paper') {
       const fillPrice = parseFloat(entry?.d?.p || event.close || 0);
-      const qty        = fillPrice > 0 ? ST15_PRIORITY_USD_SIZE / fillPrice : 0;
-      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: ST15_PRIORITY_USD_SIZE, qty, fillPrice, buyOrderId: `PAPER_ST15_${now}` };
+      const qty        = fillPrice > 0 ? st15UsdSize / fillPrice : 0;
+      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st15UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST15_${now}` };
       const lvl = recalcLevelsFromFill(fillPrice, shock);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
-      logAudit('st15_paper_buy', { sym, id: event.id, usdSize: ST15_PRIORITY_USD_SIZE, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: ST15_PRIORITY_USD_SIZE });
+      logAudit('st15_paper_buy', { sym, id: event.id, usdSize: st15UsdSize, fillPrice });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: st15UsdSize });
       await pushTradeLogToGitHub(loadTradeLog());
-      if (process.env.TRADE_SIZE_MODE === 'percent') adjustPaperBalance(-ST15_PRIORITY_USD_SIZE);
+      if (effectiveSizeMode === 'percent') adjustPaperBalance(-st15UsdSize);
       changed = true;
       event.status = 'EXECUTED';
       await sendTelegram(
-        `📝 *ST15 PRIORITY PAPER BUY* — ${base} $${ST15_PRIORITY_USD_SIZE} USDT @ ~$${fillPrice.toFixed(6)}\n` +
+        `📝 *ST15 PRIORITY PAPER BUY* — ${base} $${st15UsdSize} USDT @ ~$${fillPrice.toFixed(6)}\n` +
         `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._` +
         (protectedPositions.length ? `\n  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._` : '')
       );
     } else {
-      console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${pair} $${ST15_PRIORITY_USD_SIZE} USDT via MEXC...`);
+      console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${pair} $${st15UsdSize} USDT via MEXC...`);
       try {
         // NOTE: MEXC's REST API wants the bare pair ("TAOUSDT"), not the
         // TradingView-style prefixed `sym` ("BINANCE:TAOUSDT") used as the
         // internal positions[] tracking key — passing `sym` here caused
         // every ST15 live buy to fail with "Invalid symbol" (HTTP 400).
-        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, ST15_PRIORITY_USD_SIZE);
+        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, st15UsdSize);
         positions[sym].liveOrder = {
-          mode: 'live', buyAt: now, usdSize: ST15_PRIORITY_USD_SIZE,
+          mode: 'live', buyAt: now, usdSize: st15UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
         const lvl = recalcLevelsFromFill(buy.fillPrice, shock);
@@ -777,15 +816,15 @@ export async function executeSTPriorityRotation({
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
-        logAudit('st15_live_buy', { sym, id: event.id, usdSize: ST15_PRIORITY_USD_SIZE, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: ST15_PRIORITY_USD_SIZE });
+        logAudit('st15_live_buy', { sym, id: event.id, usdSize: st15UsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: st15UsdSize });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
         await sendTelegram(
           `⚡ *ST15 PRIORITY LIVE BUY* — ${base} — ${utc}\n` +
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
-          `  Size: $${ST15_PRIORITY_USD_SIZE} USDT  Order ID: \`${buy.orderId}\`\n` +
+          `  Size: $${st15UsdSize} USDT  Order ID: \`${buy.orderId}\`\n` +
           `  Event \`${event.id}\` marked EXECUTED.\n` +
           `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
           (protectedPositions.length ? `  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._\n` : '') +
@@ -827,7 +866,9 @@ const ST5_ENABLE            = (process.env.ST5_ENABLE ?? 'true') === 'true';
 const ST5_PRIORITY_USD_SIZE = parseFloat(process.env.ST5_PRIORITY_USD_SIZE || process.env.TRADE_USD_SIZE || '25');
 
 export async function executeST5PriorityRotation({
-  market, positions, tradeState, effectiveTradeMode, effectiveMaxLive, utc, closedOutcomes,
+  market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+  effectiveSizeMode = 'usd', effectiveSizePct = 100,
+  utc, closedOutcomes,
 }) {
   let changed = false;
   if (!ST5_ENABLE) return { changed };
@@ -1062,6 +1103,18 @@ export async function executeST5PriorityRotation({
     // ── BUY the ST candidate ──
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
+
+    const { totalUsd: st5UsdSize } = await computeSTPriorityUsdSize({
+      effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
+      fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'ST5 priority',
+    });
+    if (st5UsdSize <= 0) {
+      event.status = 'BLOCKED_ZERO_BALANCE';
+      logAudit('st5_blocked_zero_balance', { pair, id: event.id });
+      await sendTelegram(`🚫 *ST5 CROSS — ${base}* — $0 available after rotation sells (percent sizing) — BUY skipped this cycle.`);
+      continue;
+    }
+
     positions[sym] = {
       sym, base, assetType: 'crypto', exchangePrefix: entry.exchangePrefix || 'BINANCE', session: '24/7',
       setup: 'ST5 PRIORITY', dir: 'bull',
@@ -1077,34 +1130,34 @@ export async function executeST5PriorityRotation({
 
     if (effectiveTradeMode === 'paper') {
       const fillPrice = parseFloat(entry?.d?.p || event.close || 0);
-      const qty        = fillPrice > 0 ? ST5_PRIORITY_USD_SIZE / fillPrice : 0;
-      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: ST5_PRIORITY_USD_SIZE, qty, fillPrice, buyOrderId: `PAPER_ST5_${now}` };
+      const qty        = fillPrice > 0 ? st5UsdSize / fillPrice : 0;
+      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st5UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST5_${now}` };
       const lvl = recalcLevelsFromFill(fillPrice, shock);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
-      logAudit('st5_paper_buy', { sym, id: event.id, usdSize: ST5_PRIORITY_USD_SIZE, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: ST5_PRIORITY_USD_SIZE });
+      logAudit('st5_paper_buy', { sym, id: event.id, usdSize: st5UsdSize, fillPrice });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: st5UsdSize });
       await pushTradeLogToGitHub(loadTradeLog());
-      if (process.env.TRADE_SIZE_MODE === 'percent') adjustPaperBalance(-ST5_PRIORITY_USD_SIZE);
+      if (effectiveSizeMode === 'percent') adjustPaperBalance(-st5UsdSize);
       changed = true;
       event.status = 'EXECUTED';
       await sendTelegram(
-        `📝 *ST5 PRIORITY PAPER BUY* — ${base} $${ST5_PRIORITY_USD_SIZE} USDT @ ~$${fillPrice.toFixed(6)}\n` +
+        `📝 *ST5 PRIORITY PAPER BUY* — ${base} $${st5UsdSize} USDT @ ~$${fillPrice.toFixed(6)}\n` +
         `  Event \`${event.id}\` marked EXECUTED.\n  _Paper mode — no real order placed._` +
         (protectedPositions.length ? `\n  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._` : '')
       );
     } else {
-      console.log(`  🟢  ST5 PRIORITY LIVE BUY — ${pair} $${ST5_PRIORITY_USD_SIZE} USDT via MEXC...`);
+      console.log(`  🟢  ST5 PRIORITY LIVE BUY — ${pair} $${st5UsdSize} USDT via MEXC...`);
       try {
         // NOTE: MEXC's REST API wants the bare pair ("TAOUSDT"), not the
         // TradingView-style prefixed `sym` ("BINANCE:TAOUSDT") used as the
         // internal positions[] tracking key — passing `sym` here caused
         // every ST5 live buy to fail with "Invalid symbol" (HTTP 400).
-        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, ST5_PRIORITY_USD_SIZE);
+        const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, st5UsdSize);
         positions[sym].liveOrder = {
-          mode: 'live', buyAt: now, usdSize: ST5_PRIORITY_USD_SIZE,
+          mode: 'live', buyAt: now, usdSize: st5UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
         const lvl = recalcLevelsFromFill(buy.fillPrice, shock);
@@ -1112,15 +1165,15 @@ export async function executeST5PriorityRotation({
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
-        logAudit('st5_live_buy', { sym, id: event.id, usdSize: ST5_PRIORITY_USD_SIZE, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: ST5_PRIORITY_USD_SIZE });
+        logAudit('st5_live_buy', { sym, id: event.id, usdSize: st5UsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: st5UsdSize });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
         await sendTelegram(
           `🟢 *ST5 PRIORITY LIVE BUY* — ${base} — ${utc}\n` +
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
-          `  Size: $${ST5_PRIORITY_USD_SIZE} USDT  Order ID: \`${buy.orderId}\`\n` +
+          `  Size: $${st5UsdSize} USDT  Order ID: \`${buy.orderId}\`\n` +
           `  Event \`${event.id}\` marked EXECUTED.\n` +
           `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
           (protectedPositions.length ? `  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._\n` : '') +
