@@ -125,6 +125,16 @@ function isOnCooldown(state, cdKey, assetType) {
 }
 function markCooldown(state, cdKey) { state[cdKey] = Date.now(); }
 
+// Dedicated post-stop-loss cooldown — see the STEP 1 comment where it's
+// set. Deliberately independent of LB_COOLDOWN_MIN (and typically longer)
+// so it isn't just re-deriving the same window a stop-out already lives
+// inside of.
+const STOP_COOLDOWN_MIN = parseInt(process.env.LB_STOP_COOLDOWN_MIN || '90', 10);
+function isOnStopCooldown(state, pair) {
+  const ts = state[`lb_stopcd_${pair}`] || 0;
+  return (Date.now() - ts) < STOP_COOLDOWN_MIN * 60000;
+}
+
 // ── Same-day repeat-failure check ──────────────────────────────────────
 // See the constants block above for the reasoning. Deliberately looks at
 // LOSSES ONLY (pnlPct <= 0) — a symbol that closed profitably twice today
@@ -398,6 +408,28 @@ async function main() {
       if (history.length > HISTORY_MAX_ROWS) history = history.slice(history.length - HISTORY_MAX_ROWS);
       saveHistory(history);
       logAudit('history_recorded', { rows: monitored.closedOutcomes.length, totalKept: history.length });
+
+      // ── Post-stop-loss cooldown ──────────────────────────────────────
+      // Separate from the generic post-alert cooldown (LB_COOLDOWN_MIN,
+      // checked below in STEP 2) and from the 2-loss same-day-failure
+      // pause (checkSamedayFailures — deliberately requires 2+ losses so
+      // one bad trade doesn't block a real re-qualifying signal). This one
+      // exists for the specific "stopped out, then the exact same
+      // breakout level gets re-reclaimed and re-alerts before the generic
+      // 60-min cooldown expires" pattern — e.g. two UNI stop-outs 65 min
+      // apart, both off the same breakout level, each losing ~1.7%. A
+      // single stop-out on a symbol blocks a fresh buy alert on THAT
+      // symbol for STOP_COOLDOWN_MIN, independent of the alert cooldown's
+      // own timer. Saved immediately (own load/save) rather than piggy-
+      // backing on the `cooldowns` var loaded in STEP 2 below, so it's
+      // captured even on a cycle that exits early via a hard guard block.
+      const freshStops = monitored.closedOutcomes.filter(o => o.outcome === 'stopped');
+      if (freshStops.length) {
+        const stopCooldowns = loadCooldowns();
+        for (const o of freshStops) stopCooldowns[`lb_stopcd_${o.pair}`] = Date.now();
+        saveCooldowns(stopCooldowns);
+        logAudit('stop_cooldown_set', { symbols: freshStops.map(o => o.pair), minutes: STOP_COOLDOWN_MIN });
+      }
     }
 
     // Send all exit/stop/stale Telegram alerts
@@ -834,6 +866,10 @@ async function main() {
     const cdKey = cooldownKey(pair, entry.assetType);
     if (isOnCooldown(cooldowns, cdKey, entry.assetType)) {
       console.log(`  🔕  ${pair} — cooldown`);
+      continue;
+    }
+    if (entry.assetType === 'crypto' && isOnStopCooldown(cooldowns, pair)) {
+      console.log(`  🔕  ${pair} — stop-loss cooldown (${STOP_COOLDOWN_MIN}min)`);
       continue;
     }
 
