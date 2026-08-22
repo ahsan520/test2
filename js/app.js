@@ -1276,6 +1276,41 @@ function _mdSt15Cell(e) {
       : { label: '—', color: 'var(--text-dim)', title };
 }
 
+// ── ST5 cell (Priority-0 / P0) — same read-only, server-computed pattern
+// as _mdSt15Cell above, one timeframe down. e.st5Event / e.supertrend5m are
+// persisted by market-fetcher.js exactly like their ST15 counterparts, so
+// this is a straight duplicate with the field names swapped — no new
+// logic, deliberately kept in sync with _mdSt15Cell rather than sharing a
+// helper, so the two can diverge later (e.g. different status labels) if
+// P0 vs P1 ever need to look different, without one edit silently
+// changing both columns.
+function _mdSt5Cell(e) {
+  const ev = e.st5Event;
+  const st = e.supertrend5m;
+  if (ev) {
+    const title = `${ev.id || ''} · candle ${ev.candleTime || ''} · +${ev.distancePct ?? '—'}% above ST` + (ev.detail ? ` · ${ev.detail}` : '');
+    switch (ev.status) {
+      case 'EXECUTED':          return { label: '🟢 EXECUTED',      color: _MD_GREEN_FULL, title };
+      case 'EXECUTING':
+      case 'PENDING':            return { label: '🟡 PENDING',       color: 'var(--accent)', title };
+      case 'SELL_FAILED':        return { label: '🚨 SELL FAILED',   color: _MD_DEEP_RED, title };
+      case 'BUY_FAILED':         return { label: '🚨 BUY FAILED',    color: _MD_DEEP_RED, title };
+      case 'BLOCKED_MAX_LIVE':   return { label: '🚫 MAX LIVE',      color: _MD_DEEP_RED, title };
+      case 'NOOP_ALREADY_HELD':  return { label: 'ℹ️ ALREADY HELD',  color: 'var(--text-dim)', title };
+      case 'SKIPPED_NO_TRADE':   return { label: '⛔ NO-TRADE',      color: 'var(--text-dim)', title };
+      case 'ERROR':               return { label: '🚨 ERROR',         color: _MD_DEEP_RED, title };
+      default:                    return { label: ev.status || '—',  color: 'var(--text-dim)', title };
+    }
+  }
+  if (!st) return { label: '—', color: 'var(--text-dim)', title: '' };
+  const title = `ST ${st.value ?? '—'} · ${st.distancePct ?? '—'}% from close · last closed candle ${st.lastClosedCandle || '—'}`;
+  return st.direction === 'BULL'
+    ? { label: `▲ BULL`, color: 'var(--bull)', title }
+    : st.direction === 'BEAR'
+      ? { label: `▼ BEAR`, color: 'var(--bear)', title }
+      : { label: '—', color: 'var(--text-dim)', title };
+}
+
 // ── Market Data: click-to-sort on every column header ───────────────────────
 // Categorical columns (bias, OI DIV, CVD, OI MOM) get ranked rather than
 // alphabetized — "BULL 4H" should sort above "BEAR 4H", not below it just
@@ -1344,6 +1379,14 @@ const _MD_SORT_ACCESSORS = {
     const dirRank = e.supertrend15m?.direction === 'BULL' ? 1 : e.supertrend15m?.direction === 'BEAR' ? 0 : -1;
     return dirRank * 100 + (e.supertrend15m?.distancePct ?? 0) / 100;
   },
+  // Same pattern as st15 above, one timeframe down — P0 instead of P1.
+  st5: e => {
+    const ev = e.st5Event;
+    const evRank = ev ? (_MD_ST15_STATUS_RANK[ev.status] ?? 1) : 0; // same status vocabulary/rank as ST15, shared map
+    if (evRank > 0) return evRank * 1000 + (ev.distancePct ?? 0);
+    const dirRank = e.supertrend5m?.direction === 'BULL' ? 1 : e.supertrend5m?.direction === 'BEAR' ? 0 : -1;
+    return dirRank * 100 + (e.supertrend5m?.distancePct ?? 0) / 100;
+  },
   trigger:  e => (_MD_TRIGGER_RANK[e.triggerStatus] ?? 1) * 1000 + (e.triggerScore ?? 0),
 };
 
@@ -1358,7 +1401,7 @@ const _MD_ST15_STATUS_RANK = {
 
 // [header label, sort key] — order here IS the column order rendered.
 const _MD_COLUMNS = [
-  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['TRIGGER', 'trigger'], ['ST15', 'st15'], ['24H%', 'chg'],
+  ['SYMBOL', 'symbol'], ['PRICE', 'price'], ['SIGNAL', 'signal'], ['TRIGGER', 'trigger'], ['ST5', 'st5'], ['ST15', 'st15'], ['24H%', 'chg'],
   ['CONV', 'conv'], ['BULLCONF', 'bullConf'], ['WHALE', 'whale'], ['SHOCK', 'shock'],
   ['RSI15', 'rsi15'], ['4H BIAS', 'bias4h'], ['DAILY BIAS', 'biasDay'], ['OI DIV', 'oiDiv'],
   ['CVD', 'cvd'], ['OI MOM', 'oiMom'], ['HIST (30D)', 'hist'], ['POSITION', 'position'],
@@ -1459,7 +1502,7 @@ function renderMarketData() {
   }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="19" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="20" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
     return;
   }
 
@@ -1470,6 +1513,7 @@ function renderMarketData() {
     const sig = _classifySignal(e); // computed once — reused for the SIGNAL cell AND the row tint below, so they can never disagree
     const rowTint = _mdRowTint(sig.color);
     const trig = _mdTriggerCell(e);
+    const st5  = _mdSt5Cell(e);
     const st15 = _mdSt15Cell(e);
     const biText = bi && bi.penalty > 0
       ? `<span style="color:var(--bear)" title="${(bi.reasons || []).join(' · ')}">-${bi.penalty} ⚠</span>`
@@ -1494,6 +1538,7 @@ function renderMarketData() {
       <td style="font-size:9px">${e.price != null ? '$' + e.price : '—'}</td>
       <td style="font-size:9px;color:${sig.color}" title="${(bi?.reasons || []).join(' · ') || ''}">${sig.label}</td>
       <td style="font-size:9px;color:${trig.color}" title="${trig.title}">${trig.label}</td>
+      <td style="font-size:9px;color:${st5.color}" title="${st5.title}">${st5.label}</td>
       <td style="font-size:9px;color:${st15.color}" title="${st15.title}">${st15.label}</td>
       <td style="font-size:9px;color:${_mdColorChg(e.chg)}">${e.chg != null ? (e.chg > 0 ? '+' : '') + e.chg.toFixed(2) + '%' : '—'}</td>
       <td style="font-size:9px;font-weight:700;color:${_mdColorConv(e.conv)}" title="${e.buyIntelPenalty > 0 ? `raw ${e.rawConv} − ${e.buyIntelPenalty} penalty = ${e.conv}` : ''}">${e.conv ?? '—'}${e.buyIntelPenalty > 0 ? ` <span style="color:var(--text-dim);font-weight:400">(${e.rawConv})</span>` : ''}</td>
