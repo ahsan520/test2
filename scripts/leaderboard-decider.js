@@ -747,9 +747,9 @@ async function main() {
 
     // ── P2 signal-type gate (dev-team "Buy Priority / Rotation / Sell
     // Intelligence" doc) ──────────────────────────────────────────────
-    // Previously nothing here checked evald.signal at all — only the
-    // numeric conv score above. signal-evaluator.js's AVOID/WEAK/FALLING
-    // KNIFE branches are reachable with a high conv score in some
+    // Previously nothing here checked the signal classification at all —
+    // only the numeric conv score above. signal-evaluator.js's AVOID/WEAK/
+    // FALLING KNIFE branches are reachable with a high conv score in some
     // combinations (e.g. FALLING KNIFE's bias4h==='BEAR' branch doesn't
     // require conv<=0), so a candidate whose signal actively says "don't
     // buy this" could still reach the Entry Quality Check and beyond on
@@ -760,10 +760,19 @@ async function main() {
     // impulseExhaustion/breakoutDistance in the Entry Quality Check), so
     // it shouldn't be blocked by a signal classification that doesn't
     // account for an extreme-shock event in the first place.
+    //
+    // NOTE: reads entry.signal (the market-data.json field market-fetcher.js
+    // sets from classifySignal(r), same source the GUI's SIGNAL column
+    // uses) — NOT evald.signal. evaluateSymbol() above returns
+    // {conv, setup, shock, obi, source} and has never had a `signal`
+    // property, so the original version of this gate (evald.signal) was
+    // always comparing against `undefined` — silently rejecting every
+    // non-CAP-BUY candidate that reached this line, every cycle, since the
+    // gate was added. Fixed to read the field that actually holds it.
     const isCapBuyEarly = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
     const P2_ELIGIBLE_SIGNALS = new Set(['BUY', 'EARLY BUY', 'WATCH']);
-    if (!isCapBuyEarly && !P2_ELIGIBLE_SIGNALS.has(evald.signal)) {
-      console.log(`  ⏭  ${pair} signal=${evald.signal} — not P2-eligible (AVOID/WEAK/FALLING KNIFE never buy, regardless of conv)`);
+    if (!isCapBuyEarly && !P2_ELIGIBLE_SIGNALS.has(entry.signal)) {
+      console.log(`  ⏭  ${pair} signal=${entry.signal} — not P2-eligible (AVOID/WEAK/FALLING KNIFE never buy, regardless of conv)`);
       continue;
     }
     // "P2 rejects WATCH/EARLY BUY + SETUP" — belt-and-suspenders on top of
@@ -773,8 +782,8 @@ async function main() {
     // in case triggerStatus and entryState ever disagree (e.g. stale
     // trigger data lagging a fresh entryState read). CAP BUY exempt for
     // the same reason as above.
-    if (!isCapBuyEarly && (evald.signal === 'WATCH' || evald.signal === 'EARLY BUY') && entry.entryState === 'SETUP') {
-      console.log(`  ⏭  ${pair} signal=${evald.signal} + entryState=SETUP — rejected, too early (P2 requires BREAKOUT/TRIGGERING)`);
+    if (!isCapBuyEarly && (entry.signal === 'WATCH' || entry.signal === 'EARLY BUY') && entry.entryState === 'SETUP') {
+      console.log(`  ⏭  ${pair} signal=${entry.signal} + entryState=SETUP — rejected, too early (P2 requires BREAKOUT/TRIGGERING)`);
       continue;
     }
 

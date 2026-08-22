@@ -773,7 +773,7 @@ export function calcBullConf(d, whaleScore) {
 // candle[1]=open, candle[4]=close, candle[5]=volume; depth.bids/asks as
 // [price, qty, ...] pairs) — so no other code in scoreSymbol needed to change.
 const KRAKEN_SPOT_DIRECT = 'https://api.kraken.com';
-const KRAKEN_INTERVAL_MIN = { '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
+const KRAKEN_INTERVAL_MIN = { '5m': 5, '15m': 15, '1h': 60, '4h': 240, '1d': 1440 };
 
 async function fetchKrakenTicker(krakenPair) {
   const d = await fetchJSON(`${KRAKEN_SPOT_DIRECT}/0/public/Ticker?pair=${krakenPair}`);
