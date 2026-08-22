@@ -491,6 +491,57 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 const ST15_ENABLE            = (process.env.ST15_ENABLE ?? 'true') === 'true';
 const ST15_PRIORITY_USD_SIZE = parseFloat(process.env.ST15_PRIORITY_USD_SIZE || process.env.TRADE_USD_SIZE || '25');
 
+// ── Rotation-storm controls — dev-team note "ST5 / ST15 Priority Buy &
+// Multi-Alert Rotation". Shared by BOTH executeST5PriorityRotation (P0)
+// and executeSTPriorityRotation/ST15 (P1) below — one repo Variable set
+// controls both timeframes, since the storm the note describes was
+// exactly "many independent ST rotations of either timeframe within
+// minutes of each other," not a per-timeframe problem.
+//
+// ST_EVENT_TTL_MIN     — a PENDING event older than this is EXPIRED
+//                         instead of executed (never trade a stale cross).
+// ST_MAX_DISTANCE_PCT  — a cross already this far above its own ST line is
+//                         REJECTED_TOO_FAR (the note's ZEC example: +5.4%
+//                         above ST is a late chase, not a fresh cross).
+// ST_ROTATION_COOLDOWN_MIN — after any ST5/ST15 rotation actually SELLS or
+//                         BUYs something, both functions skip entirely
+//                         (leaving events PENDING for next cycle) for this
+//                         long — this is the "only one P0 basket/rotation
+//                         executes at a time" control, implemented as a
+//                         cooldown rather than a lock file, since every run
+//                         is a fresh process (no in-memory lock would
+//                         survive between GitHub Actions runs anyway).
+// ST_EQUAL_ALLOCATE    — when multiple fresh candidates are eligible in
+//                         the SAME cycle, divide the configured priority
+//                         USD size across them instead of giving each one
+//                         the full amount (note §1).
+// ST_FAILED_SELL_QUARANTINE_MIN — once a tracked position's SELL fails
+//                         with a real exchange error (not zero-balance —
+//                         see the zero_balance branch below, that's a
+//                         different, non-error case), it's excluded from
+//                         every ST rotation's sell list for this long
+//                         instead of being retried (and failing the same
+//                         way) on every subsequent cross — this is what
+//                         stopped the IMX SELL failing 10 times in ~20
+//                         minutes in the log the note reviewed.
+const ST_EVENT_TTL_MIN               = parseFloat(process.env.ST_EVENT_TTL_MIN || '20');
+const ST_MAX_DISTANCE_PCT            = parseFloat(process.env.ST_MAX_DISTANCE_PCT || '3');
+const ST_ROTATION_COOLDOWN_MIN       = parseFloat(process.env.ST_ROTATION_COOLDOWN_MIN || '10');
+const ST_EQUAL_ALLOCATE              = (process.env.ST_EQUAL_ALLOCATE ?? 'true') === 'true';
+const ST_FAILED_SELL_QUARANTINE_MIN  = parseFloat(process.env.ST_FAILED_SELL_QUARANTINE_MIN || '60');
+
+function isSTRotationOnCooldown(tradeState) {
+  const last = tradeState.lastSTRotationAt || 0;
+  return (Date.now() - last) < ST_ROTATION_COOLDOWN_MIN * 60000;
+}
+function markSTRotationExecuted(tradeState) {
+  tradeState.lastSTRotationAt = Date.now();
+}
+function isSellQuarantined(pos) {
+  if (!pos.sellBlockedAt) return false;
+  return (Date.now() - pos.sellBlockedAt) < ST_FAILED_SELL_QUARANTINE_MIN * 60000;
+}
+
 // ── Shared sizing for ST5/ST15 priority buys ──
 // Mirrors executeAutoBuys' percent-mode sizing exactly (same balance
 // source, same MEXC_SIZING_BUFFER_PCT buffer) so a priority buy respects
@@ -525,6 +576,10 @@ export async function executeSTPriorityRotation({
   if (!ST15_ENABLE) return { changed };
   if (effectiveTradeMode === 'off') return { changed };       // TRADE_MODE off remains off — no exception
   if (!tradeState.tradingEnabled) return { changed };          // Telegram /pause kill-switch
+  if (isSTRotationOnCooldown(tradeState)) {
+    console.log(`  ⏸  ST15 rotation on cooldown (${ST_ROTATION_COOLDOWN_MIN}min since last ST5/ST15 execution) — deferring all pending events to next cycle`);
+    return { changed };
+  }
 
   const pending = Object.entries(market.symbols || {})
     .filter(([, e]) => e.assetType === 'crypto' && e.st15Event?.status === 'PENDING')
@@ -536,7 +591,42 @@ export async function executeSTPriorityRotation({
   // detected first (§12 acceptance test: "Two symbols cross together").
   pending.sort((x, y) => new Date(x.event.detectedAt) - new Date(y.event.detectedAt));
 
-  for (const { pair, entry, event } of pending) {
+  // ── Freshness / chase protection (dev-team note §5) — filtered BEFORE
+  // the basket size is computed, so an expired/too-far event neither
+  // executes NOR shrinks everyone else's equal-allocation share. ──
+  const fresh = [];
+  for (const cand of pending) {
+    const { event, pair } = cand;
+    const ageMin = (Date.now() - new Date(event.detectedAt).getTime()) / 60000;
+    if (ageMin > ST_EVENT_TTL_MIN) {
+      event.status = 'EXPIRED';
+      logAudit('st15_expired', { pair, id: event.id, ageMin: ageMin.toFixed(1), ttlMin: ST_EVENT_TTL_MIN });
+      continue;
+    }
+    if (event.distancePct != null && event.distancePct > ST_MAX_DISTANCE_PCT) {
+      event.status = 'REJECTED_TOO_FAR';
+      logAudit('st15_rejected_too_far', { pair, id: event.id, distancePct: event.distancePct, maxPct: ST_MAX_DISTANCE_PCT });
+      continue;
+    }
+    fresh.push(cand);
+  }
+  if (!fresh.length) return { changed };
+
+  // ── Equal allocation (dev-team note §1) — basket size is the fresh-
+  // candidate count determined above, BEFORE any per-symbol NOOP/no-trade
+  // rejection below (§2: "determine the final candidate set first,
+  // calculate equal allocation second" — this repo's simpler reading of
+  // that rule stops at "fresh and not obviously invalid," rather than
+  // pre-resolving already-held/no-trade too, to avoid a second full pass
+  // over live exchange state before any order is placed). A candidate that
+  // turns out NOOP/no-trade simply leaves its share unused rather than
+  // redistributing it — matches §8's "no automatic redistribution" default. ──
+  const basketSize = ST_EQUAL_ALLOCATE ? fresh.length : 1;
+  if (fresh.length > 1) {
+    console.log(`  🧺  ST15 basket: ${fresh.length} fresh candidate(s) this cycle (${fresh.map(c => c.pair).join(', ')})${ST_EQUAL_ALLOCATE ? ` — equal allocation ÷${basketSize}` : ''}`);
+  }
+
+  for (const { pair, entry, event } of fresh) {
     const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
     const sym  = buildSymKey(pair);
 
@@ -618,6 +708,11 @@ export async function executeSTPriorityRotation({
         && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
         && !['stopped', 'tp2_hit'].includes(p.status);
       if (!eligible) return false;
+      if (isSellQuarantined(p)) {
+        protectedPositions.push(`${p.base} (quarantined)`);
+        logAudit('st15_rotation_sell_quarantined', { base: p.base, eventId: event.id, sellBlockedAt: p.sellBlockedAt });
+        return false;
+      }
       const curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
       if (!isAboveBuyPrice(p, curPrice)) {
         protectedPositions.push(p.base);
@@ -664,7 +759,10 @@ export async function executeSTPriorityRotation({
         }
 
         sellFailed = true;
-        console.log(`  🛑  ST15 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}`);
+        pos.sellBlockedAt = Date.now();
+        pos.sellBlockedReason = closeResult.reason || 'unknown';
+        logAudit('st15_sell_quarantine_set', { base: pos.base, eventId: event.id, reason: pos.sellBlockedReason, quarantineMin: ST_FAILED_SELL_QUARANTINE_MIN });
+        console.log(`  🛑  ST15 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}, quarantining ${pos.base} for ${ST_FAILED_SELL_QUARANTINE_MIN}min`);
         continue;
       }
       const finalExitPrice = pos.liveOrder?.exitFillPrice || marketPrice;
@@ -755,10 +853,11 @@ export async function executeSTPriorityRotation({
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
 
-    const { totalUsd: st15UsdSize } = await computeSTPriorityUsdSize({
+    const { totalUsd: st15TotalUsd } = await computeSTPriorityUsdSize({
       effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
       fallbackUsdSize: ST15_PRIORITY_USD_SIZE, label: 'ST15 priority',
     });
+    const st15UsdSize = parseFloat((st15TotalUsd / basketSize).toFixed(2));
     if (st15UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st15_blocked_zero_balance', { pair, id: event.id });
@@ -843,6 +942,7 @@ export async function executeSTPriorityRotation({
     }
   }
 
+  if (changed) markSTRotationExecuted(tradeState);
   return { changed };
 }
 
@@ -874,6 +974,10 @@ export async function executeST5PriorityRotation({
   if (!ST5_ENABLE) return { changed };
   if (effectiveTradeMode === 'off') return { changed };       // TRADE_MODE off remains off — no exception
   if (!tradeState.tradingEnabled) return { changed };          // Telegram /pause kill-switch
+  if (isSTRotationOnCooldown(tradeState)) {
+    console.log(`  ⏸  ST5 rotation on cooldown (${ST_ROTATION_COOLDOWN_MIN}min since last ST5/ST15 execution) — deferring all pending events to next cycle`);
+    return { changed };
+  }
 
   const pending = Object.entries(market.symbols || {})
     .filter(([, e]) => e.assetType === 'crypto' && e.st5Event?.status === 'PENDING')
@@ -885,7 +989,35 @@ export async function executeST5PriorityRotation({
   // detected first (§12 acceptance test: "Two symbols cross together").
   pending.sort((x, y) => new Date(x.event.detectedAt) - new Date(y.event.detectedAt));
 
-  for (const { pair, entry, event } of pending) {
+  // ── Freshness / chase protection (dev-team note §5) — filtered BEFORE
+  // the basket size is computed, so an expired/too-far event neither
+  // executes NOR shrinks everyone else's equal-allocation share. ──
+  const fresh = [];
+  for (const cand of pending) {
+    const { event, pair } = cand;
+    const ageMin = (Date.now() - new Date(event.detectedAt).getTime()) / 60000;
+    if (ageMin > ST_EVENT_TTL_MIN) {
+      event.status = 'EXPIRED';
+      logAudit('st5_expired', { pair, id: event.id, ageMin: ageMin.toFixed(1), ttlMin: ST_EVENT_TTL_MIN });
+      continue;
+    }
+    if (event.distancePct != null && event.distancePct > ST_MAX_DISTANCE_PCT) {
+      event.status = 'REJECTED_TOO_FAR';
+      logAudit('st5_rejected_too_far', { pair, id: event.id, distancePct: event.distancePct, maxPct: ST_MAX_DISTANCE_PCT });
+      continue;
+    }
+    fresh.push(cand);
+  }
+  if (!fresh.length) return { changed };
+
+  // ── Equal allocation (dev-team note §1) — see the identical comment in
+  // executeSTPriorityRotation (ST15) above; same rule, same simplification. ──
+  const basketSize = ST_EQUAL_ALLOCATE ? fresh.length : 1;
+  if (fresh.length > 1) {
+    console.log(`  🧺  ST5 basket: ${fresh.length} fresh candidate(s) this cycle (${fresh.map(c => c.pair).join(', ')})${ST_EQUAL_ALLOCATE ? ` — equal allocation ÷${basketSize}` : ''}`);
+  }
+
+  for (const { pair, entry, event } of fresh) {
     const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
     const sym  = buildSymKey(pair);
 
@@ -967,6 +1099,11 @@ export async function executeST5PriorityRotation({
         && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
         && !['stopped', 'tp2_hit'].includes(p.status);
       if (!eligible) return false;
+      if (isSellQuarantined(p)) {
+        protectedPositions.push(`${p.base} (quarantined)`);
+        logAudit('st5_rotation_sell_quarantined', { base: p.base, eventId: event.id, sellBlockedAt: p.sellBlockedAt });
+        return false;
+      }
       const curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
       if (!isAboveBuyPrice(p, curPrice)) {
         protectedPositions.push(p.base);
@@ -1013,7 +1150,10 @@ export async function executeST5PriorityRotation({
         }
 
         sellFailed = true;
-        console.log(`  🛑  ST5 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}`);
+        pos.sellBlockedAt = Date.now();
+        pos.sellBlockedReason = closeResult.reason || 'unknown';
+        logAudit('st5_sell_quarantine_set', { base: pos.base, eventId: event.id, reason: pos.sellBlockedReason, quarantineMin: ST_FAILED_SELL_QUARANTINE_MIN });
+        console.log(`  🛑  ST5 rotation SELL failed for ${pos.base} (${closeResult.reason}) — aborting BUY for ${base}, quarantining ${pos.base} for ${ST_FAILED_SELL_QUARANTINE_MIN}min`);
         continue;
       }
       const finalExitPrice = pos.liveOrder?.exitFillPrice || marketPrice;
@@ -1104,10 +1244,11 @@ export async function executeST5PriorityRotation({
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
 
-    const { totalUsd: st5UsdSize } = await computeSTPriorityUsdSize({
+    const { totalUsd: st5TotalUsd } = await computeSTPriorityUsdSize({
       effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
       fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'ST5 priority',
     });
+    const st5UsdSize = parseFloat((st5TotalUsd / basketSize).toFixed(2));
     if (st5UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
@@ -1192,6 +1333,7 @@ export async function executeST5PriorityRotation({
     }
   }
 
+  if (changed) markSTRotationExecuted(tradeState);
   return { changed };
 }
 

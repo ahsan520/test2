@@ -553,6 +553,13 @@ async function main() {
     logAudit('history_recorded', { rows: stPriorityOutcomes.length, totalKept: stHist.length, source: 'st15_priority' });
   }
 
+  // Persist tradeState here — both the ST5 (STEP 1.6) and ST15 (STEP 1.7)
+  // passes above may have set tradeState.lastSTRotationAt (dev-team note
+  // "ST5 / ST15 Priority Buy & Multi-Alert Rotation" §4's rotation-storm
+  // cooldown), and the last saveTradeState() call was earlier in this
+  // function, before either pass ran.
+  saveTradeState(tradeState);
+
   // ══════════════════════════════════════════════════════
   // STEP 2 — Scan for new BUY signals
   // Skipped entirely if market data is stale (see gate above) — no new

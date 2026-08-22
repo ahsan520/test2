@@ -54,7 +54,36 @@ export async function getBaseSizePrecision(symbol) {
   const res  = await fetch(`${MEXC_BASE}/api/v3/exchangeInfo?symbol=${symbol}`);
   const data = await res.json().catch(() => ({}));
   const info = (data.symbols || [])[0];
-  const step = info ? parseFloat(info.baseSizePrecision || '0.00000001') : 0.00000001;
+
+  // ── Root cause of the repeated IMX "quantity scale is invalid" HTTP 400s
+  // (dev-team note "ST5 / ST15 Priority Buy & Multi-Alert Rotation" §7) ──
+  // The old code always treated `baseSizePrecision` as a literal step size
+  // (e.g. "0.01"). For a coarse/integer-only symbol MEXC can instead return
+  // it as a bare decimal-PLACES count (e.g. "0" meaning "whole units
+  // only"). parseFloat("0") is falsy, and floorToStep's `if (!step) return
+  // qty` short-circuited on that — skipping rounding ENTIRELY and
+  // submitting IMX's raw fractional balance to a symbol that only accepts
+  // integers, every single cycle it was retried.
+  //
+  // Fix: detect a bare small integer string (0-8, no decimal point) and
+  // treat THAT as a places-count (step = 10^-places, so "0" → step 1,
+  // whole units); anything else is treated as the literal step size, as
+  // before. Whatever happens, never let step end up falsy/zero — that's
+  // exactly the bug. Whole-unit granularity (step=1) is always a SAFE
+  // fallback (floors to an integer, which every symbol accepts) if nothing
+  // usable came back from the exchange at all.
+  let step = null;
+  const raw = info?.baseSizePrecision;
+  if (raw != null && raw !== '') {
+    const rawStr = String(raw).trim();
+    const val = parseFloat(rawStr);
+    if (!isNaN(val)) {
+      const looksLikePlacesCount = /^\d+$/.test(rawStr) && val <= 8;
+      step = looksLikePlacesCount ? Math.pow(10, -val) : (val > 0 ? val : null);
+    }
+  }
+  if (!step || step <= 0 || !isFinite(step)) step = 1;
+
   _lotSizeCache.set(symbol, step);
   return step;
 }
