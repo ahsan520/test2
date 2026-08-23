@@ -194,6 +194,16 @@ jobs:
           EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
           ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
+          # Higher bar specifically for rotating OUT of a position that
+          # itself came from an ST5/ST15 priority buy — lets a real move
+          # run toward T1/T2 instead of getting harvested by the next
+          # priority cross the instant it clears the normal 0.2% floor
+          # (trade-log review: rotation exits were averaging only +0.65%,
+          # barely above that floor, while stop-hit losses ran the full
+          # -1.36% every time). Applies in both mexc-trader.js's ST5/ST15
+          # rotation-sell guards AND normal executeRotation, so an
+          # ST5/ST15-origin holding gets the same treatment either way.
+          ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT: ${{ vars.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '1' }}
           # ── ST5 (5m) / ST15 (15m) Supertrend Priority Execution ──
           # Detection/execution enable switches and priority buy size —
           # these already default to 'true'/$TRADE_USD_SIZE at the JS
