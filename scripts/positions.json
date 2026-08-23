@@ -24,8 +24,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1787525546267,
-      "usdSize": 1577.39,
-      "qty": 1024.58,
+      "usdSize": 1183.86,
+      "qty": 768.97,
       "fillPrice": 1.5395437935544323,
       "buyOrderId": "C02__720343656594083840036",
       "qtyEstimated": false
@@ -60,23 +60,23 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 12 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -5,
-      "confidenceDecay": 0,
-      "exitProbability": 12,
-      "dynamicPositionRisk": 12,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 50 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 48,
+      "confidenceDecay": 29,
+      "exitProbability": 50,
+      "dynamicPositionRisk": 50,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787528245952
+      "evaluatedAt": 1787528539817
     },
     "highestPnLSeen": -0.04,
-    "lastR15": 58.7,
+    "lastR15": 51.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.04% below 0.4% floor — not evaluated yet",
@@ -84,8 +84,9 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787528245952
-    }
+      "evaluatedAt": 1787528539817
+    },
+    "piPartialLevel": 1
   },
   "BINANCE:SUIUSDT": {
     "sym": "BINANCE:SUIUSDT",
@@ -150,9 +151,9 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -11,
-      "confidenceDecay": 0,
+      "fallingKnifeScore": 3,
+      "thesisDrop": -1,
+      "confidenceDecay": 13,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
@@ -161,18 +162,18 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787528245952
+      "evaluatedAt": 1787528539817
     },
     "highestPnLSeen": 1.2,
-    "lastR15": 59.8,
+    "lastR15": 58.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.75% ≥ 0.5% but momentum not yet weak — holding, letting it run",
+      "reason": "drawdown 0.99% ≥ 0.5% but momentum not yet weak — holding, letting it run",
       "highestPnLSeen": 1.2,
-      "drawdownFromPeak": 0.75,
+      "drawdownFromPeak": 0.99,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1787528245952
+      "evaluatedAt": 1787528539817
     }
   }
 }
