@@ -17,7 +17,7 @@
     "spikeScore": 0.4715211513197786,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-LINK-20260823T063000Z",
@@ -28,7 +28,10 @@
       "qty": 70.28,
       "fillPrice": 11.271,
       "buyOrderId": "C02__720098335406342144036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__720112151959633920036",
+      "exitFillPrice": 11.293190381331815,
+      "closedAt": 1787470352591
     },
     "entrySnapshot": {
       "at": 1787467058410,
@@ -85,7 +88,10 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1787470347072
-    }
+    },
+    "exitPrice": 11.293190381331815,
+    "statusChangedAt": 1787470354348,
+    "rotatedOut": true
   },
   "BINANCE:UNIUSDT": {
     "sym": "BINANCE:UNIUSDT",
@@ -262,5 +268,66 @@
       "giveBack": null,
       "evaluatedAt": 1787470347072
     }
+  },
+  "BINANCE:APTUSDT": {
+    "sym": "BINANCE:APTUSDT",
+    "base": "APT",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST5 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1787470356091,
+    "holdLockUntil": 1787470356091,
+    "entryPrice": 0.6104423248305897,
+    "stop": 0.6043,
+    "t1": 0.6288,
+    "t2": 0.6471,
+    "score": -2,
+    "spikeScore": 0.10697471525616772,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st5_priority_v1",
+    "scoreSource": "st5_cross",
+    "st5EventId": "ST5-APT-20260823T071500Z",
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1787470356091,
+      "usdSize": 363.04,
+      "qty": 594.71,
+      "fillPrice": 0.6104423248305897,
+      "buyOrderId": "C02__720112170632671232036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1787470357038,
+      "price": 0.609,
+      "conv": -2,
+      "whaleScore": 70,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": false,
+        "aboveEma": false,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": true,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "LEAN BEAR",
+      "cvdTrend": "up",
+      "thesisScore": 25,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "TRIGGERING",
+      "breakoutLevel": 0.611
+    },
+    "entryTriggerStatus": "TRIGGERING",
+    "entryStateAtBuy": "ST5_CROSS_UP"
   }
 }
