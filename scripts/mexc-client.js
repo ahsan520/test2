@@ -45,6 +45,25 @@ async function signedRequest(apiKey, apiSecret, method, endpoint, params = {}) {
   return body;
 }
 
+// Public endpoint — no signature needed. Used for a final, exchange- and
+// moment-accurate price check right before a rotation sell decision (see
+// mexc-trader.js's isAboveBuyPrice guard) — NOT cached, unlike
+// getBaseSizePrecision below, because staleness is exactly the problem
+// this exists to avoid. market.symbols[...].price is sourced from
+// Binance and is only as fresh as the last market-fetcher.js run (up to
+// one ~5min cycle old); the actual SELL fills on MEXC's live order book
+// moments later. A position that looks like it clears the configured
+// ROTATION_MIN_PROFIT_PCT margin against that stale, cross-exchange
+// snapshot can easily have drifted below it by the time the real MEXC
+// market order fills — this fetches the SAME exchange's price at the
+// SAME moment the sell decision is actually made, closing both gaps.
+export async function mexcGetLivePrice(symbol) {
+  const res  = await fetch(`${MEXC_BASE}/api/v3/ticker/price?symbol=${symbol}`);
+  const data = await res.json().catch(() => ({}));
+  const price = parseFloat(data?.price);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
 // Public endpoint — no signature needed. Cached per symbol for the lifetime
 // of one Job B process (a fresh process each run, so this just avoids
 // hitting it twice for the same symbol within a single cycle).

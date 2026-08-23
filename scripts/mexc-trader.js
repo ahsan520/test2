@@ -19,7 +19,7 @@
 // actually fired. Fixed here by taking closedOutcomes as an explicit param.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, mexcGetMyTrades, getBaseSizePrecision, floorToStep } from './mexc-client.js';
+import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, mexcGetMyTrades, mexcGetLivePrice, getBaseSizePrecision, floorToStep } from './mexc-client.js';
 import { closeLiveOrder, countLiveOpenPositions } from './position-monitor.js';
 import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
@@ -703,24 +703,36 @@ export async function executeSTPriorityRotation({
       return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + ST15_MIN_PROFIT_PCT / 100);
     };
 
-    const trackedToSell = Object.entries(positions).filter(([, p]) => {
+    const trackedToSell = [];
+    for (const [key, p] of Object.entries(positions)) {
       const eligible = p.assetType === 'crypto' && p.base !== base
         && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
         && !['stopped', 'tp2_hit'].includes(p.status);
-      if (!eligible) return false;
+      if (!eligible) continue;
       if (isSellQuarantined(p)) {
         protectedPositions.push(`${p.base} (quarantined)`);
         logAudit('st15_rotation_sell_quarantined', { base: p.base, eventId: event.id, sellBlockedAt: p.sellBlockedAt });
-        return false;
+        continue;
       }
-      const curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
+      // Live MEXC price fetched RIGHT NOW, not market.symbols[...].price
+      // (Binance-sourced, up to one ~5min market-fetcher cycle stale) —
+      // see the mexcGetLivePrice comment in mexc-client.js for why this
+      // specific gap matters here: it's the same exchange and same
+      // moment the actual SELL below will use, so this guard can't pass
+      // on a snapshot the real fill has already drifted below.
+      let curPrice = null;
+      if (effectiveTradeMode === 'live') {
+        try { curPrice = await mexcGetLivePrice(p.base + 'USDT'); }
+        catch (e) { console.log(`  ⚠️  ST15: live price fetch failed for ${p.base} (${e.message}) — falling back to market-data.json snapshot`); }
+      }
+      if (curPrice == null) curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
       if (!isAboveBuyPrice(p, curPrice)) {
         protectedPositions.push(p.base);
         logAudit('st15_rotation_sell_protected', { base: p.base, eventId: event.id, buyPrice: p.liveOrder?.fillPrice, curPrice });
-        return false;
+        continue;
       }
-      return true;
-    });
+      trackedToSell.push([key, p]);
+    }
 
     for (const [key, pos] of trackedToSell) {
       const mData       = (market.symbols || {})[pos.base + 'USDT'];
@@ -1094,24 +1106,32 @@ export async function executeST5PriorityRotation({
       return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + ST5_MIN_PROFIT_PCT / 100);
     };
 
-    const trackedToSell = Object.entries(positions).filter(([, p]) => {
+    const trackedToSell = [];
+    for (const [key, p] of Object.entries(positions)) {
       const eligible = p.assetType === 'crypto' && p.base !== base
         && p.liveOrder?.mode === effectiveTradeMode && !p.liveOrder?.closedAt
         && !['stopped', 'tp2_hit'].includes(p.status);
-      if (!eligible) return false;
+      if (!eligible) continue;
       if (isSellQuarantined(p)) {
         protectedPositions.push(`${p.base} (quarantined)`);
         logAudit('st5_rotation_sell_quarantined', { base: p.base, eventId: event.id, sellBlockedAt: p.sellBlockedAt });
-        return false;
+        continue;
       }
-      const curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
+      // Live MEXC price fetched RIGHT NOW — see the matching comment in
+      // the ST15 block above / mexcGetLivePrice in mexc-client.js.
+      let curPrice = null;
+      if (effectiveTradeMode === 'live') {
+        try { curPrice = await mexcGetLivePrice(p.base + 'USDT'); }
+        catch (e) { console.log(`  ⚠️  ST5: live price fetch failed for ${p.base} (${e.message}) — falling back to market-data.json snapshot`); }
+      }
+      if (curPrice == null) curPrice = parseFloat((market.symbols || {})[p.base + 'USDT']?.price);
       if (!isAboveBuyPrice(p, curPrice)) {
         protectedPositions.push(p.base);
         logAudit('st5_rotation_sell_protected', { base: p.base, eventId: event.id, buyPrice: p.liveOrder?.fillPrice, curPrice });
-        return false;
+        continue;
       }
-      return true;
-    });
+      trackedToSell.push([key, p]);
+    }
 
     for (const [key, pos] of trackedToSell) {
       const mData       = (market.symbols || {})[pos.base + 'USDT'];

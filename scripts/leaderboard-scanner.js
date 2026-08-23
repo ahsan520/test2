@@ -883,7 +883,15 @@ async function fetchKrakenOHLC(krakenPair, interval, limit) {
   // Kraken candle: [time, open, high, low, close, vwap, volume, count]
   // Normalized to: [time, open, high, low, close, volume] — the only
   // indices (1=open, 4=close, 5=volume) anything downstream reads.
-  return rows.slice(-limit).map(c => [c[0], c[1], c[2], c[3], c[4], c[6]]);
+  // time is converted seconds -> milliseconds here (Kraken returns Unix
+  // SECONDS; Binance returns milliseconds, and every consumer — most
+  // importantly calcSupertrend's closed-candle filter and event-ID
+  // timestamp — assumes milliseconds). Left unconverted, a real 2026
+  // timestamp like 1787501852 (seconds) gets read as milliseconds, which
+  // is only ~20 days after the Unix epoch — this is exactly why XMR/ST5
+  // event IDs were coming out as "...19700121T...": the epoch-seconds
+  // value was being interpreted as epoch-milliseconds.
+  return rows.slice(-limit).map(c => [c[0] * 1000, c[1], c[2], c[3], c[4], c[6]]);
 }
 
 async function fetchKrakenDepth(krakenPair, count) {
