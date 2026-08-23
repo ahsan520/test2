@@ -1,15 +1,5 @@
 [
   {
-    "timestamp": "2026-08-23T15:57:29.108Z",
-    "job": "leaderboard-decider",
-    "action": "mexc_sell",
-    "sym": "APTUSDT",
-    "reason": "stop hit",
-    "qty": 2454.79,
-    "fillPrice": 0.6523977578530139,
-    "orderId": "C02__720239224485203968036"
-  },
-  {
     "timestamp": "2026-08-23T15:57:30.324Z",
     "job": "leaderboard-decider",
     "action": "trade_log_pushed",
@@ -5144,7 +5134,7 @@
     ]
   },
   {
-    "timestamp": "2026-08-23T16:57:24.724Z",
+    "timestamp": "2026-08-23T16:57:22.880Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 20,
@@ -5156,7 +5146,7 @@
       {
         "pair": "AAVEUSDT",
         "status": "ok",
-        "conv": 1,
+        "conv": -1,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5184,7 +5174,7 @@
       {
         "pair": "DOGEUSDT",
         "status": "ok",
-        "conv": -2,
+        "conv": -1,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5205,7 +5195,7 @@
       {
         "pair": "GALAUSDT",
         "status": "ok",
-        "conv": 8,
+        "conv": 7,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -5289,10 +5279,144 @@
       {
         "pair": "ZECUSDT",
         "status": "ok",
-        "conv": 5,
+        "conv": 2,
         "session": "24/7",
         "assetType": "crypto"
       }
     ]
+  },
+  {
+    "timestamp": "2026-08-23T16:57:22.954Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-08-23T16:57:26.288Z",
+    "job": "leaderboard-decider",
+    "action": "REDUCE_25",
+    "sym": "BINANCE:SOLUSDT",
+    "reason": "dynamicPositionRisk 51 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+    "fallingKnifeScore": 34,
+    "thesisDrop": 52,
+    "confidenceDecay": 29,
+    "exitProbability": 51,
+    "dynamicPositionRisk": 51
+  },
+  {
+    "timestamp": "2026-08-23T16:57:26.869Z",
+    "job": "leaderboard-decider",
+    "action": "mexc_partial_sell_skipped_small",
+    "sym": "SOLUSDT",
+    "reason": "position intelligence: dynamicPositionRisk 51 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+    "pct": 0.25,
+    "free": 0.043,
+    "sellQty": 0.01,
+    "sellNotional": 0.9536
+  },
+  {
+    "timestamp": "2026-08-23T16:57:27.873Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 2
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.339Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 2,
+    "openAfter": 2,
+    "alerts": 1
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.524Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:RENDERUSDT",
+    "base": "RENDER",
+    "free": 0.39,
+    "estNotional": 0.5928
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.526Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:DOGEUSDT",
+    "base": "DOGE",
+    "free": 0.05,
+    "estNotional": 0.004616
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.528Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.025717,
+    "estNotional": 0.038747803899999995
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.530Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.005,
+    "estNotional": 1.1640000000000001
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.531Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XLMUSDT",
+    "base": "XLM",
+    "free": 0.03,
+    "estNotional": 0.005958
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.532Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.000582,
+    "estNotional": 0.49696398
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.715Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "RENDERUSDT",
+    "blockers": [
+      "TRIGGER_STALE"
+    ]
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.719Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0
+  },
+  {
+    "timestamp": "2026-08-23T16:57:28.722Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-08-23T16:57:29.934Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 2,
+    "monitored": 2
   }
 ]
