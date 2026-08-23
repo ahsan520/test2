@@ -61,22 +61,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 29 below 50 threshold",
-      "fallingKnifeScore": 34,
-      "thesisDrop": 42,
-      "confidenceDecay": 25,
-      "exitProbability": 29,
-      "dynamicPositionRisk": 29,
+      "reason": "dynamicPositionRisk 19 below 50 threshold",
+      "fallingKnifeScore": 13,
+      "thesisDrop": 33,
+      "confidenceDecay": 38,
+      "exitProbability": 19,
+      "dynamicPositionRisk": 19,
       "recovery": {
         "recovering": true,
         "sustainedMin": 6
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787511445023
+      "evaluatedAt": 1787511747110
     },
     "highestPnLSeen": 0.14,
-    "lastR15": 52.3,
+    "lastR15": 55.7,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.4% floor — not evaluated yet",
@@ -84,7 +84,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787511445023
+      "evaluatedAt": 1787511747110
     }
   },
   "BINANCE:XMRUSDT": {
@@ -103,9 +103,9 @@
     "t2": 455.01,
     "score": 7,
     "spikeScore": 0.005995002450841386,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787511747110,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-XMR-20260823T183000Z",
@@ -116,7 +116,10 @@
       "qty": 3.72,
       "fillPrice": 429.25286559139784,
       "buyOrderId": "C02__720282013830938626036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__720285777308610560036",
+      "exitFillPrice": 426.8843655913978,
+      "closedAt": 1787511748049
     },
     "entrySnapshot": {
       "at": 1787510850807,
@@ -148,20 +151,20 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 23 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 20,
-      "confidenceDecay": 13,
-      "exitProbability": 23,
-      "dynamicPositionRisk": 23,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 86 → current 20 (drop 66 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 4,
+      "thesisDrop": 66,
+      "confidenceDecay": 38,
+      "exitProbability": 45,
+      "dynamicPositionRisk": 45,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787511445023
+      "evaluatedAt": 1787511747110
     },
     "highestPnLSeen": -0.3,
     "lastR15": 56.5,
@@ -173,6 +176,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1787511445023
-    }
+    },
+    "exitPrice": 426.84,
+    "statusChangedAt": 1787511747110
   }
 }
