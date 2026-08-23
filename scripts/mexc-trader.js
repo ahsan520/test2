@@ -23,6 +23,7 @@ import { mexcMarketBuy, mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, mex
 import { closeLiveOrder, countLiveOpenPositions } from './position-monitor.js';
 import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
+import { calcEntryExtension } from './buy-intelligence.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -190,12 +191,19 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   // unavailable, this guard has no opinion (falls through to the other
   // guards) rather than blocking or allowing by default.
   const ROTATION_SELL_MIN_NET_PNL_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
+  // Same setup-aware bump as ST5/ST15's own rotation guard (see the
+  // comment there for the trade-log rationale) — normal rotation can
+  // also reach an ST5/ST15-origin holding, so it needs the same higher
+  // bar or that position could still get harvested early via THIS path
+  // even with the ST5/ST15-side fix in place.
+  const ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT = parseFloat(process.env.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '1');
   const currentlyAtOrAboveBuy = (base, pos) => {
     const buyPrice = pos?.liveOrder?.fillPrice;
     if (!buyPrice) return null; // no opinion — no buy price on record to compare against
     const cur = (market.symbols || {})[base + 'USDT']?.price;
     if (cur === undefined || cur === null) return null; // no opinion — no current price available
-    return parseFloat(cur) >= parseFloat(buyPrice) * (1 + ROTATION_SELL_MIN_NET_PNL_PCT / 100);
+    const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ROTATION_SELL_MIN_NET_PNL_PCT;
+    return parseFloat(cur) >= parseFloat(buyPrice) * (1 + minPct / 100);
   };
 
   // ── Stagnation override — waives Guard 2's flat-position protection ──
@@ -660,6 +668,29 @@ export async function executeSTPriorityRotation({
       continue;
     }
 
+    // ── RSI-overextension gate ──
+    // ST15 bypasses every OTHER strategy-qualification check by design
+    // (grade, conviction, whale, breakout confirmation, etc. — see the
+    // dev-team note this whole path is built from) — but that meant it
+    // was buying purely on the Supertrend flip with literally no check
+    // for whether the move was already exhausted by the time the cross
+    // confirmed. Trade-log review (46 closed ST5/ST15 trades) showed
+    // stop-hit losses (avg -1.36%) running full-size against
+    // rotation-capped wins (avg +0.65%) that almost never reach T1/T2 —
+    // net roughly breakeven-to-negative before fees. Reusing
+    // buy-intelligence.js's existing RSI check (already proven on the
+    // normal buy path) closes the most direct hole: don't buy a cross
+    // that's already deep into overbought RSI on the SAME r15/r1h data
+    // this cycle's market-fetcher already computed for this symbol —
+    // no extra API calls, no added latency to the priority path.
+    const st15Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
+    if (st15Ext.penalty > 0) {
+      event.status = 'SKIPPED_OVEREXTENDED';
+      logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason });
+      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — skipped, already overextended (${st15Ext.reason}). Event marked handled, no positions touched.`);
+      continue;
+    }
+
     console.log(`  🟣  ST15_CROSS_UP — ${pair} [${event.id}] — Priority-0 execution starting`);
     logAudit('st15_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
     await sendTelegram(
@@ -697,10 +728,22 @@ export async function executeSTPriorityRotation({
     const protectedPositions = [];
 
     const ST15_MIN_PROFIT_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
+    // Trade-log review (46 closed ST5/ST15 trades) showed rotation exits
+    // averaging only +0.65% — barely above the 0.2% floor — because a
+    // priority-origin position gets harvested by the very NEXT cross the
+    // instant it clears that floor, never getting a real shot at T1/T2,
+    // while stop-hit losses ran the full -1.36% every time. Positions
+    // that themselves came from an ST5/ST15 priority buy now need a
+    // higher bar (ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT, default 1%)
+    // before another priority event is allowed to rotate them out —
+    // everything else (normal topN-sourced holdings) keeps the original
+    // 0.2% floor unchanged.
+    const ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT = parseFloat(process.env.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '1');
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
-      return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + ST15_MIN_PROFIT_PCT / 100);
+      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST15_MIN_PROFIT_PCT;
+      return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + minPct / 100);
     };
 
     const trackedToSell = [];
@@ -1063,6 +1106,16 @@ export async function executeST5PriorityRotation({
       continue;
     }
 
+    // ── RSI-overextension gate — see the matching ST15 comment above for
+    // the full trade-log rationale (46 closed trades review). ──
+    const st5Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
+    if (st5Ext.penalty > 0) {
+      event.status = 'SKIPPED_OVEREXTENDED';
+      logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason });
+      await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
+      continue;
+    }
+
     console.log(`  🟣  ST5_CROSS_UP — ${pair} [${event.id}] — Priority-0 (P0) execution starting`);
     logAudit('st5_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
     await sendTelegram(
@@ -1100,10 +1153,13 @@ export async function executeST5PriorityRotation({
     const protectedPositions = [];
 
     const ST5_MIN_PROFIT_PCT = parseFloat(process.env.ROTATION_MIN_PROFIT_PCT || '0.2');
+    // See the matching ST15 comment above for the full trade-log rationale.
+    const ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT = parseFloat(process.env.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '1');
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
-      return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + ST5_MIN_PROFIT_PCT / 100);
+      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST5_MIN_PROFIT_PCT;
+      return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + minPct / 100);
     };
 
     const trackedToSell = [];
