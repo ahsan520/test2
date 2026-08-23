@@ -381,7 +381,12 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
   const n = closed.length;
   // Needs period bars to seed ATR, plus 2 more closed bars so a
   // previous-vs-current direction comparison (the cross itself) is
-  // possible.
+  // possible, plus SLOPE_LOOKBACK more so the slope/barsSinceCross
+  // enrichment below has real history to look back over (falls back to
+  // whatever's available if a symbol has fewer bars than ideal — those
+  // fields degrade gracefully to null/0 rather than the whole calc
+  // failing, since the core Supertrend value/direction are still valid
+  // and more valuable than the enrichment on top of them).
   if (n < period + 2) return null;
 
   const highs  = closed.map(c => parseFloat(c[2]));
@@ -436,6 +441,80 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
 
   const crossUp = dir[prev] === 'BEAR' && dir[last] === 'BULL';
   const stVal   = st[last];
+  const atrVal  = atr[last]; // already computed above, just wasn't returned before
+
+  // ── ST5/ST15 TIMING ENGINE ENRICHMENT ──────────────────────────────────
+  // Per the "ST5/ST15 Timing Engine" dev-team doc (§2-§4): ATR-normalized
+  // distance/extension, slope, bars-since-cross, and candle-impulse — used
+  // downstream by st-timing-engine.js as a P2 entry-timing/falling-knife/
+  // exhaustion layer, kept entirely separate from conviction scoring.
+  // distanceATR is SIGNED: positive = price above the ST line (normal for
+  // BULL), negative = price below it (normal for BEAR, or an early warning
+  // inside a BULL run). Extension zone below uses the absolute value.
+  const distanceATR = atrVal > 0 ? parseFloat(((closes[last] - stVal) / atrVal).toFixed(3)) : null;
+
+  const STZ_GOOD  = parseFloat(process.env.ST_ATR_ZONE_GOOD  || '0.75'); // 0–this   = GOOD_ENTRY
+  const STZ_EXT   = parseFloat(process.env.ST_ATR_ZONE_EXT   || '1.25'); // this–below = EXTENDED
+  const STZ_VEXT  = parseFloat(process.env.ST_ATR_ZONE_VEXT  || '2.0');  // this–below = VERY_EXTENDED, above = EXHAUSTED
+  let extensionZone = null;
+  if (distanceATR != null) {
+    const absD = Math.abs(distanceATR);
+    extensionZone = absD <= STZ_GOOD ? 'GOOD_ENTRY'
+                  : absD <= STZ_EXT  ? 'EXTENDED'
+                  : absD <= STZ_VEXT ? 'VERY_EXTENDED'
+                                     : 'EXHAUSTED';
+  }
+
+  // barsSinceCross — consecutive closed bars (including the current one)
+  // holding the same direction as `last`. Caps the backward scan at the
+  // full series rather than assuming SLOPE_LOOKBACK bars exist.
+  let barsSinceCross = 1;
+  for (let i = last - 1; i >= period - 1 && dir[i] === dir[last]; i--) barsSinceCross++;
+
+  // slope — ST line movement over the last SLOPE_LOOKBACK closed bars,
+  // normalized to ATR units per bar so it's comparable across symbols of
+  // very different price scale. Falls back to null if not enough bars
+  // exist yet (new-ish symbol / early in the fetched window) rather than
+  // computing a misleading slope off too few points.
+  const SLOPE_LOOKBACK = parseInt(process.env.ST_SLOPE_LOOKBACK || '3', 10);
+  const slopeIdx = last - SLOPE_LOOKBACK;
+  let slope = null, slopeStrength = null;
+  if (slopeIdx >= period - 1 && st[slopeIdx] != null && atrVal > 0) {
+    slope = parseFloat(((stVal - st[slopeIdx]) / SLOPE_LOOKBACK / atrVal).toFixed(4));
+    const absSlope = Math.abs(slope);
+    const SLOPE_WEAK   = parseFloat(process.env.ST_SLOPE_WEAK_MAX   || '0.05');
+    const SLOPE_STRONG = parseFloat(process.env.ST_SLOPE_STRONG_MIN || '0.15');
+    slopeStrength = absSlope < SLOPE_WEAK ? 'WEAK' : absSlope >= SLOPE_STRONG ? 'STRONG' : 'NORMAL';
+  }
+
+  // candleImpulseATR — the most recent closed candle's full range relative
+  // to ATR. A large value (big green/red candle) is the "detect chasing"
+  // signal from §2's st5CandleImpulse — an EXTENDED/VERY_EXTENDED zone
+  // reached via one huge candle is a much worse entry than the same zone
+  // reached gradually.
+  const candleImpulseATR = atrVal > 0 ? parseFloat(((highs[last] - lows[last]) / atrVal).toFixed(3)) : null;
+
+  // retest — did price recently push into EXTENDED-or-worse territory and
+  // then pull back toward the ST line while direction held (no flip), and
+  // is now turning back up? This is a heuristic over the last
+  // RETEST_LOOKBACK closed bars, not a strict pattern match — the doc
+  // explicitly flags entry-timing thresholds as needing backtesting before
+  // being fixed; this gives a reasonable starting definition rather than
+  // leaving retest permanently false.
+  const RETEST_LOOKBACK = parseInt(process.env.ST_RETEST_LOOKBACK || '6', 10);
+  let retest = false;
+  if (distanceATR != null && extensionZone === 'GOOD_ENTRY' && dir[last] === 'BULL') {
+    const from = Math.max(period - 1, last - RETEST_LOOKBACK);
+    let pushedExtended = false;
+    for (let i = from; i < last; i++) {
+      if (atr[i] > 0 && dir[i] === 'BULL') {
+        const d = Math.abs((closes[i] - st[i]) / atr[i]);
+        if (d > STZ_GOOD) { pushedExtended = true; break; }
+      }
+    }
+    retest = pushedExtended && closes[last] >= closes[last - 1];
+  }
+
   return {
     period, multiplier,
     value:              parseFloat(stVal.toFixed(8)),
@@ -445,6 +524,15 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
     close:              closes[last],
     lastClosedCandle:   new Date(parseInt(closed[last][0], 10)).toISOString(),
     distancePct:        stVal > 0 ? parseFloat((((closes[last] - stVal) / stVal) * 100).toFixed(3)) : 0,
+    // ── timing-engine enrichment (all additive, backward-compatible) ──
+    atr:                atrVal != null ? parseFloat(atrVal.toFixed(8)) : null,
+    distanceATR,
+    extensionZone,      // 'GOOD_ENTRY' | 'EXTENDED' | 'VERY_EXTENDED' | 'EXHAUSTED' | null
+    barsSinceCross,
+    slope,              // ATR units per bar, signed
+    slopeStrength,      // 'WEAK' | 'NORMAL' | 'STRONG' | null
+    candleImpulseATR,
+    retest,
   };
 }
 

@@ -40,7 +40,7 @@ import { monitorPositions, reconcileTrackedLiveBalances } from './position-monit
 import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
-import { checkSTAlignment } from './st-alignment-check.js';
+import { evaluateSTTiming } from './st-timing-engine.js';
 
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
@@ -938,26 +938,31 @@ async function main() {
       }
 
       // ══════════════════════════════════════════════════════════════════
-      // ST5/ST15 ALIGNMENT — per the "P0/P1/P2 WATCH + ST Alignment" dev
-      // doc (§3-§4, §8): a SEPARATE timing/confirmation layer on top of the
-      // Entry Quality Check above, not a conviction-score weight. Reads the
-      // CURRENT ST5/ST15 direction (no fresh cross required — that's P0/P1's
-      // job, STEP 1.6/1.7 above) to reduce falling-knife and
-      // premature-transition entries in the frequent P2 engine. CAP BUY is
-      // exempt for the same reason it's exempt everywhere else in this
-      // block — it's a deliberate extreme-shock exception to normal
-      // qualification, not a candidate this timing layer is meant to judge.
-      // See st-alignment-check.js for the full per-combination reasoning.
+      // ST5/ST15 TIMING ENGINE — per the "ST5/ST15 Timing Engine" dev doc
+      // (22 Aug 2026, supersedes the simpler alignment-only gate from the
+      // earlier WATCH+ST doc): a SEPARATE entry-timing/confirmation layer
+      // on top of the Entry Quality Check above, not a conviction-score
+      // weight. Reads the CURRENT ST5/ST15 state (direction, ATR-normalized
+      // distance/extension, slope, retest) — no fresh cross required,
+      // that's P0/P1's job (STEP 1.6/1.7 above). CAP BUY is exempt for the
+      // same reason it's exempt everywhere else in this block — a
+      // deliberate extreme-shock exception, not a candidate this timing
+      // layer is meant to judge. See st-timing-engine.js for full
+      // per-condition reasoning.
       if (!isCapBuyForTrigger) {
-        const stAlign = checkSTAlignment(entry);
-        if (!stAlign.pass) {
-          console.log(`  📉  ${pair} — ST alignment blocked (ST5:${stAlign.st5Dir ?? '—'}/ST15:${stAlign.st15Dir ?? '—'}) — ${stAlign.reason}`);
-          logAudit('st_alignment_blocked', { pair, alignment: stAlign.alignment, st5Dir: stAlign.st5Dir, st15Dir: stAlign.st15Dir });
+        const timing = evaluateSTTiming(entry);
+        if (timing.p2State === 'BLOCK') {
+          console.log(`  📉🔪  ${pair} — ST timing BLOCK — ${timing.reason}`);
+          logAudit('st_timing_blocked', { pair, p2State: timing.p2State, timingScore: timing.timingScore, reason: timing.reason });
           continue;
         }
-        if (stAlign.alignment !== 'STRONG') {
-          console.log(`  ✅  ${pair} — ST alignment ${stAlign.alignment} (ST5:${stAlign.st5Dir}/ST15:${stAlign.st15Dir}) — ${stAlign.reason}`);
+        if (timing.p2State === 'WAIT_RETEST' || timing.p2State === 'WAIT') {
+          console.log(`  ⏸  ${pair} — ST timing ${timing.p2State} (score ${timing.timingScore}/95) — ${timing.reason}`);
+          logAudit('st_timing_wait', { pair, p2State: timing.p2State, timingScore: timing.timingScore, reason: timing.reason });
+          continue;
         }
+        // timing.p2State === 'READY'
+        console.log(`  ✅  ${pair} — ST timing READY (score ${timing.timingScore}/95, ${timing.alignment?.alignment}) — ${timing.reason}`);
       }
     }
 
