@@ -1572,6 +1572,44 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
 // the 15-min software stop check in position-monitor.js is the only stop
 // mechanism MEXC's API allows, and is now PRIMARY, not a fallback.
 
+// ── Rank-weighted capital allocation across this cycle's picks ──
+// Default behavior (unchanged): split totalUsd evenly across picks.
+// EXEC_ALLOC_WEIGHTED=true switches to a 70/30 rule — the #1 pick gets
+// 70% and the remaining slots split the other 30% equally — but ONLY
+// when picks[0] is a genuinely clear leader over picks[1]: either a
+// strictly higher letter grade, or (same grade) a rankScore lead of at
+// least EXEC_ALLOC_LEAD_SCORE_GAP_PCT (default 10%, relative to the
+// leader's own rankScore). Anything short of that falls back to equal
+// split — comparable candidates should be sized comparably.
+// picks are always sorted best-first (allStarred/ranked preserves rank
+// order), so picks[0]/picks[1] is always "leader vs runner-up".
+function computeAllocationWeights(picks, totalUsd) {
+  const n = picks.length;
+  if (n <= 1) return [totalUsd];
+
+  const equalSplit = () => {
+    const each = Math.floor((totalUsd / n) * 100) / 100; // floor — slices must never sum above totalUsd
+    return picks.map(() => each);
+  };
+
+  const WEIGHTED = (process.env.EXEC_ALLOC_WEIGHTED || 'false').toLowerCase() === 'true';
+  if (!WEIGHTED) return equalSplit();
+
+  const LEAD_SCORE_GAP_PCT = parseFloat(process.env.EXEC_ALLOC_LEAD_SCORE_GAP_PCT || '0.1');
+  const top = picks[0], next = picks[1];
+  const topGradeRank  = GRADE_RANK[top.a.entry?.grade]  ?? 0;
+  const nextGradeRank = GRADE_RANK[next.a.entry?.grade] ?? 0;
+  const scoreGap = top.rankScore > 0 ? (top.rankScore - next.rankScore) / top.rankScore : 0;
+  const clearLeader = topGradeRank > nextGradeRank || scoreGap >= LEAD_SCORE_GAP_PCT;
+
+  if (!clearLeader) return equalSplit();
+
+  const leaderUsd  = Math.floor(totalUsd * 0.70 * 100) / 100;
+  const remainder  = totalUsd - leaderUsd;
+  const restEach   = Math.floor((remainder / (n - 1)) * 100) / 100;
+  return [leaderUsd, ...Array(n - 1).fill(restEach)];
+}
+
 async function executeAutoBuys({
   ranked, showRecoTags, positions, tradeState,
   effectiveTradeMode, effectiveExecStrategy, effectiveTopNCount, effectiveUsdSize, effectiveMaxLive,
@@ -1600,12 +1638,37 @@ async function executeAutoBuys({
     logAudit('mexc_blocked', { strategy: effectiveExecStrategy, reasons: [`grade below EXEC_MIN_GRADE (${EXEC_MIN_GRADE})`], symbols: gradeSkipped.map(r => r.a.pair) });
     await sendTelegram(`🚫 *NO BUY* — ${list} ranked #1 but grade is below EXEC_MIN_GRADE (${EXEC_MIN_GRADE}) — skipped, no positions touched.`);
   }
-  // 'topN' buys effectiveTopNCount picks (e.g. 2 or 3) if that repo Variable
-  // is set; unset/0 falls back to the original behavior of every starred
-  // symbol, uncapped.
-  const picks = effectiveExecStrategy === 'topN'
-    ? (effectiveTopNCount ? allStarred.slice(0, effectiveTopNCount) : allStarred)
-    : allStarred.slice(0, 1);
+  // ── Stage 2 selection layer — available slots BEFORE candidate sizing ──
+  // Previously `picks` was sliced straight to effectiveTopNCount (a config
+  // number) with no regard for how many live slots were actually free.
+  // That meant capital got divided by the CONFIGURED pick count even when
+  // fewer slots were available — e.g. EXEC_TOP_N_COUNT=3 with only 1 slot
+  // open still computed basePerPickUsd = totalUsd / 3, so the one pick that
+  // actually clears the per-symbol liveLock check later in the loop only
+  // ever received a third of the intended size, silently leaving the rest
+  // of totalUsd unallocated. Computing availableSlots first — and building
+  // the eligible pool from allStarred with already-held symbols excluded
+  // (they don't consume a NEW slot and shouldn't shrink the split for the
+  // picks that do) — means `picks.length` always equals the number of
+  // symbols that can actually be bought this cycle, so capital sizing
+  // below is correct by construction. The per-pick liveLock re-check later
+  // in the loop stays in place as a defense-in-depth re-verify (position
+  // state can still shift between this calculation and order execution).
+  const currentLiveOpen  = countLiveOpenPositions(positions);
+  const availableSlots   = Math.max(0, effectiveMaxLive - currentLiveOpen);
+  const eligiblePool     = allStarred.filter(r => !positions[r.a.sym]?.liveOrder);
+  const requestedCount   = effectiveExecStrategy === 'topN'
+    ? (effectiveTopNCount || eligiblePool.length)
+    : 1;
+  const picks = eligiblePool.slice(0, Math.min(requestedCount, availableSlots));
+
+  if (!picks.length) {
+    if (eligiblePool.length && availableSlots <= 0) {
+      console.log(`  🚫  No available live slots (${currentLiveOpen}/${effectiveMaxLive}) — no new buys this cycle.`);
+      logAudit('mexc_blocked', { strategy: effectiveExecStrategy, reasons: [`no available live slots (${currentLiveOpen}/${effectiveMaxLive})`] });
+    }
+    return;
+  }
 
   // ── Total USD allocated this cycle ──
   // 'usd'     → effectiveUsdSize is already a fixed dollar figure (unchanged
@@ -1642,9 +1705,11 @@ async function executeAutoBuys({
     }
   }
 
-  const basePerPickUsd = effectiveExecStrategy === 'topN' && picks.length > 1
-    ? Math.floor((totalUsd / picks.length) * 100) / 100 // floor, not round — slices must never sum above totalUsd
-    : totalUsd;
+  // ── Per-pick allocation ── see computeAllocationWeights() — equal split
+  // by default, or a 70/30 leader-weighted split when EXEC_ALLOC_WEIGHTED=true
+  // and picks[0] is a clear leader over picks[1].
+  const pickWeights = computeAllocationWeights(picks, totalUsd);
+  const isWeightedSplit = new Set(pickWeights).size > 1;
 
   // ── Scout entries (leaderboard-decider.js: entry.scoutBuy) get sized
   // down to BUY_SCOUT_SIZE_PCT of the normal slice ──
@@ -1656,7 +1721,7 @@ async function executeAutoBuys({
   // data exists in symbol-history.json to justify it).
   const BUY_SCOUT_SIZE_PCT = parseFloat(process.env.BUY_SCOUT_SIZE_PCT || '30');
 
-  console.log(`  ⚡  Exec strategy: ${effectiveExecStrategy} (${effectiveSizeMode === 'percent' ? effectiveSizePct + '%' : '$' + effectiveUsdSize}) — ${picks.length} pick(s) @ $${basePerPickUsd} each`);
+  console.log(`  ⚡  Exec strategy: ${effectiveExecStrategy} (${effectiveSizeMode === 'percent' ? effectiveSizePct + '%' : '$' + effectiveUsdSize}) — ${picks.length} pick(s), $${totalUsd} total → [${pickWeights.map(w => '$' + w).join(', ')}] (${availableSlots} slot(s) available, ${currentLiveOpen}/${effectiveMaxLive} live)`);
 
   if (!tradeState.tradingEnabled) {
     console.log(`  🚫  Auto-trade blocked — trading paused via Telegram /pause`);
@@ -1664,7 +1729,9 @@ async function executeAutoBuys({
     return;
   }
 
-  for (const { a: pick } of picks) {
+  for (let pickIdx = 0; pickIdx < picks.length; pickIdx++) {
+    const { a: pick } = picks[pickIdx];
+    const basePerPickUsd = pickWeights[pickIdx];
     const pos    = positions[pick.sym];
     const symbol = pick.pair.replace(/[^A-Z]/g, '') + (pick.pair.includes('USDT') ? '' : 'USDT');
     const isScout   = pick.entry?.scoutBuy === true;
@@ -1762,7 +1829,7 @@ async function executeAutoBuys({
       if (effectiveSizeMode === 'percent') adjustPaperBalance(-perPickUsd);
       await sendTelegram(
         `📝 *PAPER BUY${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} $${perPickUsd} USDT @ ~$${pos.liveOrder.fillPrice.toFixed(6)}\n` +
-        `  Strategy: ${effectiveExecStrategy === 'topN' ? `top${picks.length} split` : 'top 1'}\n` +
+        `  Strategy: ${effectiveExecStrategy === 'topN' ? `top${picks.length}${isWeightedSplit ? ' weighted split' : ' split'}` : 'top 1'}\n` +
         (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
         `  _Paper mode — no real order placed. Set TRADE\\_MODE=live to trade for real._`
       );
@@ -1808,7 +1875,7 @@ async function executeAutoBuys({
           `⚡ *LIVE BUY PLACED${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} — ${utc}\n` +
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated — MEXC did not report a fill qty)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
           `  Size: $${perPickUsd} USDT  Order ID: \`${buy.orderId}\`\n` +
-          (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length} split ($${effectiveUsdSize} ÷ ${picks.length})\n` : '') +
+          (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length}${isWeightedSplit ? ' weighted split' : ' split'} ($${totalUsd} → [${pickWeights.map(w => '$' + w).join(', ')}])\n` : '') +
           (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
           `  🛡 Watched by the 15-min software stop check.\n` +
           `  Stop/T2 exits will close this position automatically.\n` +
