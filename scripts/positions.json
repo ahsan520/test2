@@ -10,14 +10,14 @@
     "alertedAt": 1787537846960,
     "holdLockUntil": 1787537846960,
     "entryPrice": 419.2680724557522,
-    "stop": 411.93,
+    "stop": 414.03,
     "t1": 431.85,
     "t2": 444.42,
     "score": -10,
     "spikeScore": 0.10375667263084565,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787542940924,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XMR-20260824T021000Z",
@@ -28,7 +28,10 @@
       "qty": 3.616,
       "fillPrice": 419.2680724557522,
       "buyOrderId": "C02__720395247778983936036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__720416616998711297036",
+      "exitFillPrice": 415.8665210176991,
+      "closedAt": 1787542942721
     },
     "entrySnapshot": {
       "at": 1787537847837,
@@ -73,10 +76,10 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787542648378
+      "evaluatedAt": 1787542940924
     },
     "highestPnLSeen": -0.06,
-    "lastR15": 39.8,
+    "lastR15": 38.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.06% below 0.4% floor — not evaluated yet",
@@ -84,8 +87,10 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787542648378
-    }
+      "evaluatedAt": 1787542940924
+    },
+    "exitPrice": 416.24,
+    "statusChangedAt": 1787542940924
   },
   "BINANCE:UNIUSDT": {
     "sym": "BINANCE:UNIUSDT",
@@ -98,14 +103,14 @@
     "alertedAt": 1787538747564,
     "holdLockUntil": 1787538747564,
     "entryPrice": 4.484999999999999,
-    "stop": 4.407,
+    "stop": 4.429,
     "t1": 4.6195,
     "t2": 4.7541,
     "score": 2,
     "spikeScore": 0.11088910786654496,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-UNI-20260824T021500Z",
@@ -116,7 +121,10 @@
       "qty": 0.8,
       "fillPrice": 4.484999999999999,
       "buyOrderId": "C02__720399025437593600036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "closedAt": 1787542944221,
+      "exitFillPrice": 4.417,
+      "dustIgnored": true
     },
     "entrySnapshot": {
       "at": 1787538748572,
@@ -173,7 +181,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1787542648378
-    }
+    },
+    "exitPrice": 4.417,
+    "statusChangedAt": 1787542940924
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -186,14 +196,14 @@
     "alertedAt": 1787538756945,
     "holdLockUntil": 1787538756945,
     "entryPrice": 843.99,
-    "stop": 829.22,
+    "stop": 833.44,
     "t1": 869.31,
     "t2": 894.63,
     "score": 5,
     "spikeScore": 0.25549105112043485,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-ZEC-20260824T022500Z",
@@ -204,7 +214,10 @@
       "qty": 0.00244,
       "fillPrice": 843.99,
       "buyOrderId": "C02__720399065711296512036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "closedAt": 1787542946026,
+      "exitFillPrice": 832.88,
+      "dustIgnored": true
     },
     "entrySnapshot": {
       "at": 1787538758164,
@@ -261,7 +274,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1787542648378
-    }
+    },
+    "exitPrice": 832.88,
+    "statusChangedAt": 1787542940924
   },
   "BINANCE:AAVEUSDT": {
     "sym": "BINANCE:AAVEUSDT",
@@ -274,7 +289,7 @@
     "alertedAt": 1787539649663,
     "holdLockUntil": 1787539649663,
     "entryPrice": 138.57,
-    "stop": 136.15,
+    "stop": 136.84,
     "t1": 142.73,
     "t2": 146.88,
     "score": 5,
@@ -325,30 +340,30 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -3,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 5 below 50 threshold",
+      "fallingKnifeScore": 5,
+      "thesisDrop": 19,
+      "confidenceDecay": 13,
+      "exitProbability": 5,
+      "dynamicPositionRisk": 5,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 2
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787542648378
+      "evaluatedAt": 1787542940924
     },
     "highestPnLSeen": 1.02,
-    "lastR15": 49.7,
+    "lastR15": 49.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.38% below tier A give-back 0.5%",
+      "reason": "drawdown 0.39% below tier A give-back 0.5%",
       "highestPnLSeen": 1.02,
-      "drawdownFromPeak": 0.38,
+      "drawdownFromPeak": 0.39,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1787542648378
+      "evaluatedAt": 1787542940924
     }
   },
   "BINANCE:APTUSDT": {
@@ -362,7 +377,7 @@
     "alertedAt": 1787539654240,
     "holdLockUntil": 1787539654240,
     "entryPrice": 0.6204,
-    "stop": 0.6095,
+    "stop": 0.6126,
     "t1": 0.639,
     "t2": 0.6576,
     "score": -1,
@@ -425,10 +440,10 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787542648378
+      "evaluatedAt": 1787542940924
     },
     "highestPnLSeen": 0.26,
-    "lastR15": 34.9,
+    "lastR15": 35.7,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.26% below 0.4% floor — not evaluated yet",
@@ -436,7 +451,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1787542648378
+      "evaluatedAt": 1787542940924
     }
   }
 }
