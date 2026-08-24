@@ -42,6 +42,19 @@ export const EXCHANGES = {
     providers:   { price: ['binance'], extras: ['binance'] },
     stooqSuffix: null,
   },
+  NASDAQ: {
+    name:        'NASDAQ',
+    suffixes:    [],                  // detected by explicit 'NASDAQ:' prefix only
+    tz:          'America/New_York',
+    currency:    'USD',
+    sessions: {
+      pre_market:  { open: '04:00', close: '09:30' },
+      regular:     { open: '09:30', close: '16:00' },
+      after_hours: { open: '16:00', close: '20:00' },
+    },
+    providers:   { price: ['yahoo', 'stooq'], extras: ['yahoo'] },
+    stooqSuffix: '.us',
+  },
   TSX: {
     name:        'Toronto Stock Exchange',
     suffixes:    ['.TO'],
@@ -143,6 +156,15 @@ export function resolveExchange(sym) {
   // Crypto: BINANCE:BTCUSDT or bare BTCUSDT (no dot, no known suffix)
   if (sym.startsWith('BINANCE:') || (!sym.includes('.') && !sym.includes(':'))) {
     return EXCHANGES.BINANCE;
+  }
+
+  // Explicit, already-valid exchange prefix (e.g. NASDAQ:NVDA, NYSE:GE) —
+  // trust it outright instead of re-deriving from the suffix table below,
+  // which collapses every unsuffixed US ticker to NYSE regardless of the
+  // real listing exchange.
+  if (sym.includes(':')) {
+    const prefixKey = sym.split(':')[0].toUpperCase();
+    if (EXCHANGES[prefixKey]) return EXCHANGES[prefixKey];
   }
 
   // Strip any exchange prefix (e.g. TSX:ETHY.TO → ETHY.TO)

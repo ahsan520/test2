@@ -237,9 +237,13 @@ async function fetchStooqBars(sym) {
 
 // ── Yahoo bars fetch ──
 async function fetchYahooBars(sym) {
+  // Yahoo's chart API wants the bare ticker only — no exchange prefix
+  // (NASDAQ:NVDA → NVDA). Suffix-based tickers (.TO, .L, .DE …) are passed
+  // through unchanged since Yahoo expects those as-is.
+  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
   const crumbSuffix = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
   const d = await fetchJSON(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=3mo${crumbSuffix}`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${bare}?interval=1d&range=3mo${crumbSuffix}`,
     yahooHeaders()
   );
   const r  = d.chart.result[0];
