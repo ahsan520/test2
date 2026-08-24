@@ -24,6 +24,7 @@ import { closeLiveOrder, countLiveOpenPositions } from './position-monitor.js';
 import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { calcEntryExtension } from './buy-intelligence.js';
+import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -691,6 +692,38 @@ export async function executeSTPriorityRotation({
       continue;
     }
 
+    // ── Falling-knife / ATR-exhaustion gate ──
+    // RSI overextension above catches a slow grind into overbought on
+    // 15m/1h — it says nothing about the cross itself already being a
+    // blown 5m/15m move (Cross distance already +1-2%+ by the time the
+    // candle closed and this event fired). st-timing-engine.js's
+    // checkFallingKnife/checkExhaustedEntry were built for exactly this
+    // (ATR-normalized distance zones + ST5/ST15 direction/slope) but were
+    // originally wired only into the P2 engine (leaderboard-decider.js) —
+    // P0/P1 bought purely on the flip with no exhaustion check at all.
+    // Only the HARD conditions block here (BEAR/BEAR knife, strongly
+    // negative ST5 slope, signal-evaluator's own FALLING KNIFE tag, or an
+    // EXHAUSTED ATR zone) — WAIT/WAIT_RETEST-style softer states are
+    // strategy-qualification concepts that ST15/ST5 priority is meant to
+    // bypass by design; this only blocks the "buying the exhaustion of a
+    // move that's already over" case the trade log showed.
+    if (entry?.supertrend5m && entry?.supertrend15m) {
+      const st15Knife = checkFallingKnife(entry, entry.supertrend5m, entry.supertrend15m);
+      if (st15Knife.isFallingKnife) {
+        event.status = 'SKIPPED_FALLING_KNIFE';
+        logAudit('st15_skipped_falling_knife', { pair, id: event.id, reasons: st15Knife.reasons });
+        await sendTelegram(`🔪 *ST15 CROSS — ${base}* — skipped, falling knife (${st15Knife.reasons.join(' · ')}). Event marked handled, no positions touched.`);
+        continue;
+      }
+      const st15Exhausted = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m);
+      if (st15Exhausted.blocked) {
+        event.status = 'SKIPPED_EXHAUSTED';
+        logAudit('st15_skipped_exhausted', { pair, id: event.id, reason: st15Exhausted.reason });
+        await sendTelegram(`📉 *ST15 CROSS — ${base}* — skipped, exhausted entry (${st15Exhausted.reason}). Event marked handled, no positions touched.`);
+        continue;
+      }
+    }
+
     console.log(`  🟣  ST15_CROSS_UP — ${pair} [${event.id}] — Priority-0 execution starting`);
     logAudit('st15_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
     await sendTelegram(
@@ -1114,6 +1147,28 @@ export async function executeST5PriorityRotation({
       logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason });
       await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
       continue;
+    }
+
+    // ── Falling-knife / ATR-exhaustion gate — see the matching ST15 comment
+    // above for the full rationale. Same hard-conditions-only scope: this
+    // is the exact pattern from the RENDER/SUI/TAO trap (all three P0 buys
+    // fired on an already-extended 5m cross distance with no exhaustion
+    // check at all). ──
+    if (entry?.supertrend5m && entry?.supertrend15m) {
+      const st5Knife = checkFallingKnife(entry, entry.supertrend5m, entry.supertrend15m);
+      if (st5Knife.isFallingKnife) {
+        event.status = 'SKIPPED_FALLING_KNIFE';
+        logAudit('st5_skipped_falling_knife', { pair, id: event.id, reasons: st5Knife.reasons });
+        await sendTelegram(`🔪 *ST5 CROSS — ${base}* — skipped, falling knife (${st5Knife.reasons.join(' · ')}). Event marked handled, no positions touched.`);
+        continue;
+      }
+      const st5Exhausted = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m);
+      if (st5Exhausted.blocked) {
+        event.status = 'SKIPPED_EXHAUSTED';
+        logAudit('st5_skipped_exhausted', { pair, id: event.id, reason: st5Exhausted.reason });
+        await sendTelegram(`📉 *ST5 CROSS — ${base}* — skipped, exhausted entry (${st5Exhausted.reason}). Event marked handled, no positions touched.`);
+        continue;
+      }
     }
 
     console.log(`  🟣  ST5_CROSS_UP — ${pair} [${event.id}] — Priority-0 (P0) execution starting`);
