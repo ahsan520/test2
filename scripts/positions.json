@@ -15,9 +15,9 @@
     "t2": 0.8979,
     "score": 6,
     "spikeScore": 0.3295468030637405,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1787530646143,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-SUI-20260823T225000Z",
@@ -28,7 +28,10 @@
       "qty": 17.69,
       "fillPrice": 0.8471,
       "buyOrderId": "C02__720347432084197376036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__720365046319730690036",
+      "exitFillPrice": 0.839,
+      "closedAt": 1787530647353
     },
     "entrySnapshot": {
       "at": 1787526447722,
@@ -61,30 +64,32 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold",
-      "fallingKnifeScore": 6,
-      "thesisDrop": 8,
-      "confidenceDecay": 13,
-      "exitProbability": 2,
-      "dynamicPositionRisk": 2,
+      "reason": "dynamicPositionRisk 31 below 50 threshold",
+      "fallingKnifeScore": 37,
+      "thesisDrop": 44,
+      "confidenceDecay": 25,
+      "exitProbability": 31,
+      "dynamicPositionRisk": 31,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787530345262
+      "evaluatedAt": 1787530646143
     },
     "highestPnLSeen": 1.2,
-    "lastR15": 52.4,
+    "lastR15": 49.5,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 1.72% ≥ 0.5% but momentum not yet weak — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +1.20% (tier A) → now +-0.97%, gave back 2.17% ≥ 0.5% with weakening momentum [CVD fading]",
       "highestPnLSeen": 1.2,
-      "drawdownFromPeak": 1.72,
+      "drawdownFromPeak": 2.17,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1787530345262
-    }
+      "evaluatedAt": 1787530646143
+    },
+    "exitPrice": 0.8389,
+    "statusChangedAt": 1787530646143
   }
 }
