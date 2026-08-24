@@ -17,6 +17,15 @@ const EXCHANGES = {
     name: 'Binance', suffixes: [], tz: 'UTC', currency: 'USD',
     sessions: { regular: null }, // null = 24/7
   },
+  NASDAQ: {
+    name: 'NASDAQ', suffixes: [],
+    tz: 'America/New_York', currency: 'USD',
+    sessions: {
+      pre_market:  { open: '04:00', close: '09:30' },
+      regular:     { open: '09:30', close: '16:00' },
+      after_hours: { open: '16:00', close: '20:00' },
+    },
+  },
   TSX: {
     name: 'Toronto Stock Exchange', suffixes: ['.TO'],
     tz: 'America/New_York', currency: 'CAD',
@@ -75,6 +84,14 @@ function resolveExchange(sym) {
   if (!sym) return EXCHANGES.NYSE;
   if (sym.startsWith('BINANCE:') || (!sym.includes('.') && !sym.includes(':'))) {
     return EXCHANGES.BINANCE;
+  }
+  // Explicit, already-valid exchange prefix (e.g. NASDAQ:NVDA, NYSE:GE) —
+  // trust it outright instead of re-deriving from the suffix table below,
+  // which collapses every unsuffixed US ticker to NYSE regardless of the
+  // real listing exchange.
+  if (sym.includes(':')) {
+    const prefixKey = sym.split(':')[0].toUpperCase();
+    if (EXCHANGES[prefixKey]) return EXCHANGES[prefixKey];
   }
   const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
   // longest suffix first so .TO doesn't accidentally match .T

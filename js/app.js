@@ -1747,8 +1747,12 @@ function addTicker() {
     e = v.startsWith('BINANCE:') ? v : `BINANCE:${v}${v.includes('USDT') ? '' : 'USDT'}`;
   } else {
     // Stock/ETF: keep bare symbol (TSX .TO, LSE .L, XETRA .DE etc.)
-    // resolveExchange() in exchange-registry-browser.js handles detection
-    e = v;
+    // resolveExchange() in exchange-registry-browser.js handles detection —
+    // EXCEPT for a truly bare US ticker with no suffix and no prefix (e.g.
+    // "NVDA"), which resolveExchange's crypto shorthand check would treat
+    // as a Binance pair. Default those to NASDAQ: explicitly so they're
+    // never ambiguous downstream (chart, watchlist, or the Node pipeline).
+    e = (!v.includes('.') && !v.includes(':')) ? `NASDAQ:${v}` : v;
   }
 
   if (!STATE.watchlist.includes(e)) {
