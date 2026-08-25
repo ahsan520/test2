@@ -71,8 +71,13 @@ export function checkFallingKnife(entry, st5, st15) {
     // "ST15 BEAR with deteriorating fast trend" — ST15 bearish while ST5's
     // own slope is turning down too, even if ST5 hasn't fully flipped BEAR
     // yet — an early warning the doc explicitly calls out separately from
-    // the simpler BEAR/BEAR case above.
-    if (st15.direction === 'BEAR' && st5.slope != null && st5.slope < 0) {
+    // the simpler BEAR/BEAR case above. Uses the same SLOPE_STRONG_MIN
+    // threshold as the check below it, not a bare <0 — a fresh ST5 bull
+    // cross very often still has a barely-negative trailing slope for a
+    // few bars while ST15 catches up (lookback window still includes
+    // pre-cross candles), which isn't a knife, just lag. Requiring a real
+    // magnitude here avoids blocking that normal case.
+    if (st15.direction === 'BEAR' && st5.slope != null && st5.slope <= -SLOPE_STRONG_MIN) {
       reasons.push('ST15 BEAR with ST5 slope turning negative — deteriorating fast trend');
     }
   }
