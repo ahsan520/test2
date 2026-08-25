@@ -324,8 +324,17 @@ async function main() {
   const stocksToFreeze = [];
 
   for (const sym of stockSyms) {
-    const session = getMarketSession(sym);
-    if (session === 'closed' || session === 'lunch_break') {
+    const session      = getMarketSession(sym);
+    const hasPriorData = !!existing.symbols?.[sym];
+    // Cold start: a symbol with no scoring history yet gets one forced
+    // attempt regardless of session, so it never sits permanently blank —
+    // freezeEntry() returns null with no prior data to carry forward, so
+    // without this a symbol added outside its exchange's live window would
+    // never get its first price until a scan cycle happened to land inside
+    // one. Once it has a first score, normal freeze/carry-forward resumes.
+    if (!hasPriorData) {
+      stocksToScore.push({ sym, session });
+    } else if (session === 'closed' || session === 'lunch_break') {
       stocksToFreeze.push({ sym, session });
     } else {
       stocksToScore.push({ sym, session }); // open | pre_market | after_hours
