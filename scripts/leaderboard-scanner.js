@@ -264,6 +264,9 @@ async function fetchYahooBars(sym) {
   // meta carries Yahoo's live quote fields (same response, previously
   // discarded) — regularMarketPrice always present; pre/postMarketPrice
   // only present when that session's data is actually available.
+  // TEMP DIAGNOSTIC — remove once we confirm what Yahoo actually returns
+  // for pre/post-market fields on these tickers.
+  console.log(`  🔎  ${sym} meta: reg=${r.meta?.regularMarketPrice} pre=${r.meta?.preMarketPrice} post=${r.meta?.postMarketPrice} prevClose=${r.meta?.chartPreviousClose ?? r.meta?.previousClose}`);
   return { bars, meta: r.meta || null };
 }
 
