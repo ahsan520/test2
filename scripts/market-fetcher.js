@@ -15,7 +15,7 @@
 
 import fs   from 'fs';
 import path from 'path';
-import { scoreSymbol, scoreStock, initYahoo } from './leaderboard-scanner.js';
+import { scoreSymbol, scoreStock, initYahoo, primeYahooQuotes } from './leaderboard-scanner.js';
 import { resolveExchange, getMarketSession, EXCHANGES } from './exchange-registry.js';
 import { computeMarketState } from './market-intelligence.js';
 import { classifySignal } from './signal-evaluator.js';
@@ -341,8 +341,14 @@ async function main() {
     }
   }
 
-  // Init Yahoo once if any stocks need scoring
-  if (stocksToScore.length) await initYahoo();
+  // Init Yahoo once if any stocks need scoring, then batch-fetch live
+  // pre/post-market quotes for all of them in a single call (scoreStock
+  // reads from this cache internally — see primeYahooQuotes/getLiveQuote
+  // in leaderboard-scanner.js).
+  if (stocksToScore.length) {
+    await initYahoo();
+    await primeYahooQuotes(stocksToScore.map(({ sym }) => sym));
+  }
 
   // ── BTC trigger confirmation carried forward from last cycle ──
   // scoreSymbol() for every crypto pair (including BTCUSDT itself) runs in

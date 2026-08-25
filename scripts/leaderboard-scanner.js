@@ -208,6 +208,67 @@ function yahooHeaders() {
   return { 'User-Agent': YAHOO_UA, Cookie: yahooCookie, Accept: 'application/json' };
 }
 
+// ── Batched live quote fetch (v7/finance/quote) ──────────────────────────
+// The v8/finance/chart endpoint used for daily bars does NOT reliably carry
+// pre/post-market prices (confirmed empty in production) and its
+// chartPreviousClose field doesn't line up with the actual daily-bar series
+// (produced 16-21% phantom % moves when tried). v7/finance/quote is Yahoo's
+// dedicated live-quote endpoint — it's built for exactly this and exposes
+// ready-made regularMarketChangePercent/preMarketChangePercent/
+// postMarketChangePercent fields directly, so there's no manual
+// previous-close arithmetic to get wrong. One batched call for every stock
+// symbol at once (not per-symbol), cached for the life of this process run.
+const _yahooQuoteCache = new Map(); // bare ticker -> quote fields
+
+export async function primeYahooQuotes(syms) {
+  const bareList = [...new Set(
+    syms.map(s => s.includes(':') ? s.split(':').slice(1).join(':') : s)
+  )];
+  if (!bareList.length) return;
+  const crumbSuffix = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
+  try {
+    const d = await fetchJSON(
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${bareList.join(',')}${crumbSuffix}`,
+      yahooHeaders()
+    );
+    const results = d?.quoteResponse?.result || [];
+    for (const q of results) {
+      if (!q?.symbol) continue;
+      _yahooQuoteCache.set(q.symbol.toUpperCase(), {
+        regularMarketPrice:        q.regularMarketPrice,
+        regularMarketChangePercent: q.regularMarketChangePercent,
+        preMarketPrice:            q.preMarketPrice,
+        preMarketChangePercent:    q.preMarketChangePercent,
+        postMarketPrice:           q.postMarketPrice,
+        postMarketChangePercent:   q.postMarketChangePercent,
+        marketState:               q.marketState,
+      });
+    }
+    console.log(`  📡  Yahoo live quotes: ${results.length}/${bareList.length} symbols`);
+  } catch (e) {
+    console.log('  ⚠  Yahoo batched quote fetch failed:', e.message, '— stocks will use daily-bar close as before');
+  }
+}
+
+// Live price/% for one symbol, or null if this ticker isn't in the cache
+// (batch fetch failed, or wasn't primed) — caller falls back to daily bars.
+function getLiveQuote(sym) {
+  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+  const q = _yahooQuoteCache.get(bare.toUpperCase());
+  if (!q) return null;
+  // Prefer the most "extended" session that actually has data: post > pre > regular.
+  if (q.marketState === 'POST' && typeof q.postMarketPrice === 'number' && typeof q.postMarketChangePercent === 'number') {
+    return { price: q.postMarketPrice, chg: parseFloat(q.postMarketChangePercent.toFixed(2)) };
+  }
+  if (q.marketState === 'PRE' && typeof q.preMarketPrice === 'number' && typeof q.preMarketChangePercent === 'number') {
+    return { price: q.preMarketPrice, chg: parseFloat(q.preMarketChangePercent.toFixed(2)) };
+  }
+  if (typeof q.regularMarketPrice === 'number' && typeof q.regularMarketChangePercent === 'number') {
+    return { price: q.regularMarketPrice, chg: parseFloat(q.regularMarketChangePercent.toFixed(2)) };
+  }
+  return null;
+}
+
 // ── Stooq CSV fetch → returns bars[] same shape as Yahoo path ──
 // Stooq CSV format: Date,Open,High,Low,Close,Volume
 async function fetchStooqBars(sym) {
@@ -1148,9 +1209,9 @@ export async function scoreStock(sym) {
       .find(([, v]) => v === ex)?.[0] ?? 'NYSE';
 
     // Fetch bars via provider chain (Yahoo → Stooq)
-    let bars, meta;
+    let bars;
     try {
-      ({ bars, meta } = await fetchStockBars(sym));
+      ({ bars } = await fetchStockBars(sym));
     } catch (e) {
       console.log(`  ⚠  ${sym} all providers failed: ${e.message}`);
       return null;
@@ -1161,18 +1222,14 @@ export async function scoreStock(sym) {
     const volumes = bars.map(b => b.v);
 
     // ── Price / 24H% ──
-    // Confirmed via live diagnostic: Yahoo's chart-endpoint meta block does
-    // NOT carry pre/post-market prices for these tickers even with
-    // includePrePost=true (both always undefined), and its
-    // regularMarketPrice/chartPreviousClose don't reliably line up with the
-    // actual daily-bar series (chartPreviousClose in particular produced
-    // 16-21% phantom moves — it isn't "yesterday's close"). Reverted to the
-    // daily-bar-only calc, which was correct. Genuine live/extended-hours
-    // pricing needs Yahoo's dedicated v7/finance/quote endpoint instead —
-    // separate follow-up, not this one.
-    const price = closes[n - 1];
-    const prev  = closes[n - 2] || price;
-    const chg   = parseFloat(((price - prev) / prev * 100).toFixed(2));
+    // Prefer the live batched quote (primeYahooQuotes/getLiveQuote) — real
+    // pre/post-market price and Yahoo's own pre-computed change%, no manual
+    // previous-close arithmetic. Falls back to the daily-bar close/close
+    // calc (the original, reliable method) if the live quote wasn't primed
+    // or didn't come back for this symbol.
+    const liveQuote = getLiveQuote(sym);
+    const price = liveQuote ? liveQuote.price : closes[n - 1];
+    const chg   = liveQuote ? liveQuote.chg   : parseFloat((((closes[n-1]) - (closes[n-2] || closes[n-1])) / (closes[n-2] || closes[n-1]) * 100).toFixed(2));
 
     // Vol shock
     const recentVols = volumes.slice(-5);
