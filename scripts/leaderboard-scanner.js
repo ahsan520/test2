@@ -264,9 +264,6 @@ async function fetchYahooBars(sym) {
   // meta carries Yahoo's live quote fields (same response, previously
   // discarded) — regularMarketPrice always present; pre/postMarketPrice
   // only present when that session's data is actually available.
-  // TEMP DIAGNOSTIC — remove once we confirm what Yahoo actually returns
-  // for pre/post-market fields on these tickers.
-  console.log(`  🔎  ${sym} meta: reg=${r.meta?.regularMarketPrice} pre=${r.meta?.preMarketPrice} post=${r.meta?.postMarketPrice} prevClose=${r.meta?.chartPreviousClose ?? r.meta?.previousClose}`);
   return { bars, meta: r.meta || null };
 }
 
@@ -1163,25 +1160,19 @@ export async function scoreStock(sym) {
     const closes  = bars.map(b => b.c);
     const volumes = bars.map(b => b.v);
 
-    // ── Live price / 24H% ──
-    // Prefer Yahoo's live quote fields (meta) over the last daily close —
-    // this is what makes price/24h% track pre-market and after-hours
-    // movement the same way Yahoo's own site does, instead of freezing at
-    // the prior regular-session close until the next day's bar lands.
-    // Every OTHER field below (RSI, EMA, bias, whale, shock, signal …)
-    // still runs off the historical daily-close series unchanged — those
-    // remain daily-granularity, not live; only price/chg get the live
-    // override here.
-    let price = closes[n - 1];
-    let prev  = closes[n - 2] || price;
-    if (meta) {
-      const live = meta.postMarketPrice ?? meta.preMarketPrice ?? meta.regularMarketPrice;
-      if (typeof live === 'number') {
-        price = live;
-        prev  = meta.chartPreviousClose ?? meta.previousClose ?? prev;
-      }
-    }
-    const chg = parseFloat(((price - prev) / prev * 100).toFixed(2));
+    // ── Price / 24H% ──
+    // Confirmed via live diagnostic: Yahoo's chart-endpoint meta block does
+    // NOT carry pre/post-market prices for these tickers even with
+    // includePrePost=true (both always undefined), and its
+    // regularMarketPrice/chartPreviousClose don't reliably line up with the
+    // actual daily-bar series (chartPreviousClose in particular produced
+    // 16-21% phantom moves — it isn't "yesterday's close"). Reverted to the
+    // daily-bar-only calc, which was correct. Genuine live/extended-hours
+    // pricing needs Yahoo's dedicated v7/finance/quote endpoint instead —
+    // separate follow-up, not this one.
+    const price = closes[n - 1];
+    const prev  = closes[n - 2] || price;
+    const chg   = parseFloat(((price - prev) / prev * 100).toFixed(2));
 
     // Vol shock
     const recentVols = volumes.slice(-5);
