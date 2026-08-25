@@ -243,7 +243,7 @@ async function fetchYahooBars(sym) {
   const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
   const crumbSuffix = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
   const d = await fetchJSON(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${bare}?interval=1d&range=3mo${crumbSuffix}`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${bare}?interval=1d&range=3mo&includePrePost=true${crumbSuffix}`,
     yahooHeaders()
   );
   const r  = d.chart.result[0];
@@ -261,10 +261,16 @@ async function fetchYahooBars(sym) {
     }
   }
   if (bars.length < 10) throw new Error(`Yahoo: only ${bars.length} bars`);
-  return bars;
+  // meta carries Yahoo's live quote fields (same response, previously
+  // discarded) — regularMarketPrice always present; pre/postMarketPrice
+  // only present when that session's data is actually available.
+  return { bars, meta: r.meta || null };
 }
 
 // ── Fetch bars with provider fallback chain from registry ──
+// Returns { bars, meta } — meta is Yahoo's live quote block (null for the
+// Stooq fallback, which is delayed daily-CSV only and has no live/extended
+// -hours concept).
 async function fetchStockBars(sym) {
   const ex        = resolveExchange(sym);
   const providers = ex?.providers?.price ?? ['yahoo', 'stooq'];
@@ -273,14 +279,14 @@ async function fetchStockBars(sym) {
   for (const provider of providers) {
     try {
       if (provider === 'yahoo') {
-        const bars = await fetchYahooBars(sym);
+        const { bars, meta } = await fetchYahooBars(sym);
         console.log(`  📥  ${sym} bars via Yahoo (${bars.length} days)`);
-        return bars;
+        return { bars, meta };
       }
       if (provider === 'stooq') {
         const bars = await fetchStooqBars(sym);
         console.log(`  📥  ${sym} bars via Stooq fallback (${bars.length} days)`);
-        return bars;
+        return { bars, meta: null };
       }
     } catch (e) {
       console.log(`  ⚠  ${sym} ${provider} failed: ${e.message}`);
@@ -1142,9 +1148,9 @@ export async function scoreStock(sym) {
       .find(([, v]) => v === ex)?.[0] ?? 'NYSE';
 
     // Fetch bars via provider chain (Yahoo → Stooq)
-    let bars;
+    let bars, meta;
     try {
-      bars = await fetchStockBars(sym);
+      ({ bars, meta } = await fetchStockBars(sym));
     } catch (e) {
       console.log(`  ⚠  ${sym} all providers failed: ${e.message}`);
       return null;
@@ -1153,9 +1159,26 @@ export async function scoreStock(sym) {
     const n       = bars.length;
     const closes  = bars.map(b => b.c);
     const volumes = bars.map(b => b.v);
-    const price   = closes[n - 1];
-    const prev    = closes[n - 2] || price;
-    const chg     = parseFloat(((price - prev) / prev * 100).toFixed(2));
+
+    // ── Live price / 24H% ──
+    // Prefer Yahoo's live quote fields (meta) over the last daily close —
+    // this is what makes price/24h% track pre-market and after-hours
+    // movement the same way Yahoo's own site does, instead of freezing at
+    // the prior regular-session close until the next day's bar lands.
+    // Every OTHER field below (RSI, EMA, bias, whale, shock, signal …)
+    // still runs off the historical daily-close series unchanged — those
+    // remain daily-granularity, not live; only price/chg get the live
+    // override here.
+    let price = closes[n - 1];
+    let prev  = closes[n - 2] || price;
+    if (meta) {
+      const live = meta.postMarketPrice ?? meta.preMarketPrice ?? meta.regularMarketPrice;
+      if (typeof live === 'number') {
+        price = live;
+        prev  = meta.chartPreviousClose ?? meta.previousClose ?? prev;
+      }
+    }
+    const chg = parseFloat(((price - prev) / prev * 100).toFixed(2));
 
     // Vol shock
     const recentVols = volumes.slice(-5);
