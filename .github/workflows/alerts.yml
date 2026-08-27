@@ -296,6 +296,17 @@ jobs:
           GUARD_STOP_OVERRIDE_MAX_LOSS_PCT: ${{ vars.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5' }}
           # ── Phase 2: Smart BTC Gate (Alpha Exception) ──
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
+          # ── ST5/ST15 Timing Engine slope threshold (st-timing-engine.js /
+          # leaderboard-scanner.js) — previously an orphaned repo Variable
+          # (set to 1.5, never wired into env: so it had zero effect; the
+          # falling-knife slope gate was silently using the code default of
+          # 0.15 the whole time). Wiring it here at that SAME 0.15 default —
+          # do NOT bump the repo Variable back up to 1.5 now that this is
+          # live, since leaderboard-scanner.js's band-switch slope bug is
+          # already fixed at the source: real slope values are no longer
+          # artificially inflated, so 1.5 would make this check nearly
+          # impossible to trigger and effectively disable it.
+          ST_SLOPE_STRONG_MIN: ${{ vars.ST_SLOPE_STRONG_MIN || '0.15' }}
           GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
           GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
