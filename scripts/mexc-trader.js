@@ -715,7 +715,16 @@ export async function executeSTPriorityRotation({
         await sendTelegram(`🔪 *ST15 CROSS — ${base}* — skipped, falling knife (${st15Knife.reasons.join(' · ')}). Event marked handled, no positions touched.`);
         continue;
       }
-      const st15Exhausted = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m);
+      // Judge exhaustion against the frozen-at-cross snapshot, not the
+      // live re-fetched entry — checkExhaustedEntry used to see whatever
+      // distanceATR the NEXT fetch cycle produced, several minutes after
+      // the actual cross, penalizing entries for drift that happened
+      // AFTER the signal (see the comment in market-fetcher.js's
+      // buildST15Event). Falls back to the live entry if an older event
+      // (pre-dating this change) has no frozen snapshot.
+      const st15ExhaustedSrc  = event.st5AtCross  || entry.supertrend5m;
+      const st15ExhaustedSrc2 = event.st15AtCross || entry.supertrend15m;
+      const st15Exhausted = checkExhaustedEntry(st15ExhaustedSrc, st15ExhaustedSrc2);
       if (st15Exhausted.blocked) {
         event.status = 'SKIPPED_EXHAUSTED';
         logAudit('st15_skipped_exhausted', { pair, id: event.id, reason: st15Exhausted.reason });
@@ -1162,7 +1171,14 @@ export async function executeST5PriorityRotation({
         await sendTelegram(`🔪 *ST5 CROSS — ${base}* — skipped, falling knife (${st5Knife.reasons.join(' · ')}). Event marked handled, no positions touched.`);
         continue;
       }
-      const st5Exhausted = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m);
+      // Judge exhaustion against the frozen-at-cross snapshot, not the
+      // live re-fetched entry — see the matching comment in the ST15
+      // block above / market-fetcher.js's buildST5Event for the full
+      // rationale. Falls back to the live entry if an older event
+      // (pre-dating this change) has no frozen snapshot.
+      const st5ExhaustedSrc  = event.st5AtCross  || entry.supertrend5m;
+      const st5ExhaustedSrc2 = event.st15AtCross || entry.supertrend15m;
+      const st5Exhausted = checkExhaustedEntry(st5ExhaustedSrc, st5ExhaustedSrc2);
       if (st5Exhausted.blocked) {
         event.status = 'SKIPPED_EXHAUSTED';
         logAudit('st5_skipped_exhausted', { pair, id: event.id, reason: st5Exhausted.reason });

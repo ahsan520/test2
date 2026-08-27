@@ -85,7 +85,7 @@ function logAudit(action, details = {}) {
 // detection time) means re-fetching the SAME closed candle across
 // multiple 5-min cycles never creates a second event, and never
 // overwrites one Job B has already started consuming (status !== PENDING).
-function buildST15Event(prev, st15, base) {
+function buildST15Event(prev, st15, st5, base) {
   const prevEvent = prev?.st15Event || null;
   if (!st15) return prevEvent;      // fetch/data issue this cycle — carry forward whatever existed
   if (!st15.crossUp) return prevEvent; // no fresh cross this cycle — carry forward (Job B may still be consuming a pending one)
@@ -103,6 +103,19 @@ function buildST15Event(prev, st15, base) {
     supertrend:   st15.value,
     distancePct:  st15.distancePct,
     status:       'PENDING',
+    // ── frozen-at-detection exhaustion snapshot ──
+    // checkExhaustedEntry() used to be evaluated against whatever the
+    // NEXT fetch cycle's live entry.supertrend5m/15m looked like at
+    // consumption time — several minutes after the actual cross (fetch
+    // every 5 min, decide 2 min later). During that gap, exactly the
+    // fast/strong moves worth buying keep extending, so the check was
+    // penalizing entries for drift that happened AFTER the real signal,
+    // not at it. Freezing distanceATR/extensionZone here (same pattern
+    // distancePct already used for the ST_MAX_DISTANCE_PCT freshness
+    // gate) lets execution judge the entry as it actually was at the
+    // moment of the cross.
+    st5AtCross:  st5  ? { distanceATR: st5.distanceATR,  extensionZone: st5.extensionZone }  : null,
+    st15AtCross: st15 ? { distanceATR: st15.distanceATR, extensionZone: st15.extensionZone } : null,
   };
 }
 
@@ -113,7 +126,7 @@ function buildST15Event(prev, st15, base) {
 // bullish ST5 direction that isn't a fresh cross (crossUp=false) never
 // creates one at all — "a persistent bullish ST5 state does not generate
 // repeated P0 buys" per the dev-team acceptance criteria.
-function buildST5Event(prev, st5, base) {
+function buildST5Event(prev, st5, st15, base) {
   const prevEvent = prev?.st5Event || null;
   if (!st5) return prevEvent;
   if (!st5.crossUp) return prevEvent;
@@ -131,6 +144,10 @@ function buildST5Event(prev, st5, base) {
     supertrend:   st5.value,
     distancePct:  st5.distancePct,
     status:       'PENDING',
+    // ── frozen-at-detection exhaustion snapshot — see matching comment
+    // in buildST15Event above for the full rationale. ──
+    st5AtCross:  st5  ? { distanceATR: st5.distanceATR,  extensionZone: st5.extensionZone }  : null,
+    st15AtCross: st15 ? { distanceATR: st15.distanceATR, extensionZone: st15.extensionZone } : null,
   };
 }
 
@@ -184,14 +201,14 @@ function buildEntry(r, prev, now, session) {
   // already read triggerStatus/entryState, without reaching into d.
   const st15Base  = r.pair.replace('USDT', '').replace(/\.\w+$/, '');
   const st15Event = r.assetType === 'crypto'
-    ? buildST15Event(prev, r.d?.supertrend15m, st15Base)
+    ? buildST15Event(prev, r.d?.supertrend15m, r.d?.supertrend5m, st15Base)
     : (prev?.st15Event || null);
 
   // ── 5m Supertrend Priority Execution (P0) — same pattern, one timeframe
   // down. Highest priority of the three buy paths (P0 > P1/ST15 > P2/
   // normal candidate scan) — see mexc-trader.js executeSTPriorityRotation.
   const st5Event = r.assetType === 'crypto'
-    ? buildST5Event(prev, r.d?.supertrend5m, st15Base)
+    ? buildST5Event(prev, r.d?.supertrend5m, r.d?.supertrend15m, st15Base)
     : (prev?.st5Event || null);
 
   return {
