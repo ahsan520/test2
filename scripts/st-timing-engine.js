@@ -98,13 +98,56 @@ export function checkFallingKnife(entry, st5, st15) {
   return { isFallingKnife: reasons.length > 0, reasons };
 }
 
-export function checkExhaustedEntry(st5, st15) {
+// Broad-rally override threshold — breadth score (0-100, market-state.json)
+// required, on top of RISK_ON regime + a confirmed BREAKOUT trigger, before
+// an EXHAUSTED-zone cross is allowed through. Same shape as the existing
+// MIXED-alignment exception in checkSTAlignment below: a hard gate stays
+// hard by default, and only relaxes given multiple independent confirming
+// signals at once, not just one.
+const EXHAUSTED_OVERRIDE_BREADTH_MIN = num('BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN', '85');
+
+// momentum = { triggerStatus, regime, breadthScore } — all optional; when
+// omitted, behaves exactly as before (hard block, no override path). This
+// lets callers that don't have market-state.json loaded (or older call
+// sites) keep the pre-existing strict behavior.
+export function checkExhaustedEntry(st5, st15, momentum = {}) {
+  const { triggerStatus = null, regime = null, breadthScore = null } = momentum;
+
+  // Broad-rally exception — on a day where the whole market is running
+  // (RISK_ON regime + high breadth), a fresh ST cross is often ALREADY a
+  // few ATR past the band the instant it fires, simply because the flip
+  // candle itself was a strong momentum bar — not because the entry drifted
+  // stale after the real signal (that drift case is what the frozen-at-cross
+  // snapshot upstream already handles). Applying the same flat 2.0 ATR bar
+  // on those days hard-blocks nearly every cross market-wide, right when
+  // the trend is strongest. Require a CONFIRMED BREAKOUT trigger (not
+  // merely TRIGGERING) plus RISK_ON plus breadth above threshold — three
+  // independent confirmations — before relaxing the hard block; a single
+  // extended cross in an otherwise normal/mixed market still gets blocked.
+  const broadRallyException =
+    triggerStatus === 'BREAKOUT' &&
+    regime === 'RISK_ON' &&
+    breadthScore != null && breadthScore >= EXHAUSTED_OVERRIDE_BREADTH_MIN;
+
   // Hard block — beyond backtestable "wait for retest", this is simply too
   // extended to be a reasonable entry regardless of what happens next.
+  // (Unless the broad-rally exception above applies.)
   if (st5.extensionZone === 'EXHAUSTED') {
+    if (broadRallyException) {
+      return {
+        blocked: false, waitRetest: false, overrideUsed: true,
+        reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
+      };
+    }
     return { blocked: true, waitRetest: false, reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, hard block` };
   }
   if (st15.extensionZone === 'EXHAUSTED') {
+    if (broadRallyException) {
+      return {
+        blocked: false, waitRetest: false, overrideUsed: true,
+        reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
+      };
+    }
     return { blocked: true, waitRetest: false, reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, hard block` };
   }
 

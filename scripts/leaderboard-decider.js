@@ -496,6 +496,7 @@ async function main() {
     effectiveSizeMode, effectiveSizePct,
     utc: new Date().toUTCString().slice(17, 22) + ' UTC',
     closedOutcomes: st5PriorityOutcomes,
+    marketState,
   });
   saveMarketData(market);
   if (st5Result.changed) {
@@ -534,6 +535,7 @@ async function main() {
     effectiveSizeMode, effectiveSizePct,
     utc: new Date().toUTCString().slice(17, 22) + ' UTC',
     closedOutcomes: stPriorityOutcomes,
+    marketState,
   });
   // Always persist — event status transitions (PENDING → EXECUTING →
   // EXECUTED/SELL_FAILED/BUY_FAILED/etc.) must survive even on an early

@@ -579,7 +579,7 @@ async function computeSTPriorityUsdSize({ effectiveTradeMode, effectiveSizeMode,
 export async function executeSTPriorityRotation({
   market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
   effectiveSizeMode = 'usd', effectiveSizePct = 100,
-  utc, closedOutcomes,
+  utc, closedOutcomes, marketState = {},
 }) {
   let changed = false;
   if (!ST15_ENABLE) return { changed };
@@ -724,12 +724,20 @@ export async function executeSTPriorityRotation({
       // (pre-dating this change) has no frozen snapshot.
       const st15ExhaustedSrc  = event.st5AtCross  || entry.supertrend5m;
       const st15ExhaustedSrc2 = event.st15AtCross || entry.supertrend15m;
-      const st15Exhausted = checkExhaustedEntry(st15ExhaustedSrc, st15ExhaustedSrc2);
+      const st15Exhausted = checkExhaustedEntry(st15ExhaustedSrc, st15ExhaustedSrc2, {
+        triggerStatus: entry?.triggerStatus ?? null,
+        regime: marketState?.marketRegime ?? null,
+        breadthScore: marketState?.breadth?.score ?? null,
+      });
       if (st15Exhausted.blocked) {
         event.status = 'SKIPPED_EXHAUSTED';
         logAudit('st15_skipped_exhausted', { pair, id: event.id, reason: st15Exhausted.reason });
         await sendTelegram(`📉 *ST15 CROSS — ${base}* — skipped, exhausted entry (${st15Exhausted.reason}). Event marked handled, no positions touched.`);
         continue;
+      }
+      if (st15Exhausted.overrideUsed) {
+        logAudit('st15_exhausted_override', { pair, id: event.id, reason: st15Exhausted.reason });
+        await sendTelegram(`⚡ *ST15 CROSS — ${base}* — EXHAUSTED-zone hard block bypassed (${st15Exhausted.reason}).`);
       }
     }
 
@@ -1065,7 +1073,7 @@ const ST5_PRIORITY_USD_SIZE = parseFloat(process.env.ST5_PRIORITY_USD_SIZE || pr
 export async function executeST5PriorityRotation({
   market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
   effectiveSizeMode = 'usd', effectiveSizePct = 100,
-  utc, closedOutcomes,
+  utc, closedOutcomes, marketState = {},
 }) {
   let changed = false;
   if (!ST5_ENABLE) return { changed };
@@ -1178,12 +1186,20 @@ export async function executeST5PriorityRotation({
       // (pre-dating this change) has no frozen snapshot.
       const st5ExhaustedSrc  = event.st5AtCross  || entry.supertrend5m;
       const st5ExhaustedSrc2 = event.st15AtCross || entry.supertrend15m;
-      const st5Exhausted = checkExhaustedEntry(st5ExhaustedSrc, st5ExhaustedSrc2);
+      const st5Exhausted = checkExhaustedEntry(st5ExhaustedSrc, st5ExhaustedSrc2, {
+        triggerStatus: entry?.triggerStatus ?? null,
+        regime: marketState?.marketRegime ?? null,
+        breadthScore: marketState?.breadth?.score ?? null,
+      });
       if (st5Exhausted.blocked) {
         event.status = 'SKIPPED_EXHAUSTED';
         logAudit('st5_skipped_exhausted', { pair, id: event.id, reason: st5Exhausted.reason });
         await sendTelegram(`📉 *ST5 CROSS — ${base}* — skipped, exhausted entry (${st5Exhausted.reason}). Event marked handled, no positions touched.`);
         continue;
+      }
+      if (st5Exhausted.overrideUsed) {
+        logAudit('st5_exhausted_override', { pair, id: event.id, reason: st5Exhausted.reason });
+        await sendTelegram(`⚡ *ST5 CROSS — ${base}* — EXHAUSTED-zone hard block bypassed (${st5Exhausted.reason}).`);
       }
     }
 
