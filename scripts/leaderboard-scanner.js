@@ -550,7 +550,19 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
   const SLOPE_LOOKBACK = parseInt(process.env.ST_SLOPE_LOOKBACK || '3', 10);
   const slopeIdx = last - SLOPE_LOOKBACK;
   let slope = null, slopeStrength = null;
-  if (slopeIdx >= period - 1 && st[slopeIdx] != null && atrVal > 0) {
+  // dir[slopeIdx] === dir[last] guards against a band-switch artifact: st[]
+  // tracks lowerBand while BULL and upperBand while BEAR (see st[i] assignment
+  // above), so diffing across a direction flip subtracts two different bands
+  // (e.g. new lowerBand − old upperBand) rather than measuring the same
+  // line's movement. That produces a large, mechanically-guaranteed negative
+  // delta on almost every fresh cross-up (regardless of real momentum), which
+  // was getting misread downstream as a "strongly negative slope" falling-
+  // knife signal on legitimate fresh crosses. Requiring the lookback bar to
+  // be in the SAME direction as `last` makes slope correctly fall back to
+  // null (no penalty) until there's enough same-regime history — consistent
+  // with this function's existing "fall back to null rather than compute a
+  // misleading slope" policy.
+  if (slopeIdx >= period - 1 && st[slopeIdx] != null && dir[slopeIdx] === dir[last] && atrVal > 0) {
     slope = parseFloat(((stVal - st[slopeIdx]) / SLOPE_LOOKBACK / atrVal).toFixed(4));
     const absSlope = Math.abs(slope);
     const SLOPE_WEAK   = parseFloat(process.env.ST_SLOPE_WEAK_MAX   || '0.05');
