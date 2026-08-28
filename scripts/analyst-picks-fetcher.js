@@ -1,0 +1,238 @@
+// ══════════════════════════════════════════════════════════════════════════════
+// analyst-picks-fetcher.js — structured analyst-ratings + earnings-calendar poller
+// --------------------------------------------------------------------------
+// v2 — replaces the original RSS-headline-text-mining approach. That approach
+// re-surfaced the same handful of headlines run after run (news doesn't
+// turn over every 5 min the way price data does) and only ever caught a
+// rating change if a wire happened to write a headline about it that day.
+// This version pulls STRUCTURED rating-change and earnings-date data
+// instead, so results are query-driven, not headline-luck-driven.
+//
+// Sources:
+//   PRIMARY:  Finnhub.io free tier — /stock/upgrade-downgrade (market-wide
+//             recent rating changes, any US symbol) + /calendar/earnings
+//             (date-ranged, market-wide). Needs FINNHUB_API_KEY (free,
+//             60 req/min, no card). Falls back to Yahoo-only if unset.
+//   BACKUP:   Yahoo Finance quoteSummary (recommendationTrend +
+//             upgradeDowngradeHistory + calendarEvents modules) — free, no
+//             key, but per-symbol only (covers SYMBOL_UNIVERSE below, not a
+//             true market-wide scan).
+//
+// Cadence: runs 4x/day at fixed ET hours (FETCH_HOURS_ET below) — this
+// data doesn't change intraday every 5 min the way price data does, so
+// polling it that often was the actual cause of "same info every time",
+// but a single daily run also means anything issued mid-day (an upgrade at
+// 11am, an earnings-date change) doesn't show up until the next morning.
+// 4x/day is a middle ground: pre-market, mid-morning, midday, after-close.
+//
+// Output shape (scripts/analyst-picks-data.json):
+//   {
+//     fetchedAt, source: 'finnhub'|'yahoo',
+//     items: [{
+//       symbol, company, signal: 'upgrade'|'downgrade'|'earnings'|'both',
+//       ratingFrom, ratingTo, firm, ratingDate,
+//       earningsDate, daysToEarnings, score, source
+//     }]
+//   }
+// Sorted by score descending — "recent upgrade AND earnings within 7 days"
+// ranks highest, since that intersection is the actual "look at this
+// before market open" signal, not either alone.
+// ══════════════════════════════════════════════════════════════════════════════
+
+import fs   from 'fs';
+import path from 'path';
+
+const OUT_PATH       = path.join(process.cwd(), 'analyst-picks-data.json');
+const WATCHLIST_PATH = path.join(process.cwd(), '..', 'watchlist.json');
+
+const FETCH_HOURS_ET           = [7, 11, 14, 20]; // 4x/day ET: pre-market, mid-morning, midday, after-close
+const RATING_LOOKBACK_DAYS    = 10; // Finnhub upgrade/downgrade window
+const EARNINGS_LOOKAHEAD_DAYS = 7;
+const MAX_ITEMS_OUT           = 60;
+const MIN_HOURS_BETWEEN_RUNS  = 3; // guards against double-firing within the same target hour's 5-min ticks
+
+// Watchlist + Nasdaq-100 constituents. Finnhub's upgrade-downgrade endpoint
+// is queried market-wide (no symbol needed); this universe is used for the
+// Yahoo backup path (per-symbol only) and to bias scoring toward names you
+// actually track.
+const NASDAQ_100 = [
+  'AAPL','MSFT','NVDA','AMZN','GOOGL','GOOG','META','AVGO','TSLA','COST',
+  'NFLX','AMD','PEP','ADBE','CSCO','TMUS','LIN','QCOM','INTU','TXN',
+  'AMGN','CMCSA','ISRG','AMAT','HON','BKNG','VRTX','PANW','ADP','SBUX',
+  'GILD','MU','ADI','LRCX','MDLZ','REGN','PYPL','KLAC','SNPS','CDNS',
+  'MELI','CRWD','MAR','ORLY','CSX','ASML','ABNB','FTNT','MRVL','WDAY',
+  'PCAR','NXPI','ROP','MNST','PAYX','CPRT','ODFL','DXCM','AEP','ROST',
+  'KDP','FANG','EXC','CTAS','CHTR','KHC','EA','VRSK','TTD','FAST',
+  'CTSH','BKR','GEHC','DDOG','ANSS','ON','ZS','TEAM','CCEP','MCHP',
+  'GFS','WBD','ILMN','BIIB','DLTR','MRNA','LULU','SIRI','WBA','ENPH',
+];
+
+function loadWatchlistSymbols() {
+  try {
+    const raw  = JSON.parse(fs.readFileSync(WATCHLIST_PATH, 'utf8'));
+    const list = Array.isArray(raw) ? raw : raw.symbols || [];
+    return list
+      .filter(s => !s.startsWith('BINANCE:')) // crypto has no analyst ratings/earnings
+      .map(s => s.includes(':') ? s.split(':')[1] : s)
+      .map(s => s.split('.')[0]); // strip .TO/.L/etc — Finnhub/Yahoo want the bare US-listing symbol
+  } catch { return []; }
+}
+
+function buildUniverse() {
+  const seen = new Set(); const out = [];
+  for (const s of [...loadWatchlistSymbols(), ...NASDAQ_100]) {
+    if (!seen.has(s)) { seen.add(s); out.push(s); }
+  }
+  return out;
+}
+
+function loadExisting() {
+  try { return JSON.parse(fs.readFileSync(OUT_PATH, 'utf8')); }
+  catch { return { fetchedAt: 0, items: [] }; }
+}
+function saveOutput(data) { fs.writeFileSync(OUT_PATH, JSON.stringify(data, null, 2)); }
+function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
+
+async function fetchFinnhubUpgrades(apiKey, fromDate, toDate) {
+  const url = `https://finnhub.io/api/v1/stock/upgrade-downgrade?from=${fromDate}&to=${toDate}&token=${encodeURIComponent(apiKey)}`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) { console.log(`Finnhub upgrade-downgrade: HTTP ${r.status}`); return []; }
+    const data = await r.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) { console.log(`Finnhub upgrade-downgrade fetch failed: ${e.message}`); return []; }
+}
+
+async function fetchFinnhubEarnings(apiKey, fromDate, toDate) {
+  const url = `https://finnhub.io/api/v1/calendar/earnings?from=${fromDate}&to=${toDate}&token=${encodeURIComponent(apiKey)}`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) { console.log(`Finnhub earnings calendar: HTTP ${r.status}`); return []; }
+    const data = await r.json();
+    return Array.isArray(data?.earningsCalendar) ? data.earningsCalendar : [];
+  } catch (e) { console.log(`Finnhub earnings calendar fetch failed: ${e.message}`); return []; }
+}
+
+async function fetchYahooOne(symbol) {
+  const modules = 'recommendationTrend,upgradeDowngradeHistory,calendarEvents,price';
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const res = data?.quoteSummary?.result?.[0];
+    if (!res) return null;
+
+    const company = res.price?.longName || res.price?.shortName || symbol;
+    const hist = res.upgradeDowngradeHistory?.history || [];
+    const recent = hist.filter(h => h.epochGradeDate).sort((a, b) => b.epochGradeDate - a.epochGradeDate)[0];
+    const earningsTs = res.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
+
+    return {
+      symbol, company,
+      ratingFrom: recent?.fromGrade || null,
+      ratingTo:   recent?.toGrade   || null,
+      firm:       recent?.firm      || null,
+      ratingDate: recent?.epochGradeDate ? recent.epochGradeDate * 1000 : null,
+      earningsDate: earningsTs ? earningsTs * 1000 : null,
+      action: recent?.action || null,
+      source: 'yahoo',
+    };
+  } catch { return null; }
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = []; let i = 0;
+  async function worker() { while (i < items.length) { const idx = i++; out[idx] = await fn(items[idx]); } }
+  await Promise.all(Array.from({ length: limit }, worker));
+  return out;
+}
+
+function scoreItem(it) {
+  let score = 0;
+  const hasUpgrade  = it.signal === 'upgrade' || it.signal === 'both';
+  const hasEarnings = it.daysToEarnings != null && it.daysToEarnings >= 0 && it.daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
+  if (hasUpgrade) score += 40;
+  if (it.signal === 'downgrade') score += 15;
+  if (hasEarnings) score += 30;
+  if (hasUpgrade && hasEarnings) score += 30;
+  if (it.ratingDate) score += Math.max(0, 10 - daysBetween(it.ratingDate, Date.now()));
+  return score;
+}
+
+async function main() {
+  const now = new Date();
+  const etHour = Number(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', hour12: false }));
+  if (!FETCH_HOURS_ET.includes(etHour)) {
+    console.log(`ET hour ${etHour} not in target hours [${FETCH_HOURS_ET.join(',')}] — skipping`);
+    return;
+  }
+
+  const existing = loadExisting();
+  if (existing.fetchedAt && (Date.now() - existing.fetchedAt) < MIN_HOURS_BETWEEN_RUNS * 3600000) {
+    console.log(`Last fetch was < ${MIN_HOURS_BETWEEN_RUNS}h ago — skipping (avoids double-fire within the same target hour)`);
+    return;
+  }
+
+  const apiKey    = process.env.FINNHUB_API_KEY || '';
+  const universe  = buildUniverse();
+  const bySymbol  = new Map();
+
+  const fromDate = new Date(Date.now() - RATING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
+  const toDate   = new Date().toISOString().slice(0, 10);
+  const earnTo   = new Date(Date.now() + EARNINGS_LOOKAHEAD_DAYS * 86400000).toISOString().slice(0, 10);
+
+  if (apiKey) {
+    console.log('FINNHUB_API_KEY set — using market-wide Finnhub data');
+    const [upgrades, earnings] = await Promise.all([
+      fetchFinnhubUpgrades(apiKey, fromDate, toDate),
+      fetchFinnhubEarnings(apiKey, toDate, earnTo),
+    ]);
+
+    for (const u of upgrades) {
+      const sym = u.symbol; if (!sym) continue;
+      const prev = bySymbol.get(sym) || { symbol: sym, company: sym, source: 'finnhub' };
+      const gradeTime = u.gradeTime ? u.gradeTime * 1000 : Date.now();
+      if (!prev.ratingDate || gradeTime > prev.ratingDate) {
+        prev.ratingFrom = u.fromGrade || null;
+        prev.ratingTo   = u.toGrade   || null;
+        prev.firm       = u.company   || u.gradeCompany || null;
+        prev.ratingDate = gradeTime;
+        prev.action     = (u.action || '').toLowerCase();
+      }
+      bySymbol.set(sym, prev);
+    }
+    for (const e of earnings) {
+      const sym = e.symbol; if (!sym) continue;
+      const prev = bySymbol.get(sym) || { symbol: sym, company: sym, source: 'finnhub' };
+      const edate = e.date ? new Date(e.date + 'T00:00:00Z').getTime() : null;
+      if (edate && (!prev.earningsDate || edate < prev.earningsDate)) prev.earningsDate = edate;
+      bySymbol.set(sym, prev);
+    }
+    console.log(`Finnhub: ${upgrades.length} rating changes, ${earnings.length} earnings dates in window`);
+  } else {
+    console.log('FINNHUB_API_KEY not set — falling back to Yahoo per-symbol backup (universe-limited)');
+    const results = await mapLimit(universe, 6, fetchYahooOne);
+    for (const r of results) { if (r) bySymbol.set(r.symbol, r); }
+  }
+
+  const items = [...bySymbol.values()]
+    .filter(it => it.ratingDate || it.earningsDate)
+    .map(it => {
+      const daysToEarnings = it.earningsDate != null ? daysBetween(Date.now(), it.earningsDate) : null;
+      const hasUpgrade   = it.action === 'up' || ['Buy','Strong Buy','Outperform','Overweight'].includes(it.ratingTo);
+      const hasDowngrade = it.action === 'down';
+      const hasEarnSoon  = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
+      const signal = hasUpgrade && hasEarnSoon ? 'both' : hasUpgrade ? 'upgrade' : hasDowngrade ? 'downgrade' : 'earnings';
+      const full = { ...it, daysToEarnings, signal };
+      full.score = scoreItem(full);
+      return full;
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, MAX_ITEMS_OUT);
+
+  saveOutput({ fetchedAt: Date.now(), source: apiKey ? 'finnhub' : 'yahoo', items });
+  console.log(`Analyst picks: ${items.length} items saved (source: ${apiKey ? 'finnhub' : 'yahoo'})`);
+}
+
+main().catch(e => { console.error('analyst-picks-fetcher fatal error:', e); process.exit(0); });
