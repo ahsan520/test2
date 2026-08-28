@@ -54,7 +54,7 @@ const FETCH_WINDOWS_ET = [
   { h: 7,  m: 0  }, // pre-market
   { h: 11, m: 0  }, // mid-morning
   { h: 14, m: 0  }, // midday
-  { h: 17, m: 35 }, // after-close-ish
+  { h: 17, m: 40 }, // after-close-ish
 ];
 const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
 const RATING_LOOKBACK_DAYS    = 10; // Finnhub upgrade/downgrade window
