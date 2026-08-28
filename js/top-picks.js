@@ -59,10 +59,12 @@ function _fmtDate(ts) {
 }
 
 const SIGNAL_STYLE = {
-  both:      { label: '⭐ UPGRADE + EARNINGS', color: 'var(--bull)' },
-  upgrade:   { label: '▲ UPGRADE',             color: 'var(--bull)' },
-  downgrade: { label: '▼ DOWNGRADE',           color: 'var(--bear)' },
-  earnings:  { label: '📅 EARNINGS',           color: 'var(--text-dim)' },
+  both:           { label: '⭐ UPGRADE + EARNINGS',  color: 'var(--bull)' },
+  upgrade:        { label: '▲ UPGRADE',              color: 'var(--bull)' },
+  downgrade:      { label: '▼ DOWNGRADE',            color: 'var(--bear)' },
+  'consensus-up':   { label: '▲ CONSENSUS RISING',   color: 'var(--bull)' },
+  'consensus-down': { label: '▼ CONSENSUS FALLING',  color: 'var(--bear)' },
+  earnings:       { label: '📅 EARNINGS',            color: 'var(--text-dim)' },
 };
 
 function renderTopPicks(noteMsg) {
@@ -78,7 +80,7 @@ function renderTopPicks(noteMsg) {
       No analyst-picks data yet.<br>
       ${noteMsg ? noteMsg.substring(0,160) + '<br>' : ''}
       This tab reads <code style="color:var(--text-bright)">scripts/analyst-picks-data.json</code>, written 4x/day (pre-market, mid-morning, midday, after-close) by <code>analyst-picks-fetcher.js</code>.<br><br>
-      For a broader earnings calendar (not just your watchlist), add <code style="color:var(--text-bright)">FINNHUB_API_KEY</code> as a GitHub repo secret — free tier, no card required, from finnhub.io. Note: analyst ratings themselves are always limited to your watchlist + Nasdaq-100 via Yahoo — Finnhub's ratings endpoint requires a paid plan, so there's no free market-wide ratings source.
+      For a broader earnings calendar (not just your watchlist), add <code style="color:var(--text-bright)">FINNHUB_API_KEY</code> as a GitHub repo secret — free tier, no card required, from finnhub.io. Note: individual firm-by-firm rating changes are always limited to your watchlist + Nasdaq-100 via Yahoo — Finnhub's upgrade-downgrade endpoint requires a paid plan. When Yahoo has no specific action for a symbol, a free Finnhub key also unlocks a consensus buy/hold/sell fallback (rising/falling analyst sentiment) instead of nothing.
     </div>`;
     return;
   }
@@ -97,7 +99,9 @@ function renderTopPicks(noteMsg) {
     const sig = SIGNAL_STYLE[it.signal] || SIGNAL_STYLE.earnings;
     const ratingLine = (it.ratingFrom || it.ratingTo)
       ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--text-bright);">${it.ratingFrom || '?'} → ${it.ratingTo || '?'}</span>${it.firm ? ` <span style="color:var(--text-dim);">(${it.firm})</span>` : ''}`
-      : '';
+      : (it.recTrend
+        ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Consensus: ${it.recTrend.strongBuy + it.recTrend.buy} Buy / ${it.recTrend.hold} Hold / ${it.recTrend.sell + it.recTrend.strongSell} Sell</span>`
+        : '');
     const earnLine = it.earningsDate
       ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Earnings ${_fmtDate(it.earningsDate)}${it.daysToEarnings != null ? ` (${it.daysToEarnings}d)` : ''}</span>`
       : '';
