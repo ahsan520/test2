@@ -47,7 +47,20 @@
 // alertState (already loaded/saved every cycle by leaderboard-decider.js)
 // so it survives across runs without a new state file.
 const TRIGGER_STALE_ENABLED  = (process.env.EQ_TRIGGER_STALE_ENABLE || 'true') !== 'false';
-const TRIGGER_STALE_MAX_MIN  = parseFloat(process.env.EQ_TRIGGER_STALE_MAX_MIN || '25'); // ~1.5 Job B cycles
+// ── Trigger staleness — now trend-based, not clock-based ──
+// A time-based cutoff (the old default: 25 min) penalizes a signal purely
+// for how long it's been open, even when the underlying trend it was based
+// on is still fully intact — exactly what was happening on a genuine,
+// grinding, all-day rally: breakouts confirmed 140-555 min ago while ST5
+// was BULL the entire time, all rejected as "stale" despite the move never
+// having reversed. The real question isn't "how long has this been
+// triggering" but "is the move that triggered it still actually happening"
+// — and ST5's own direction (the same fast timeframe the trigger itself is
+// built on) already answers that directly. Staleness is now: has ST5
+// flipped away from BULL since this trigger was first seen. TRIGGER_STALE_
+// MAX_MIN still exists underneath as a backstop for the rare case ST5
+// direction data is missing that cycle — not as the primary signal.
+const TRIGGER_STALE_MAX_MIN  = parseFloat(process.env.EQ_TRIGGER_STALE_MAX_MIN || '25'); // backstop only, used when ST5 direction is unavailable
 
 // ── BPP — Book Pressure Proxy (NEW gate; the underlying obi/OBI order-book-
 // imbalance number already existed — leaderboard-scanner.js's calcOBI — but
@@ -123,12 +136,40 @@ export function checkEntryQuality({ entry, pair, alertState, isCapBuy = false, b
       : pass(entryState === 'EXTENDED' ? 'RSI-extended but not yet chase-blocked' : 'not extended');
 
   // 2 ── Trigger age (breakout confirmed too long ago) ──
+  // Was a pure wall-clock cutoff (max 25 min) — on a sustained, still-
+  // trending day (symbol sits in TRIGGERING/BREAKOUT for hours without
+  // ever dropping out) that punished a genuinely healthy, ongoing trend
+  // purely for its DURATION, even though nothing about it had actually
+  // degraded. Age now only disqualifies a trigger once the trend
+  // structure has actually broken since it was first seen — ST5
+  // direction flipped away from BULL, or either timeframe went
+  // EXHAUSTED — rather than by the clock alone. ENTRY_EXTENDED /
+  // IMPULSE_EXHAUSTED / CVD_WEAK / BPP_FADING below still independently
+  // guard "is this actually still a good entry right now" on their own
+  // terms, so this doesn't weaken protection against chasing an
+  // exhausted or reversing move — it just stops penalizing a trend
+  // purely for lasting a long time. EQ_TRIGGER_STALE_ABS_MAX_MIN is a
+  // generous sanity ceiling (default 12h) that applies regardless of
+  // structure, purely as a guard against a stuck/leaked alertState
+  // entry — it isn't meant to fire in normal operation.
   const ageMin = trackTriggerAge(alertState, pair, triggerStatus);
+  const st5  = entry.supertrend5m;
+  const st15 = entry.supertrend15m;
+  const trendStructureIntact = !!st5
+    && st5.direction === 'BULL'
+    && st5.extensionZone !== 'EXHAUSTED'
+    && (!st15 || st15.extensionZone !== 'EXHAUSTED');
+  const TRIGGER_STALE_ABS_MAX_MIN = parseFloat(process.env.EQ_TRIGGER_STALE_ABS_MAX_MIN || '720');
+
   checks.triggerAge = (!TRIGGER_STALE_ENABLED || ageMin == null)
     ? pass('trigger-age check disabled or not yet in a BREAKOUT/TRIGGERING state')
-    : ageMin > TRIGGER_STALE_MAX_MIN
-      ? fail('TRIGGER_STALE', `breakout first confirmed ${ageMin.toFixed(0)} min ago (max ${TRIGGER_STALE_MAX_MIN}) — signal may already be over`)
-      : pass(`breakout is ${ageMin.toFixed(0)} min old (max ${TRIGGER_STALE_MAX_MIN})`);
+    : ageMin > TRIGGER_STALE_ABS_MAX_MIN
+      ? fail('TRIGGER_STALE', `breakout first confirmed ${ageMin.toFixed(0)} min ago — exceeds absolute ${TRIGGER_STALE_ABS_MAX_MIN}min sanity ceiling regardless of trend structure`)
+      : trendStructureIntact
+        ? pass(`breakout is ${ageMin.toFixed(0)} min old but ST5 trend structure still intact (BULL, not exhausted) — age alone doesn't block`)
+        : ageMin > TRIGGER_STALE_MAX_MIN
+          ? fail('TRIGGER_STALE', `breakout first confirmed ${ageMin.toFixed(0)} min ago (max ${TRIGGER_STALE_MAX_MIN}) and trend structure no longer intact — signal may already be over`)
+          : pass(`breakout is ${ageMin.toFixed(0)} min old (max ${TRIGGER_STALE_MAX_MIN})`);
 
   // 3 ── Impulse exhaustion (candle-run chase / knife / high-shock-unconfirmed) ──
   const freshnessPenalty = (d.buyIntel?.freshness?.penalty ?? 0) + (d.buyIntel?.freshness?.knifePenalty ?? 0);
