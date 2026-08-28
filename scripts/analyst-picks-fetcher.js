@@ -38,8 +38,10 @@
 //     fetchedAt, source: 'finnhub'|'yahoo',
 //     items: [{
 //       symbol, company,
-//       signal: 'upgrade'|'downgrade'|'consensus-up'|'consensus-down'|'earnings'|'both',
-//       ratingFrom, ratingTo, firm, ratingDate,
+//       signal: 'upgrade'|'downgrade'|'initiated-bullish'|'initiated-bearish'|
+//               'initiated-neutral'|'reiterated'|'consensus-up'|'consensus-down'|
+//               'earnings'|'both',
+//       ratingFrom, ratingTo, firm, ratingDate, action ('up'|'down'|'init'|'main'|null),
 //       recTrend: { period, buy, hold, sell, strongBuy, strongSell } | undefined,
 //       earningsDate, daysToEarnings, score, source
 //     }]
@@ -105,7 +107,7 @@ const FETCH_WINDOWS_ET = [
   { h: 7,  m: 0  }, // pre-market
   { h: 11, m: 0  }, // mid-morning
   { h: 14, m: 0  }, // midday
-  { h: 18, m: 30 }, // after-close-ish
+  { h: 18, m: 15 }, // after-close-ish
 ];
 const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
 const EARNINGS_LOOKAHEAD_DAYS = 7;
@@ -230,16 +232,27 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+function _ratingSentiment(grade) {
+  if (!grade) return null;
+  const g = grade.toLowerCase();
+  if (/(strong buy|^buy$|outperform|overweight|positive|accumulate)/.test(g)) return 'positive';
+  if (/(strong sell|^sell$|underperform|underweight|negative|reduce)/.test(g)) return 'negative';
+  return 'neutral'; // hold, neutral, equal-weight, market perform, sector perform, peer perform
+}
+
 function scoreItem(it) {
   let score = 0;
-  const hasUpgrade  = it.signal === 'upgrade' || it.signal === 'both';
   const hasEarnings = it.daysToEarnings != null && it.daysToEarnings >= 0 && it.daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
-  if (hasUpgrade) score += 40;
-  if (it.signal === 'downgrade') score += 15;
-  if (it.signal === 'consensus-up') score += 20;
+  const isRealUpgrade = it.signal === 'upgrade' || it.signal === 'both';
+  if (isRealUpgrade)                score += 40; // actual rating raised — the only case that's a genuine directional change
+  if (it.signal === 'downgrade')    score += 15; // genuine directional change the other way — still worth flagging
+  if (it.signal === 'initiated-bullish')  score += 18; // new coverage, positive — new attention, not a change
+  if (it.signal === 'initiated-bearish')  score += 10;
+  if (it.signal === 'consensus-up')   score += 20;
   if (it.signal === 'consensus-down') score += 8;
+  if (it.signal === 'reiterated')     score += 2;  // no new info — barely nudges score, mostly for tie-breaking by recency
   if (hasEarnings) score += 30;
-  if (hasUpgrade && hasEarnings) score += 30;
+  if (isRealUpgrade && hasEarnings) score += 30;
   if (it.ratingDate) score += Math.max(0, 10 - daysBetween(it.ratingDate, Date.now()));
   return score;
 }
@@ -346,17 +359,25 @@ async function main() {
     .filter(it => it.ratingDate || it.earningsDate || it.consensusDirection)
     .map(it => {
       const daysToEarnings = it.earningsDate != null ? daysBetween(Date.now(), it.earningsDate) : null;
-      const hasUpgrade      = it.action === 'up' || ['Buy','Strong Buy','Outperform','Overweight'].includes(it.ratingTo);
-      const hasDowngrade    = it.action === 'down';
-      const hasConsensusUp  = !hasUpgrade && !hasDowngrade && it.consensusDirection === 'up';
-      const hasConsensusDn  = !hasUpgrade && !hasDowngrade && it.consensusDirection === 'down';
-      const hasEarnSoon     = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
-      const signal = hasUpgrade && hasEarnSoon ? 'both'
-        : hasUpgrade ? 'upgrade'
-        : hasDowngrade ? 'downgrade'
-        : hasConsensusUp ? 'consensus-up'
-        : hasConsensusDn ? 'consensus-down'
-        : 'earnings';
+      const hasEarnSoon    = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
+
+      // Signal is keyed off the actual Yahoo `action` field, not just
+      // whether the current rating happens to be positive — a reiterated
+      // Buy (action:'main') and a fresh upgrade to Buy (action:'up') both
+      // end up with ratingTo:'Buy', but only one of them is new information.
+      // See _ratingSentiment for the up/down/init/main → signal mapping.
+      const sentiment = _ratingSentiment(it.ratingTo);
+      let signal;
+      if (it.action === 'up')        signal = hasEarnSoon ? 'both' : 'upgrade';
+      else if (it.action === 'down') signal = 'downgrade';
+      else if (it.action === 'init') signal = sentiment === 'negative' ? 'initiated-bearish'
+                                             : sentiment === 'positive' ? 'initiated-bullish'
+                                             : 'initiated-neutral';
+      else if (it.action === 'main') signal = 'reiterated';
+      else if (it.consensusDirection === 'up')   signal = 'consensus-up';
+      else if (it.consensusDirection === 'down') signal = 'consensus-down';
+      else signal = 'earnings';
+
       const full = { ...it, daysToEarnings, signal };
       full.score = scoreItem(full);
       return full;
