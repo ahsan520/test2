@@ -8,17 +8,19 @@
 // This version pulls STRUCTURED rating-change and earnings-date data
 // instead, so results are query-driven, not headline-luck-driven.
 //
-// v3 — v2 assumed Finnhub's /stock/upgrade-downgrade was free-tier; it is
-// NOT (confirmed via live 403 in production logs — the earnings endpoint on
-// the same key/tier succeeded fine, isolating it to that one endpoint being
-// paid-plan-gated). Ratings now always come from Yahoo per-symbol, whether
-// or not a Finnhub key is present; Finnhub is used only for its free
-// earnings-calendar endpoint when a key is set.
+// v4 — added a Finnhub /stock/recommendation-trend fallback (free tier —
+// unlike /stock/upgrade-downgrade above) for symbols where Yahoo returned
+// no specific rating action. It's a monthly buy/hold/sell consensus count,
+// not a per-firm event, so it's only used to fill the gap, never to
+// override an actual Yahoo upgrade/downgrade.
 //
 // Sources:
 //   RATINGS:  Yahoo Finance quoteSummary (recommendationTrend +
 //             upgradeDowngradeHistory modules) — free, no key, per-symbol,
 //             universe-limited (watchlist + Nasdaq-100) always.
+//             Fallback: Finnhub /stock/recommendation-trend (free tier)
+//             for symbols Yahoo didn't return a specific action for —
+//             surfaces consensus direction (up/down), not a firm+date.
 //   EARNINGS: Finnhub.io /calendar/earnings if FINNHUB_API_KEY is set —
 //             this endpoint IS free-tier, market-wide, date-ranged. Falls
 //             back to whatever Yahoo's calendarEvents module found
@@ -35,8 +37,10 @@
 //   {
 //     fetchedAt, source: 'finnhub'|'yahoo',
 //     items: [{
-//       symbol, company, signal: 'upgrade'|'downgrade'|'earnings'|'both',
+//       symbol, company,
+//       signal: 'upgrade'|'downgrade'|'consensus-up'|'consensus-down'|'earnings'|'both',
 //       ratingFrom, ratingTo, firm, ratingDate,
+//       recTrend: { period, buy, hold, sell, strongBuy, strongSell } | undefined,
 //       earningsDate, daysToEarnings, score, source
 //     }]
 //   }
@@ -101,7 +105,7 @@ const FETCH_WINDOWS_ET = [
   { h: 7,  m: 0  }, // pre-market
   { h: 11, m: 0  }, // mid-morning
   { h: 14, m: 0  }, // midday
-  { h: 18, m: 15 }, // after-close-ish
+  { h: 18, m: 25 }, // after-close-ish
 ];
 const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
 const EARNINGS_LOOKAHEAD_DAYS = 7;
@@ -160,6 +164,36 @@ async function fetchFinnhubEarnings(apiKey, fromDate, toDate) {
   } catch (e) { console.log(`Finnhub earnings calendar fetch failed: ${e.message}`); return []; }
 }
 
+// /stock/recommendation-trend — aggregated monthly buy/hold/sell counts
+// across all covering analysts. Unlike /stock/upgrade-downgrade (paid-plan
+// only — individual firm actions), this endpoint IS free-tier. It doesn't
+// give a "Firm X moved from Hold to Buy" event the way Yahoo's
+// upgradeDowngradeHistory does, but it does show whether the consensus is
+// drifting more bullish or bearish month over month — used here only as a
+// fallback for symbols where Yahoo returned no specific rating action, so
+// those rows aren't left with earnings-only info when a real signal exists.
+async function fetchFinnhubRecommendationTrend(apiKey, symbol) {
+  const url = `https://finnhub.io/api/v1/stock/recommendation-trend?symbol=${encodeURIComponent(symbol)}&token=${encodeURIComponent(apiKey)}`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    // API returns most-recent-period first.
+    const latest = rows[0];
+    const prev   = rows[1] || null;
+    return { latest, prev };
+  } catch { return null; }
+}
+
+// Bullishness score for a single recommendation-trend row: strongBuy/buy
+// weighted above hold, sell/strongSell weighted negative. Only the sign and
+// relative change between two periods matters here, not the absolute value.
+function _recTrendBullScore(row) {
+  if (!row) return null;
+  return (row.strongBuy || 0) * 2 + (row.buy || 0) - (row.sell || 0) - (row.strongSell || 0) * 2;
+}
+
 async function fetchYahooOne(symbol) {
   const modules      = 'recommendationTrend,upgradeDowngradeHistory,calendarEvents,price';
   const crumbSuffix  = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
@@ -202,6 +236,8 @@ function scoreItem(it) {
   const hasEarnings = it.daysToEarnings != null && it.daysToEarnings >= 0 && it.daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
   if (hasUpgrade) score += 40;
   if (it.signal === 'downgrade') score += 15;
+  if (it.signal === 'consensus-up') score += 20;
+  if (it.signal === 'consensus-down') score += 8;
   if (hasEarnings) score += 30;
   if (hasUpgrade && hasEarnings) score += 30;
   if (it.ratingDate) score += Math.max(0, 10 - daysBetween(it.ratingDate, Date.now()));
@@ -272,18 +308,55 @@ async function main() {
       bySymbol.set(sym, prev);
     }
     console.log(`Finnhub: ${earnings.length} earnings dates in window (market-wide)`);
+
+    // ── Consensus fallback: recommendation-trend (free tier) for any symbol
+    // that still has no Yahoo rating action. Only queried for that subset —
+    // no point spending calls re-confirming what Yahoo already gave us. ──
+    const needsConsensus = universe.filter(sym => {
+      const it = bySymbol.get(sym);
+      return it && !it.ratingTo && !it.action;
+    });
+    if (needsConsensus.length) {
+      const trendResults = await mapLimit(needsConsensus, 6, sym => fetchFinnhubRecommendationTrend(apiKey, sym));
+      let consensusHits = 0;
+      trendResults.forEach((res, idx) => {
+        if (!res) return;
+        const sym = needsConsensus[idx];
+        const it  = bySymbol.get(sym);
+        if (!it) return;
+        const bullNow  = _recTrendBullScore(res.latest);
+        const bullPrev = _recTrendBullScore(res.prev);
+        it.recTrend = {
+          period: res.latest.period, buy: res.latest.buy, hold: res.latest.hold,
+          sell: res.latest.sell, strongBuy: res.latest.strongBuy, strongSell: res.latest.strongSell,
+        };
+        if (bullPrev != null && bullNow !== bullPrev) {
+          it.consensusDirection = bullNow > bullPrev ? 'up' : 'down';
+          consensusHits++;
+        }
+        bySymbol.set(sym, it);
+      });
+      console.log(`Finnhub recommendation-trend: ${consensusHits}/${needsConsensus.length} symbols showed a consensus shift (${needsConsensus.length} queried, missing a Yahoo rating action)`);
+    }
   } else {
-    console.log('FINNHUB_API_KEY not set — earnings dates limited to whatever Yahoo returned per-symbol above');
+    console.log('FINNHUB_API_KEY not set — earnings dates limited to whatever Yahoo returned per-symbol above, no consensus fallback');
   }
 
   const items = [...bySymbol.values()]
-    .filter(it => it.ratingDate || it.earningsDate)
+    .filter(it => it.ratingDate || it.earningsDate || it.consensusDirection)
     .map(it => {
       const daysToEarnings = it.earningsDate != null ? daysBetween(Date.now(), it.earningsDate) : null;
-      const hasUpgrade   = it.action === 'up' || ['Buy','Strong Buy','Outperform','Overweight'].includes(it.ratingTo);
-      const hasDowngrade = it.action === 'down';
-      const hasEarnSoon  = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
-      const signal = hasUpgrade && hasEarnSoon ? 'both' : hasUpgrade ? 'upgrade' : hasDowngrade ? 'downgrade' : 'earnings';
+      const hasUpgrade      = it.action === 'up' || ['Buy','Strong Buy','Outperform','Overweight'].includes(it.ratingTo);
+      const hasDowngrade    = it.action === 'down';
+      const hasConsensusUp  = !hasUpgrade && !hasDowngrade && it.consensusDirection === 'up';
+      const hasConsensusDn  = !hasUpgrade && !hasDowngrade && it.consensusDirection === 'down';
+      const hasEarnSoon     = daysToEarnings != null && daysToEarnings >= 0 && daysToEarnings <= EARNINGS_LOOKAHEAD_DAYS;
+      const signal = hasUpgrade && hasEarnSoon ? 'both'
+        : hasUpgrade ? 'upgrade'
+        : hasDowngrade ? 'downgrade'
+        : hasConsensusUp ? 'consensus-up'
+        : hasConsensusDn ? 'consensus-down'
+        : 'earnings';
       const full = { ...it, daysToEarnings, signal };
       full.score = scoreItem(full);
       return full;
