@@ -6,7 +6,7 @@
 //
 // Data source: scripts/analyst-picks-data.json, written server-side ONCE
 // PER DAY (pre-market) by scripts/analyst-picks-fetcher.js. Structured
-// rating-change + earnings-date data (Finnhub market-wide if
+// rating-change data (Yahoo per-symbol, always) + earnings-date data
 // FINNHUB_API_KEY is set, else Yahoo per-symbol backup limited to the
 // watchlist + Nasdaq-100 universe) — not headline text-mining, so it
 // doesn't just re-show the same news over and over.
@@ -78,13 +78,13 @@ function renderTopPicks(noteMsg) {
       No analyst-picks data yet.<br>
       ${noteMsg ? noteMsg.substring(0,160) + '<br>' : ''}
       This tab reads <code style="color:var(--text-bright)">scripts/analyst-picks-data.json</code>, written 4x/day (pre-market, mid-morning, midday, after-close) by <code>analyst-picks-fetcher.js</code>.<br><br>
-      For market-wide coverage (not just your watchlist), add <code style="color:var(--text-bright)">FINNHUB_API_KEY</code> as a GitHub repo secret — free tier, no card required, from finnhub.io. Without it, this falls back to a Yahoo Finance backup limited to your watchlist + Nasdaq-100.
+      For a broader earnings calendar (not just your watchlist), add <code style="color:var(--text-bright)">FINNHUB_API_KEY</code> as a GitHub repo secret — free tier, no card required, from finnhub.io. Note: analyst ratings themselves are always limited to your watchlist + Nasdaq-100 via Yahoo — Finnhub's ratings endpoint requires a paid plan, so there's no free market-wide ratings source.
     </div>`;
     return;
   }
 
   if (badge) {
-    const src = STATE.topPicksSource === 'finnhub' ? 'Finnhub (market-wide)' : 'Yahoo (watchlist-limited)';
+    const src = STATE.topPicksSource === 'yahoo+finnhub' ? 'Yahoo ratings + Finnhub earnings' : 'Yahoo only';
     badge.textContent = `${items.length} items · ${src} · updated ${_fmtDate(STATE.topPicksFetchedAt)}`;
   }
 
