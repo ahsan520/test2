@@ -18,7 +18,7 @@
 //             key, but per-symbol only (covers SYMBOL_UNIVERSE below, not a
 //             true market-wide scan).
 //
-// Cadence: runs 4x/day at fixed ET hours (FETCH_HOURS_ET below) — this
+// Cadence: runs 4x/day at fixed ET times (FETCH_WINDOWS_ET below) — this
 // data doesn't change intraday every 5 min the way price data does, so
 // polling it that often was the actual cause of "same info every time",
 // but a single daily run also means anything issued mid-day (an upgrade at
@@ -45,11 +45,22 @@ import path from 'path';
 const OUT_PATH       = path.join(process.cwd(), 'analyst-picks-data.json');
 const WATCHLIST_PATH = path.join(process.cwd(), '..', 'watchlist.json');
 
-const FETCH_HOURS_ET           = [7, 11, 14, 20]; // 4x/day ET: pre-market, mid-morning, midday, after-close
+// Target times in ET, each { h, m } (24h clock) — minute-precision, not
+// just hour-aligned. Matched with a tolerance window (see WINDOW_TOLERANCE_MIN)
+// since this only actually runs when the native */5 cron or the Worker's
+// catch-up dispatch happens to invoke `fetch` mode — it doesn't fire on
+// its own, so the gate below has to catch "close enough", not exact.
+const FETCH_WINDOWS_ET = [
+  { h: 7,  m: 0  }, // pre-market
+  { h: 11, m: 0  }, // mid-morning
+  { h: 14, m: 0  }, // midday
+  { h: 17, m: 35 }, // after-close-ish
+];
+const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
 const RATING_LOOKBACK_DAYS    = 10; // Finnhub upgrade/downgrade window
 const EARNINGS_LOOKAHEAD_DAYS = 7;
 const MAX_ITEMS_OUT           = 60;
-const MIN_HOURS_BETWEEN_RUNS  = 3; // guards against double-firing within the same target hour's 5-min ticks
+const MIN_HOURS_BETWEEN_RUNS  = 3; // guards against double-firing within the same target window's nearby ticks
 
 // Watchlist + Nasdaq-100 constituents. Finnhub's upgrade-downgrade endpoint
 // is queried market-wide (no symbol needed); this universe is used for the
@@ -160,11 +171,29 @@ function scoreItem(it) {
   return score;
 }
 
+// Returns the nearest target window's distance in minutes, or null if none
+// are within tolerance. Minutes-of-day comparison, ET wall-clock.
+function _nearestWindowDistanceMin(nowMinutesOfDay) {
+  let best = null;
+  for (const w of FETCH_WINDOWS_ET) {
+    const targetMin = w.h * 60 + w.m;
+    const dist = Math.abs(nowMinutesOfDay - targetMin);
+    if (best === null || dist < best) best = dist;
+  }
+  return best;
+}
+
 async function main() {
   const now = new Date();
-  const etHour = Number(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', hour12: false }));
-  if (!FETCH_HOURS_ET.includes(etHour)) {
-    console.log(`ET hour ${etHour} not in target hours [${FETCH_HOURS_ET.join(',')}] — skipping`);
+  const etParts = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).split(':');
+  const etHour = Number(etParts[0]);
+  const etMin  = Number(etParts[1]);
+  const nowMinutesOfDay = etHour * 60 + etMin;
+
+  const dist = _nearestWindowDistanceMin(nowMinutesOfDay);
+  const windowsStr = FETCH_WINDOWS_ET.map(w => `${String(w.h).padStart(2,'0')}:${String(w.m).padStart(2,'0')}`).join(',');
+  if (dist === null || dist > WINDOW_TOLERANCE_MIN) {
+    console.log(`ET time ${String(etHour).padStart(2,'0')}:${String(etMin).padStart(2,'0')} not within ±${WINDOW_TOLERANCE_MIN}min of any target window [${windowsStr}] — skipping`);
     return;
   }
 
