@@ -67,12 +67,16 @@ function _fmtAge(ts) {
 }
 
 const SIGNAL_STYLE = {
-  both:           { label: '⭐ UPGRADE + EARNINGS',  color: 'var(--bull)' },
-  upgrade:        { label: '▲ UPGRADE',              color: 'var(--bull)' },
-  downgrade:      { label: '▼ DOWNGRADE',            color: 'var(--bear)' },
-  'consensus-up':   { label: '▲ CONSENSUS RISING',   color: 'var(--bull)' },
-  'consensus-down': { label: '▼ CONSENSUS FALLING',  color: 'var(--bear)' },
-  earnings:       { label: '📅 EARNINGS',            color: 'var(--text-dim)' },
+  both:               { label: '⭐ UPGRADE + EARNINGS',  color: 'var(--bull)' },
+  upgrade:            { label: '▲ UPGRADE',              color: 'var(--bull)' },
+  downgrade:          { label: '▼ DOWNGRADE',            color: 'var(--bear)' },
+  'initiated-bullish': { label: '◆ NEW COVERAGE (Buy)',  color: 'var(--bull)' },
+  'initiated-bearish': { label: '◆ NEW COVERAGE (Sell)', color: 'var(--bear)' },
+  'initiated-neutral': { label: '◆ NEW COVERAGE',        color: 'var(--text-dim)' },
+  reiterated:         { label: 'REITERATED',             color: 'var(--text-dim)' },
+  'consensus-up':     { label: '▲ CONSENSUS RISING',     color: 'var(--bull)' },
+  'consensus-down':   { label: '▼ CONSENSUS FALLING',    color: 'var(--bear)' },
+  earnings:           { label: '📅 EARNINGS',            color: 'var(--text-dim)' },
 };
 
 // ── Client-side sort ─────────────────────────────────────────────────────
@@ -162,7 +166,14 @@ function renderTopPicks(noteMsg) {
       ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--text-bright);">${it.ratingFrom || '?'} → ${it.ratingTo || '?'}</span>${it.firm ? ` <span style="color:var(--text-dim);">(${it.firm})</span>` : ''}${it.ratingDate ? ` <span style="color:var(--text-dim);">· ${_fmtAge(it.ratingDate)}</span>` : ''}`
       : (it.recTrend
         ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Consensus: ${it.recTrend.strongBuy + it.recTrend.buy} Buy / ${it.recTrend.hold} Hold / ${it.recTrend.sell + it.recTrend.strongSell} Sell</span>`
-        : '');
+        // Bare earnings-only row, no rating info at all — `source` tells us
+        // WHY: 'yahoo' means Yahoo answered fine and genuinely had nothing
+        // to report; 'finnhub' means Yahoo never responded for this symbol
+        // (404/timeout — see fetchYahooOne), so "no signal" here actually
+        // means "we don't know," not "checked, nothing found."
+        : (it.source === 'finnhub'
+          ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);font-style:italic;">no Yahoo data (fetch failed)</span>`
+          : `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);font-style:italic;">no rating action found</span>`));
     const earnLine = it.earningsDate
       ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Earnings ${_fmtDate(it.earningsDate)}${it.daysToEarnings != null ? ` (${it.daysToEarnings}d)` : ''}</span>`
       : '';
