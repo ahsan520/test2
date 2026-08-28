@@ -168,31 +168,31 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 84 → current 19 (drop 65 > 60)",
-      "fallingKnifeScore": 60,
-      "thesisDrop": 65,
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 32 below 50 threshold",
+      "fallingKnifeScore": 34,
+      "thesisDrop": 44,
       "confidenceDecay": 38,
-      "exitProbability": 51,
-      "dynamicPositionRisk": 51,
+      "exitProbability": 32,
+      "dynamicPositionRisk": 32,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787881951186
+      "evaluatedAt": 1787882243176
     },
     "highestPnLSeen": 1.55,
-    "lastR15": 56.9,
+    "lastR15": 52.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 1.49% ≥ 0.75% but momentum not yet weak — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +1.55% (tier A+) → now +-0.41%, gave back 1.96% ≥ 0.75% with weakening momentum [CVD fading]",
       "highestPnLSeen": 1.55,
-      "drawdownFromPeak": 1.49,
+      "drawdownFromPeak": 1.96,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1787881640814
+      "evaluatedAt": 1787882243176
     }
   },
   "BINANCE:XRPUSDT": {
@@ -206,7 +206,7 @@
     "alertedAt": 1787881953866,
     "holdLockUntil": 0,
     "entryPrice": 1.4486,
-    "stop": 1.4305,
+    "stop": 1.43,
     "t1": 1.4921,
     "t2": 1.5355,
     "score": 5,
@@ -226,6 +226,31 @@
       "buyOrderId": "MANUAL_ADOPTED_1787881953866",
       "adopted": true,
       "priceSource": "trade_history"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "no entry snapshot — falling-knife-only score 20 below 75 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 33,
+      "exitProbability": 33,
+      "dynamicPositionRisk": 20,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 5
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": true,
+      "evaluatedAt": 1787882243176
+    },
+    "highestPnLSeen": 0.08,
+    "lastR15": 48.2,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak 0.08% below 0.4% floor — not evaluated yet",
+      "highestPnLSeen": 0.08,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1787882243176
     }
   }
 }
