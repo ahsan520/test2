@@ -328,6 +328,15 @@ jobs:
           BUY_MIN_BREADTH:              ${{ vars.BUY_MIN_BREADTH || '60' }}
           BUY_BREADTH_ALPHA_SCORE_MIN: ${{ vars.BUY_BREADTH_ALPHA_SCORE_MIN || '7' }}
           BUY_REQUIRE_RELATIVE_STRENGTH: ${{ vars.BUY_REQUIRE_RELATIVE_STRENGTH || 'true' }}
+          # ── Entry Quality Check — trigger-age (entry-quality-check.js) ──
+          # Was previously unwired — script always fell back to the
+          # hardcoded default (25 min), which penalized sustained-trend
+          # RETESTs purely for elapsed time. Now structural (see the
+          # comment in entry-quality-check.js): age only blocks once ST5
+          # trend direction/exhaustion has actually degraded.
+          EQ_TRIGGER_STALE_ENABLE:      ${{ vars.EQ_TRIGGER_STALE_ENABLE || 'true' }}
+          EQ_TRIGGER_STALE_MAX_MIN:    ${{ vars.EQ_TRIGGER_STALE_MAX_MIN || '25' }}
+          EQ_TRIGGER_STALE_ABS_MAX_MIN: ${{ vars.EQ_TRIGGER_STALE_ABS_MAX_MIN || '720' }}
           # ── v15 Position Intelligence Engine (position-intelligence.js) ──
           SELL_ENABLE_INTELLIGENCE:    ${{ vars.SELL_ENABLE_INTELLIGENCE || 'true' }}
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
