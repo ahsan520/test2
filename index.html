@@ -30,6 +30,7 @@
   <button class="tab"     onclick="switchTab('news',this)">📰 NEWS</button>
   <button class="tab"     onclick="switchTab('journal',this)">◆ TRADE JOURNAL</button>
   <button class="tab"     onclick="switchTab('market-data',this)">📊 MARKET DATA</button>
+  <button class="tab"     onclick="switchTab('top-picks',this)">⭐ TOP PICKS</button>
   <button class="tab"     onclick="switchTab('api-audit',this)">🛡 API AUDIT</button>
   <button class="tab"     onclick="switchTab('alerts',this)">⚙ CONFIG</button>
   <button class="tab"     onclick="switchTab('watchlist-mgr',this)">⚙ WATCHLIST</button>
@@ -403,6 +404,16 @@
      volume (the single biggest red flag found in review — several real
      blocked symbols had shock near 0 despite decent price change);
      bullConf≥7 and whale≥70 are the Alpha Exception's own bars. -->
+<div id="tab-top-picks" class="tc" style="height:calc(100vh - 80px);overflow-y:auto;">
+  <div class="api-trades-section" style="max-height:none;border-top:none;">
+    <div style="font-family:var(--mono);font-size:9px;padding:6px 10px;border-bottom:1px solid var(--text-dim);display:flex;justify-content:space-between;align-items:center;color:var(--text-dim);">
+      <span>Analyst rating changes + earnings calendar, cross-referenced — updated 4x/day ET (Finnhub market-wide if configured, else Yahoo watchlist-limited backup). Screening list for manual review, not a buy signal.</span>
+      <span id="top-picks-badge">loading…</span>
+    </div>
+    <div id="top-picks-body" style="padding:10px;"></div>
+  </div>
+</div>
+
 <div id="tab-market-data" class="tc" style="height:calc(100vh - 80px);overflow:hidden;">
   <div class="api-trades-section" style="max-height:none;height:100%;border-top:none;display:flex;flex-direction:column;">
     <!-- BTC regime banner — the context every gate decision is made
@@ -552,6 +563,7 @@
 <script src="js/sentiment.js"></script>
 <script src="js/market-intelligence.js"></script>
 <script src="js/general-news.js"></script>
+<script src="js/top-picks.js"></script>
 <script src="js/github-sync.js"></script>
 <script src="js/app.js"></script>
 
