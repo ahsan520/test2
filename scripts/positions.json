@@ -169,30 +169,30 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 4,
+      "reason": "dynamicPositionRisk 11 below 50 threshold",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 30,
       "confidenceDecay": 25,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "exitProbability": 11,
+      "dynamicPositionRisk": 11,
       "recovery": {
         "recovering": true,
         "sustainedMin": 1
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1787880440587
+      "evaluatedAt": 1787880744061
     },
     "highestPnLSeen": 1.55,
-    "lastR15": 71.1,
+    "lastR15": 67.3,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.00% below tier A+ give-back 0.75%",
+      "reason": "drawdown 0.55% below tier A+ give-back 0.75%",
       "highestPnLSeen": 1.55,
-      "drawdownFromPeak": 0,
+      "drawdownFromPeak": 0.55,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1787880440587
+      "evaluatedAt": 1787880744061
     }
   },
   "BINANCE:GALAUSDT": {
@@ -213,7 +213,7 @@
     "spikeScore": 0.35944155570405123,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "tp1_hit",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-GALA-20260828T010000Z",
@@ -224,7 +224,10 @@
       "qty": 3831.92,
       "fillPrice": 0.001892,
       "buyOrderId": "C02__721829701533732864036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__721833463308517376036",
+      "exitFillPrice": 0.001903,
+      "closedAt": 1787880745168
     },
     "entrySnapshot": {
       "at": 1787879848260,
@@ -281,6 +284,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1787880440587
-    }
+    },
+    "exitPrice": 0.001903,
+    "statusChangedAt": 1787880744061
   }
 }
