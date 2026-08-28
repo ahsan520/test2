@@ -8,15 +8,21 @@
 // This version pulls STRUCTURED rating-change and earnings-date data
 // instead, so results are query-driven, not headline-luck-driven.
 //
+// v3 — v2 assumed Finnhub's /stock/upgrade-downgrade was free-tier; it is
+// NOT (confirmed via live 403 in production logs — the earnings endpoint on
+// the same key/tier succeeded fine, isolating it to that one endpoint being
+// paid-plan-gated). Ratings now always come from Yahoo per-symbol, whether
+// or not a Finnhub key is present; Finnhub is used only for its free
+// earnings-calendar endpoint when a key is set.
+//
 // Sources:
-//   PRIMARY:  Finnhub.io free tier — /stock/upgrade-downgrade (market-wide
-//             recent rating changes, any US symbol) + /calendar/earnings
-//             (date-ranged, market-wide). Needs FINNHUB_API_KEY (free,
-//             60 req/min, no card). Falls back to Yahoo-only if unset.
-//   BACKUP:   Yahoo Finance quoteSummary (recommendationTrend +
-//             upgradeDowngradeHistory + calendarEvents modules) — free, no
-//             key, but per-symbol only (covers SYMBOL_UNIVERSE below, not a
-//             true market-wide scan).
+//   RATINGS:  Yahoo Finance quoteSummary (recommendationTrend +
+//             upgradeDowngradeHistory modules) — free, no key, per-symbol,
+//             universe-limited (watchlist + Nasdaq-100) always.
+//   EARNINGS: Finnhub.io /calendar/earnings if FINNHUB_API_KEY is set —
+//             this endpoint IS free-tier, market-wide, date-ranged. Falls
+//             back to whatever Yahoo's calendarEvents module found
+//             per-symbol if no key is set.
 //
 // Cadence: runs 4x/day at fixed ET times (FETCH_WINDOWS_ET below) — this
 // data doesn't change intraday every 5 min the way price data does, so
@@ -54,10 +60,9 @@ const FETCH_WINDOWS_ET = [
   { h: 7,  m: 0  }, // pre-market
   { h: 11, m: 0  }, // mid-morning
   { h: 14, m: 0  }, // midday
-  { h: 17, m: 40 }, // after-close-ish
+  { h: 17, m: 35 }, // after-close-ish
 ];
 const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
-const RATING_LOOKBACK_DAYS    = 10; // Finnhub upgrade/downgrade window
 const EARNINGS_LOOKAHEAD_DAYS = 7;
 const MAX_ITEMS_OUT           = 60;
 const MIN_HOURS_BETWEEN_RUNS  = 3; // guards against double-firing within the same target window's nearby ticks
@@ -103,16 +108,6 @@ function loadExisting() {
 }
 function saveOutput(data) { fs.writeFileSync(OUT_PATH, JSON.stringify(data, null, 2)); }
 function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
-
-async function fetchFinnhubUpgrades(apiKey, fromDate, toDate) {
-  const url = `https://finnhub.io/api/v1/stock/upgrade-downgrade?from=${fromDate}&to=${toDate}&token=${encodeURIComponent(apiKey)}`;
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    if (!r.ok) { console.log(`Finnhub upgrade-downgrade: HTTP ${r.status}`); return []; }
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
-  } catch (e) { console.log(`Finnhub upgrade-downgrade fetch failed: ${e.message}`); return []; }
-}
 
 async function fetchFinnhubEarnings(apiKey, fromDate, toDate) {
   const url = `https://finnhub.io/api/v1/calendar/earnings?from=${fromDate}&to=${toDate}&token=${encodeURIComponent(apiKey)}`;
@@ -207,30 +202,23 @@ async function main() {
   const universe  = buildUniverse();
   const bySymbol  = new Map();
 
-  const fromDate = new Date(Date.now() - RATING_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
   const toDate   = new Date().toISOString().slice(0, 10);
   const earnTo   = new Date(Date.now() + EARNINGS_LOOKAHEAD_DAYS * 86400000).toISOString().slice(0, 10);
 
-  if (apiKey) {
-    console.log('FINNHUB_API_KEY set — using market-wide Finnhub data');
-    const [upgrades, earnings] = await Promise.all([
-      fetchFinnhubUpgrades(apiKey, fromDate, toDate),
-      fetchFinnhubEarnings(apiKey, toDate, earnTo),
-    ]);
+  // ── Ratings: always via Yahoo per-symbol backup ──
+  // Finnhub's /stock/upgrade-downgrade is a PAID-PLAN-ONLY endpoint (401/403
+  // on the free tier — confirmed against a live free-tier key returning
+  // HTTP 403 while /calendar/earnings on the same key succeeded). There is
+  // no free market-wide ratings source, so this is universe-limited
+  // (watchlist + Nasdaq-100) regardless of whether FINNHUB_API_KEY is set.
+  console.log('Fetching ratings via Yahoo per-symbol backup (Finnhub upgrade-downgrade requires a paid plan — universe-limited either way)');
+  const yahooResults = await mapLimit(universe, 6, fetchYahooOne);
+  for (const r of yahooResults) { if (r) bySymbol.set(r.symbol, r); }
 
-    for (const u of upgrades) {
-      const sym = u.symbol; if (!sym) continue;
-      const prev = bySymbol.get(sym) || { symbol: sym, company: sym, source: 'finnhub' };
-      const gradeTime = u.gradeTime ? u.gradeTime * 1000 : Date.now();
-      if (!prev.ratingDate || gradeTime > prev.ratingDate) {
-        prev.ratingFrom = u.fromGrade || null;
-        prev.ratingTo   = u.toGrade   || null;
-        prev.firm       = u.company   || u.gradeCompany || null;
-        prev.ratingDate = gradeTime;
-        prev.action     = (u.action || '').toLowerCase();
-      }
-      bySymbol.set(sym, prev);
-    }
+  // ── Earnings: Finnhub market-wide if key present (this endpoint IS free),
+  // else fall back to whatever Yahoo already found per-symbol above. ──
+  if (apiKey) {
+    const earnings = await fetchFinnhubEarnings(apiKey, toDate, earnTo);
     for (const e of earnings) {
       const sym = e.symbol; if (!sym) continue;
       const prev = bySymbol.get(sym) || { symbol: sym, company: sym, source: 'finnhub' };
@@ -238,11 +226,9 @@ async function main() {
       if (edate && (!prev.earningsDate || edate < prev.earningsDate)) prev.earningsDate = edate;
       bySymbol.set(sym, prev);
     }
-    console.log(`Finnhub: ${upgrades.length} rating changes, ${earnings.length} earnings dates in window`);
+    console.log(`Finnhub: ${earnings.length} earnings dates in window (market-wide)`);
   } else {
-    console.log('FINNHUB_API_KEY not set — falling back to Yahoo per-symbol backup (universe-limited)');
-    const results = await mapLimit(universe, 6, fetchYahooOne);
-    for (const r of results) { if (r) bySymbol.set(r.symbol, r); }
+    console.log('FINNHUB_API_KEY not set — earnings dates limited to whatever Yahoo returned per-symbol above');
   }
 
   const items = [...bySymbol.values()]
@@ -260,7 +246,7 @@ async function main() {
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_ITEMS_OUT);
 
-  saveOutput({ fetchedAt: Date.now(), source: apiKey ? 'finnhub' : 'yahoo', items });
+  saveOutput({ fetchedAt: Date.now(), source: apiKey ? 'yahoo+finnhub' : 'yahoo', items });
   console.log(`Analyst picks: ${items.length} items saved (source: ${apiKey ? 'finnhub' : 'yahoo'})`);
 }
 
