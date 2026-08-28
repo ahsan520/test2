@@ -385,6 +385,7 @@ jobs:
           AV_API_KEY:         ${{ secrets.AV_API_KEY }}
           AV_API_KEY_NEWS:    ${{ secrets.AV_API_KEY_NEWS }}
           GNEWS_API_KEY:      ${{ secrets.GNEWS_API_KEY }}
+          FINNHUB_API_KEY:    ${{ secrets.FINNHUB_API_KEY }}
           RUN_MODE:           ${{ steps.mode.outputs.value }}
         run: |
           echo "Running in mode: $RUN_MODE"
@@ -395,6 +396,7 @@ jobs:
           echo "AV_API_KEY: $([ -n "$AV_API_KEY" ] && echo '✓ set' || echo '✗ MISSING')"
           echo "AV_API_KEY_NEWS: $([ -n "$AV_API_KEY_NEWS" ] && echo '✓ set' || echo '✗ MISSING')"
           echo "GNEWS_API_KEY: $([ -n "$GNEWS_API_KEY" ] && echo '✓ set' || echo '✗ MISSING')"
+          echo "FINNHUB_API_KEY: $([ -n "$FINNHUB_API_KEY" ] && echo '✓ set (market-wide mode)' || echo '✗ MISSING (analyst-picks-fetcher will fall back to Yahoo, watchlist-only)')"
           DRY_FLAG=""
           if [ "$DRY_RUN" = "true" ]; then
             echo "🔍 DRY RUN — no Telegram messages will be sent"
@@ -406,6 +408,7 @@ jobs:
               node market-fetcher.js
               node sentiment-fetcher.js
               node general-news-fetcher.js
+              node analyst-picks-fetcher.js
               ;;
             decide)
               # Fetch fresh market data FIRST, immediately before deciding —
