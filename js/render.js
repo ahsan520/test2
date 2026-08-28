@@ -92,6 +92,12 @@ function renderWL() {
   const cont = document.getElementById('wl-cont');
   if (!cont) return;
 
+  const countEl = document.getElementById('wl-count');
+  if (countEl) {
+    const countTxt = String(watchlist.length);
+    if (_dv['__wlcount'] !== countTxt) { countEl.textContent = countTxt; _dv['__wlcount'] = countTxt; }
+  }
+
   const wlKey = watchlist.join(',');
   if (_rendered.wl !== wlKey) {
     // Build skeleton with empty price slots — no prices in innerHTML

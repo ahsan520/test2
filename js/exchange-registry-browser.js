@@ -20,11 +20,11 @@ const EXCHANGES = {
   NASDAQ: {
     name: 'NASDAQ', suffixes: [],
     tz: 'America/New_York', currency: 'USD',
-    sessions: {
-      pre_market:  { open: '04:00', close: '09:30' },
-      regular:     { open: '09:30', close: '16:00' },
-      after_hours: { open: '16:00', close: '20:00' },
-    },
+    // Treated as 24/7 — always fetched live, never shown FROZEN. Unlike TSX/
+    // LSE/etc, NASDAQ tickers here trade pre/regular/after-hours + overnight
+    // via ECNs, so there's no window where a "closed" badge/frozen price is
+    // wanted for these.
+    sessions: { regular: null },
   },
   TSX: {
     name: 'Toronto Stock Exchange', suffixes: ['.TO'],
@@ -38,11 +38,8 @@ const EXCHANGES = {
   NYSE: {
     name: 'NYSE / NASDAQ', suffixes: [],
     tz: 'America/New_York', currency: 'USD',
-    sessions: {
-      pre_market:  { open: '04:00', close: '09:30' },
-      regular:     { open: '09:30', close: '16:00' },
-      after_hours: { open: '16:00', close: '20:00' },
-    },
+    // Same 24/7 treatment as NASDAQ above — no FROZEN state, always live.
+    sessions: { regular: null },
   },
   LSE: {
     name: 'London Stock Exchange', suffixes: ['.L'],

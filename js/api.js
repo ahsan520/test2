@@ -15,6 +15,8 @@ const PROXIES = [
   u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
   u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
   u => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://thingproxy.freeboard.io/fetch/${u}`,
 ];
 
 // ── In-flight coalescing ──
@@ -44,17 +46,45 @@ function _withProxySlot(fn) {
   });
 }
 
+// ── Per-proxy health tracking ──
+// A proxy that just failed is deprioritized (tried last) for a short cooldown
+// instead of being hammered again on every symbol in the same sync cycle —
+// public proxies fail in bursts (rate-limit windows), so backing off for a
+// few seconds materially cuts wasted round trips.
+const _proxyFailUntil = new Map(); // proxyIndex → timestamp
+const PROXY_COOLDOWN_MS = 20_000;
+
+function _orderedProxyIndices() {
+  const now = Date.now();
+  return PROXIES.map((_, i) => i).sort((a, b) => {
+    const aDown = (_proxyFailUntil.get(a) || 0) > now;
+    const bDown = (_proxyFailUntil.get(b) || 0) > now;
+    return aDown === bDown ? 0 : aDown ? 1 : -1;
+  });
+}
+
 async function fetchProxy(url) {
   return _withProxySlot(async () => {
     let lastErr;
-    for (const fn of PROXIES) {
+
+    // 1) Direct fetch — no proxy hop at all. Some endpoints (and some
+    // browser/extension CORS-relaxation setups) allow this; when it works
+    // it's faster and has no third-party dependency at all.
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(6000), mode: 'cors' });
+      if (r.ok) return await r.json();
+    } catch (e) { lastErr = e; }
+
+    // 2) Public proxy chain, healthiest-first.
+    for (const i of _orderedProxyIndices()) {
+      const fn = PROXIES[i];
       try {
         const r = await fetch(fn(url), { signal: AbortSignal.timeout(8000) });
-        if (!r.ok) { lastErr = new Error('proxy HTTP ' + r.status); continue; }
+        if (!r.ok) { lastErr = new Error('proxy HTTP ' + r.status); _proxyFailUntil.set(i, Date.now() + PROXY_COOLDOWN_MS); continue; }
         const txt = await r.text();
         try { const o = JSON.parse(txt); return o && o.contents !== undefined ? JSON.parse(o.contents) : o; }
         catch { return JSON.parse(txt); }
-      } catch (e) { lastErr = e; }
+      } catch (e) { lastErr = e; _proxyFailUntil.set(i, Date.now() + PROXY_COOLDOWN_MS); }
     }
     throw lastErr || new Error('All proxies failed');
   });

@@ -425,7 +425,10 @@ async function syncOne(s, { forceRefresh = false } = {}) {
       processAI(s, p, chg, stockExtra);
     }
     return true;
-  } catch { return false; }
+  } catch (e) {
+    console.warn(`[syncOne] ${s} failed:`, e?.message || e);
+    return false;
+  }
 }
 
 // ── FULL SYNC ──
