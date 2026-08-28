@@ -51,6 +51,47 @@ import path from 'path';
 const OUT_PATH       = path.join(process.cwd(), 'analyst-picks-data.json');
 const WATCHLIST_PATH = path.join(process.cwd(), '..', 'watchlist.json');
 
+// ── Yahoo Finance session (cookie + crumb) ──────────────────────────────
+// quoteSummary has required a session cookie + crumb token since Yahoo
+// tightened access in 2024 — a bare fetch() with only a User-Agent header
+// gets rejected (401/999) and fetchYahooOne()'s catch{} swallowed that
+// silently, so ratings looked "fetched" but came back empty for every
+// symbol, every run. leaderboard-scanner.js already solved this same
+// problem for its own Yahoo calls; mirrored here so quoteSummary carries
+// the same cookie/crumb.
+const YAHOO_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+let yahooCookie  = '';
+let yahooCrumb   = '';
+let yahooInited  = false;
+
+async function initYahoo() {
+  if (yahooInited) return;
+  try {
+    const r1 = await fetch('https://fc.yahoo.com', {
+      headers: { 'User-Agent': YAHOO_UA }, redirect: 'follow',
+    });
+    const cookieMatch = (r1.headers.get('set-cookie') || '').match(/(A\d=[^;]+)/);
+    yahooCookie = cookieMatch ? cookieMatch[1] : '';
+    const r2 = await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { 'User-Agent': YAHOO_UA, Cookie: yahooCookie },
+    });
+    yahooCrumb = await r2.text();
+    if (!yahooCrumb || yahooCrumb.includes('<') || yahooCrumb.length >= 50) {
+      console.log('  ⚠  Yahoo crumb unexpected — ratings fetch will likely fail this run');
+      yahooCrumb = '';
+    } else {
+      console.log(`  📡  Yahoo session ready (crumb ${yahooCrumb.length} chars)`);
+    }
+  } catch (e) {
+    console.log('  ⚠  Yahoo init failed:', e.message);
+  }
+  yahooInited = true;
+}
+
+function yahooHeaders() {
+  return { 'User-Agent': YAHOO_UA, Cookie: yahooCookie, Accept: 'application/json' };
+}
+
 // Target times in ET, each { h, m } (24h clock) — minute-precision, not
 // just hour-aligned. Matched with a tolerance window (see WINDOW_TOLERANCE_MIN)
 // since this only actually runs when the native */5 cron or the Worker's
@@ -120,11 +161,12 @@ async function fetchFinnhubEarnings(apiKey, fromDate, toDate) {
 }
 
 async function fetchYahooOne(symbol) {
-  const modules = 'recommendationTrend,upgradeDowngradeHistory,calendarEvents,price';
-  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}`;
+  const modules      = 'recommendationTrend,upgradeDowngradeHistory,calendarEvents,price';
+  const crumbSuffix  = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
+  const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbol)}?modules=${modules}${crumbSuffix}`;
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!r.ok) return null;
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000), headers: yahooHeaders() });
+    if (!r.ok) { console.log(`  Yahoo ${symbol}: HTTP ${r.status}`); return null; }
     const data = await r.json();
     const res = data?.quoteSummary?.result?.[0];
     if (!res) return null;
@@ -212,8 +254,11 @@ async function main() {
   // no free market-wide ratings source, so this is universe-limited
   // (watchlist + Nasdaq-100) regardless of whether FINNHUB_API_KEY is set.
   console.log('Fetching ratings via Yahoo per-symbol backup (Finnhub upgrade-downgrade requires a paid plan — universe-limited either way)');
+  await initYahoo();
   const yahooResults = await mapLimit(universe, 6, fetchYahooOne);
-  for (const r of yahooResults) { if (r) bySymbol.set(r.symbol, r); }
+  let yahooHits = 0;
+  for (const r of yahooResults) { if (r) { bySymbol.set(r.symbol, r); yahooHits++; } }
+  console.log(`Yahoo ratings: ${yahooHits}/${universe.length} symbols returned data`);
 
   // ── Earnings: Finnhub market-wide if key present (this endpoint IS free),
   // else fall back to whatever Yahoo already found per-symbol above. ──
