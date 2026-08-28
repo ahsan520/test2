@@ -500,6 +500,7 @@ function switchTab(tab, btn) {
   if (tab === 'journal')       refreshApiTrades();  // always refresh on open — was calling renderApiTrades() (render-only, no fetch), which just re-showed empty in-memory state and never actually loaded trade-log.json
   if (tab === 'market-data')   refreshMarketData(); // always refresh on open
   if (tab === 'api-audit')     refreshApiAudit();  // always refresh on open
+  if (tab === 'top-picks')     fetchTopPicks();    // always refresh on open
 }
 
 // News tab has its own subtab switcher (News Feed / Sentiment / General News)
