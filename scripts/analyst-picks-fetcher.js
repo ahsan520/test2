@@ -60,7 +60,7 @@ const FETCH_WINDOWS_ET = [
   { h: 7,  m: 0  }, // pre-market
   { h: 11, m: 0  }, // mid-morning
   { h: 14, m: 0  }, // midday
-  { h: 17, m: 50 }, // after-close-ish
+  { h: 17, m: 35 }, // after-close-ish
 ];
 const WINDOW_TOLERANCE_MIN    = 5; // native cron is */5, so ±5 min reliably catches one tick
 const EARNINGS_LOOKAHEAD_DAYS = 7;
@@ -247,7 +247,7 @@ async function main() {
     .slice(0, MAX_ITEMS_OUT);
 
   saveOutput({ fetchedAt: Date.now(), source: apiKey ? 'yahoo+finnhub' : 'yahoo', items });
-  console.log(`Analyst picks: ${items.length} items saved (source: ${apiKey ? 'finnhub' : 'yahoo'})`);
+  console.log(`Analyst picks: ${items.length} items saved (source: ${apiKey ? 'yahoo+finnhub' : 'yahoo'})`);
 }
 
 main().catch(e => { console.error('analyst-picks-fetcher fatal error:', e); process.exit(0); });
