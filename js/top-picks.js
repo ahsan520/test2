@@ -20,10 +20,17 @@ const TOP_PICKS_DATA_REPO   = () => (typeof _deriveRepo === 'function' ? _derive
 const TOP_PICKS_DATA_BRANCH = 'main';
 const TOP_PICKS_DATA_PATH   = 'scripts/analyst-picks-data.json';
 
-async function fetchTopPicks() {
+async function fetchTopPicks(manual) {
   const repo = TOP_PICKS_DATA_REPO();
   if (!repo) { renderTopPicks(); return; }
 
+  const btn = document.getElementById('top-picks-refresh-btn');
+  if (manual && btn) { btn.disabled = true; btn.textContent = '⟳ …'; }
+
+  // cache-buster (?t=) already forces a fresh pull past any CDN/browser
+  // cache — this re-reads whatever is currently committed, it does NOT
+  // trigger a new server-side fetch job early. That only runs on its own
+  // schedule (see analyst-picks-fetcher.js's FETCH_WINDOWS_ET gate).
   const url = `https://raw.githubusercontent.com/${repo}/${TOP_PICKS_DATA_BRANCH}/${TOP_PICKS_DATA_PATH}?t=${Date.now()}`;
 
   let data;
@@ -35,6 +42,8 @@ async function fetchTopPicks() {
   } catch (e) {
     renderTopPicks(`Fetch failed: ${e.message}`);
     return;
+  } finally {
+    if (manual && btn) { btn.disabled = false; btn.textContent = '⟳ REFRESH'; }
   }
 
   STATE.topPicksItems     = Array.isArray(data.items) ? data.items : [];
