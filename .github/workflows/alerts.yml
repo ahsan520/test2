@@ -322,9 +322,12 @@ jobs:
           ST_ATR_ZONE_EXT:  ${{ vars.ST_ATR_ZONE_EXT || '1.25' }}
           ST_ATR_ZONE_VEXT: ${{ vars.ST_ATR_ZONE_VEXT || '3' }}
           BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN: ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
-          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
+          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.15' }}
+          # Previously hardcoded to 7 in market-guard.js with no env var —
+          # now tunable like every other Alpha Exception threshold.
+          GUARD_BTC_ALPHA_MIN_BULLCONF: ${{ vars.GUARD_BTC_ALPHA_MIN_BULLCONF || '5' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
