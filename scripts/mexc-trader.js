@@ -735,6 +735,29 @@ export async function executeSTPriorityRotation({
         await sendTelegram(`📉 *ST15 CROSS — ${base}* — skipped, exhausted entry (${st15Exhausted.reason}). Event marked handled, no positions touched.`);
         continue;
       }
+      // waitRetest (incl. EXHAUSTED as of the 29 Aug 2026 ATR-balance
+      // tuning — see st-timing-engine.js) is NOT safe to silently fall
+      // through on here: P0/P1 is designed to bypass soft WAIT states and
+      // buy on the raw cross, which is exactly what reopens the RENDER/
+      // SUI/TAO trap for an entry that's still too extended. Re-check
+      // against the LIVE entry (the frozen-at-cross snapshot only carries
+      // {distanceATR, extensionZone} and never gains a retest flag, so
+      // waiting on it would never resolve) and requeue rather than buy or
+      // discard — picked back up next cycle, naturally expired by
+      // ST_EVENT_TTL_MIN if no retest/cooldown arrives in time.
+      if (st15Exhausted.waitRetest) {
+        const st15LiveCheck = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m, {
+          triggerStatus: entry?.triggerStatus ?? null,
+          regime: marketState?.marketRegime ?? null,
+          breadthScore: marketState?.breadth?.score ?? null,
+        });
+        if (st15LiveCheck.waitRetest) {
+          event.status = 'PENDING';
+          logAudit('st15_wait_retest', { pair, id: event.id, reason: st15LiveCheck.reason });
+          continue;
+        }
+        logAudit('st15_retest_confirmed', { pair, id: event.id, reason: st15LiveCheck.reason });
+      }
       if (st15Exhausted.overrideUsed) {
         logAudit('st15_exhausted_override', { pair, id: event.id, reason: st15Exhausted.reason });
         await sendTelegram(`⚡ *ST15 CROSS — ${base}* — EXHAUSTED-zone hard block bypassed (${st15Exhausted.reason}).`);
@@ -1196,6 +1219,23 @@ export async function executeST5PriorityRotation({
         logAudit('st5_skipped_exhausted', { pair, id: event.id, reason: st5Exhausted.reason });
         await sendTelegram(`📉 *ST5 CROSS — ${base}* — skipped, exhausted entry (${st5Exhausted.reason}). Event marked handled, no positions touched.`);
         continue;
+      }
+      // See the matching ST15 comment above for the full rationale —
+      // waitRetest (incl. EXHAUSTED as of the 29 Aug 2026 ATR-balance
+      // tuning) must be requeued, not bypassed, or P0 buys immediately
+      // into the same over-extended entry the gate exists to stop.
+      if (st5Exhausted.waitRetest) {
+        const st5LiveCheck = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m, {
+          triggerStatus: entry?.triggerStatus ?? null,
+          regime: marketState?.marketRegime ?? null,
+          breadthScore: marketState?.breadth?.score ?? null,
+        });
+        if (st5LiveCheck.waitRetest) {
+          event.status = 'PENDING';
+          logAudit('st5_wait_retest', { pair, id: event.id, reason: st5LiveCheck.reason });
+          continue;
+        }
+        logAudit('st5_retest_confirmed', { pair, id: event.id, reason: st5LiveCheck.reason });
       }
       if (st5Exhausted.overrideUsed) {
         logAudit('st5_exhausted_override', { pair, id: event.id, reason: st5Exhausted.reason });

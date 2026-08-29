@@ -17,11 +17,17 @@
 //     display/tie-breaking, plus a pass/fail P2 state.
 //
 // ── P2 STATE (§9 flow, §14 pseudocode) ──
-//   BLOCK        — falling knife, or ST5 EXHAUSTED zone (>2.0 ATR). Hard.
-//                  No score, no trigger, no CONV can override this.
-//   WAIT_RETEST  — extended/very-extended zone (0.75-2.0 ATR) without a
-//                  qualifying retest yet. Not a rejection — re-evaluated
-//                  fresh every cycle as price/ST move.
+//   BLOCK        — falling knife. Hard. No score, no trigger, no CONV can
+//                  override this.
+//   WAIT_RETEST  — extended/very-extended/EXHAUSTED zone (>0.75 ATR, incl.
+//                  >2.0 ATR EXHAUSTED as of the 29 Aug 2026 ATR-balance
+//                  tuning) without a qualifying retest yet. Not a
+//                  rejection — re-evaluated fresh every cycle as price/ST
+//                  move, so a genuinely strong cross that starts out
+//                  over-extended gets a real second look once price cools
+//                  off or retests, rather than being discarded outright.
+//                  (Unless the broad-rally exception fires, which still
+//                  buys an EXHAUSTED-zone cross immediately.)
 //   WAIT         — ST alignment unfavorable (BEAR/BULL transition, or
 //                  BULL/BEAR mixed without the stricter-trigger exception).
 //   READY        — passed every ST-timing check. Caller still must confirm
@@ -118,20 +124,26 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
   // few ATR past the band the instant it fires, simply because the flip
   // candle itself was a strong momentum bar — not because the entry drifted
   // stale after the real signal (that drift case is what the frozen-at-cross
-  // snapshot upstream already handles). Applying the same flat 2.0 ATR bar
-  // on those days hard-blocks nearly every cross market-wide, right when
-  // the trend is strongest. Require a CONFIRMED BREAKOUT trigger (not
-  // merely TRIGGERING) plus RISK_ON plus breadth above threshold — three
-  // independent confirmations — before relaxing the hard block; a single
-  // extended cross in an otherwise normal/mixed market still gets blocked.
+  // snapshot upstream already handles). Without this exception those crosses
+  // would all sit in WAIT_RETEST market-wide, right when the trend is
+  // strongest. Require a CONFIRMED BREAKOUT trigger (not merely TRIGGERING)
+  // plus RISK_ON plus breadth above threshold — three independent
+  // confirmations — before buying immediately; a single extended cross in
+  // an otherwise normal/mixed market still has to wait for retest.
   const broadRallyException =
     triggerStatus === 'BREAKOUT' &&
     regime === 'RISK_ON' &&
     breadthScore != null && breadthScore >= EXHAUSTED_OVERRIDE_BREADTH_MIN;
 
-  // Hard block — beyond backtestable "wait for retest", this is simply too
-  // extended to be a reasonable entry regardless of what happens next.
-  // (Unless the broad-rally exception above applies.)
+  // EXHAUSTED — too extended to buy into RIGHT NOW, but not thrown away.
+  // Previously a permanent hard block (the flip candle itself is very
+  // often the strong momentum bar that puts a fresh cross straight into
+  // this zone — see the broad-rally comment above — so treating every
+  // EXHAUSTED cross as dead lost genuine trend entries wholesale on
+  // strongly-trending days). Now the same waitRetest escape hatch as the
+  // softer zones below: caller re-checks against LIVE data on a later
+  // cycle rather than buying immediately OR discarding the event outright.
+  // (Unless the broad-rally exception above applies, which still buys now.)
   if (st5.extensionZone === 'EXHAUSTED') {
     if (broadRallyException) {
       return {
@@ -139,7 +151,7 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
         reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
       };
     }
-    return { blocked: true, waitRetest: false, reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, hard block` };
+    return { blocked: false, waitRetest: true, reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, waiting for retest/cooldown` };
   }
   if (st15.extensionZone === 'EXHAUSTED') {
     if (broadRallyException) {
@@ -148,7 +160,7 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
         reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
       };
     }
-    return { blocked: true, waitRetest: false, reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, hard block` };
+    return { blocked: false, waitRetest: true, reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, waiting for retest/cooldown` };
   }
 
   // Softer zones — a qualifying retest is the escape hatch; without one,
