@@ -158,6 +158,10 @@ const ALPHA_EXCEPTION_ENABLED   = (process.env.GUARD_BTC_ALLOW_ALPHA_EXCEPTION |
 const ALPHA_SCORE_MIN           = parseFloat(process.env.GUARD_BTC_ALPHA_SCORE_MIN        || '8');
 const ALPHA_MIN_WHALE           = parseFloat(process.env.GUARD_BTC_ALPHA_MIN_WHALE        || '70');
 const ALPHA_MIN_VOLUME          = parseFloat(process.env.GUARD_BTC_ALPHA_MIN_VOLUME       || '1.8');
+// Was hardcoded to 7 directly in checkBtcAlphaException's call below —
+// unlike every other core threshold here, it had no env var at all, so
+// no repo Variable could ever move it. Wired the same way as the rest.
+const ALPHA_MIN_BULLCONF        = parseFloat(process.env.GUARD_BTC_ALPHA_MIN_BULLCONF     || '7');
 const ALPHA_REQUIRE_OI_CONFIRM  = (process.env.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM  || 'true') !== 'false';
 const ALPHA_REQUIRE_POSITIVE_CVD= (process.env.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD|| 'true') !== 'false';
 const ALPHA_REQUIRE_EMA_ABOVE   = (process.env.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE   || 'true') !== 'false';
@@ -296,7 +300,7 @@ function evaluateStrengthException(entry, opts) {
 export function checkBtcAlphaException(entry) {
   return evaluateStrengthException(entry, {
     enabled: ALPHA_EXCEPTION_ENABLED,
-    minVolume: ALPHA_MIN_VOLUME, minWhale: ALPHA_MIN_WHALE, minScore: ALPHA_SCORE_MIN, minBullConf: 7,
+    minVolume: ALPHA_MIN_VOLUME, minWhale: ALPHA_MIN_WHALE, minScore: ALPHA_SCORE_MIN, minBullConf: ALPHA_MIN_BULLCONF,
     maxBuyIntelPenalty: MAX_BUYINTEL_PENALTY,
     requireBull4hCount: BTC_ALPHA_REQUIRE_BULL4H_COUNT, bull4hCountMin: BTC_ALPHA_BULL4H_COUNT_MIN,
     requireFlex4hBull: ALPHA_REQUIRE_4H_BULL, requireFlexDailyBull: ALPHA_REQUIRE_DAILY_BULL,
