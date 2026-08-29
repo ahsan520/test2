@@ -215,8 +215,8 @@ jobs:
           ST15_PRIORITY_USD_SIZE:  ${{ vars.ST15_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
           # Rotation-storm controls (dev-team note "ST5 / ST15 Priority Buy
           # & Multi-Alert Rotation") — shared by both ST5 and ST15.
-          ST_EVENT_TTL_MIN:              ${{ vars.ST_EVENT_TTL_MIN || '20' }}
-          ST_MAX_DISTANCE_PCT:           ${{ vars.ST_MAX_DISTANCE_PCT || '3' }}
+          ST_EVENT_TTL_MIN:              ${{ vars.ST_EVENT_TTL_MIN || '15' }}
+          ST_MAX_DISTANCE_PCT:           ${{ vars.ST_MAX_DISTANCE_PCT || '4' }}
           ST_ROTATION_COOLDOWN_MIN:      ${{ vars.ST_ROTATION_COOLDOWN_MIN || '10' }}
           ST_EQUAL_ALLOCATE:             ${{ vars.ST_EQUAL_ALLOCATE || 'true' }}
           ST_FAILED_SELL_QUARANTINE_MIN: ${{ vars.ST_FAILED_SELL_QUARANTINE_MIN || '60' }}
@@ -307,6 +307,21 @@ jobs:
           # artificially inflated, so 1.5 would make this check nearly
           # impossible to trigger and effectively disable it.
           ST_SLOPE_STRONG_MIN: ${{ vars.ST_SLOPE_STRONG_MIN || '0.15' }}
+          # ── ST5/ST15 extension-zone (ATR distance) thresholds
+          # (leaderboard-scanner.js calcSupertrend / st-timing-engine.js
+          # checkExhaustedEntry) — previously orphaned repo Variables, same
+          # bug pattern as ST_SLOPE_STRONG_MIN above: read via process.env
+          # in the code but never passed through this env: block, so any
+          # repo Variable set for these had zero effect and the code
+          # default (VEXT=2.0) was silently used no matter what. VEXT
+          # raised to 3 as the new default — on the 5m timeframe a single
+          # strong flip candle routinely travels 2-3 ATR on its own, so
+          # 2.0 was hard-blocking most fresh crosses in a trending market.
+          # GOOD/EXT left at their prior defaults.
+          ST_ATR_ZONE_GOOD: ${{ vars.ST_ATR_ZONE_GOOD || '0.75' }}
+          ST_ATR_ZONE_EXT:  ${{ vars.ST_ATR_ZONE_EXT || '1.25' }}
+          ST_ATR_ZONE_VEXT: ${{ vars.ST_ATR_ZONE_VEXT || '3' }}
+          BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN: ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
           GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
           GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
