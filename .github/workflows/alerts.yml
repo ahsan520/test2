@@ -321,6 +321,22 @@ jobs:
           ST_ATR_ZONE_GOOD: ${{ vars.ST_ATR_ZONE_GOOD || '0.75' }}
           ST_ATR_ZONE_EXT:  ${{ vars.ST_ATR_ZONE_EXT || '1.25' }}
           ST_ATR_ZONE_VEXT: ${{ vars.ST_ATR_ZONE_VEXT || '3' }}
+          # ── P2-A / P2-B / P2-C continuation-trigger classification
+          # (st-timing-engine.js classifyP2Trigger / leaderboard-scanner.js
+          # calcSupertrend consolidation field) — per the "P2 Continuation
+          # Strategy" dev doc (30 Aug 2026). Wired here from day one so
+          # these never become orphaned repo Variables like ST_SLOPE_STRONG_MIN
+          # and ST_ATR_ZONE_* were. This is a LABELING layer on top of the
+          # existing READY gate — it does not change whether a buy happens,
+          # only how it's classified/logged, so these are safe to leave at
+          # default (all effectively enabled) without changing buy behavior.
+          P2_CONTINUATION_ENABLED: ${{ vars.P2_CONTINUATION_ENABLED || 'true' }}
+          P2A_PULLBACK_ENABLED:    ${{ vars.P2A_PULLBACK_ENABLED || 'true' }}
+          P2A_REQUIRE_ST5_BULL:    ${{ vars.P2A_REQUIRE_ST5_BULL || 'true' }}
+          P2A_REQUIRE_ST15_BULL:   ${{ vars.P2A_REQUIRE_ST15_BULL || 'true' }}
+          P2B_BREAKOUT_ENABLED:    ${{ vars.P2B_BREAKOUT_ENABLED || 'true' }}
+          P2B_RANGE_LOOKBACK:      ${{ vars.P2B_RANGE_LOOKBACK || '4' }}
+          P2B_CONSOLIDATION_ATR_MAX: ${{ vars.P2B_CONSOLIDATION_ATR_MAX || '1.0' }}
           BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN: ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
           GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
