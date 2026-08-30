@@ -217,6 +217,78 @@ export function calcTimingScore({ st5, st15, alignment, fallingKnife, exhausted 
   return Math.max(0, Math.round(score));
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// P2-A / P2-B / P2-C — CONTINUATION TRIGGER CLASSIFICATION
+//
+// Implements the "P2 Continuation Strategy" dev-team doc's P2-A/P2-B/P2-C
+// split. This is a LABELING pass only, run once evaluateSTTiming below has
+// already independently reached READY — it never bypasses alignment,
+// exhaustion, or falling-knife (per the doc: "P2-A and P2-B are entry
+// triggers, not permission to bypass risk controls"). Priority on a tie is
+// P2-A > P2-B > P2-C, matching the doc's router (§6).
+//
+// P2-A — pullback + ST5 reclaim (XRP-style second leg). The doc's literal
+// pseudocode ("prevClose <= prevST5 && close > ST5") can't actually occur
+// in this repo's Supertrend: with sticky bands (leaderboard-scanner.js
+// calcSupertrend), a close at/below the ST5 line while direction stays BULL
+// is structurally impossible without direction flipping to BEAR first —
+// which would make it a fresh cross (P0 territory), not a continuation.
+// calcSupertrend's own `retest` field already encodes the doc's intent —
+// "pushed into EXTENDED-or-worse, closed back near ST5, turning back up,
+// direction never flipped" — so P2-A reuses it directly rather than
+// re-deriving the same pattern twice.
+// P2-B — consolidation breakout (UNI-style second leg). Reuses
+// calcSupertrend's `consolidation` field.
+// P2-C — normal/fallback P2 path — unchanged behavior for anything that
+// reaches READY without qualifying for P2-A or P2-B.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const P2_CONTINUATION_ENABLED = (process.env.P2_CONTINUATION_ENABLED ?? 'true') !== 'false';
+const P2A_PULLBACK_ENABLED    = (process.env.P2A_PULLBACK_ENABLED ?? 'true') !== 'false';
+const P2A_REQUIRE_ST5_BULL    = (process.env.P2A_REQUIRE_ST5_BULL ?? 'true') !== 'false';
+const P2A_REQUIRE_ST15_BULL   = (process.env.P2A_REQUIRE_ST15_BULL ?? 'true') !== 'false';
+const P2B_BREAKOUT_ENABLED    = (process.env.P2B_BREAKOUT_ENABLED ?? 'true') !== 'false';
+
+export function classifyP2Trigger({ st5, st15 }) {
+  if (!P2_CONTINUATION_ENABLED) return { p2Trigger: 'P2-C-NORMAL', eventKey: null };
+
+  const st5Bull  = st5.direction  === 'BULL';
+  const st15Bull = st15.direction === 'BULL';
+
+  // P2-A — pullback/reclaim. Condition 6 from the doc ("ST5 slope
+  // non-negative/improving") kept explicit here even though `retest`
+  // already implicitly requires price to be turning back up.
+  if (
+    P2A_PULLBACK_ENABLED &&
+    (!P2A_REQUIRE_ST5_BULL  || st5Bull) &&
+    (!P2A_REQUIRE_ST15_BULL || st15Bull) &&
+    st5.retest === true &&
+    (st5.slope == null || st5.slope >= 0)
+  ) {
+    return { p2Trigger: 'P2-A-PULLBACK-RECLAIM', eventKey: `P2A:${st5.lastClosedCandle}` };
+  }
+
+  // P2-B — consolidation breakout. Requires both ST5/ST15 BULL per the
+  // doc's own conditions 1-2 (not configurable per-leg like P2-A, since the
+  // doc doesn't offer that knob for P2-B).
+  if (
+    P2B_BREAKOUT_ENABLED &&
+    st5Bull && st15Bull &&
+    st5.consolidation?.breakout === true
+  ) {
+    // Event key includes the range high so a later cycle's DIFFERENT range
+    // (once the old breakout bar ages out of the lookback) is treated as a
+    // distinct event, while the SAME breakout bar/range re-evaluated next
+    // cycle collapses to the same key (dedupe hook for callers).
+    return {
+      p2Trigger: 'P2-B-CONSOLIDATION-BREAKOUT',
+      eventKey: `P2B:${st5.consolidation.rangeHigh}:${st5.lastClosedCandle}`,
+    };
+  }
+
+  return { p2Trigger: 'P2-C-NORMAL', eventKey: null };
+}
+
 // Main entry point — mirrors §14's pseudocode shape.
 export function evaluateSTTiming(entry) {
   const st5  = entry.supertrend5m;
@@ -246,5 +318,11 @@ export function evaluateSTTiming(entry) {
     return { p2State: 'WAIT', timingScore, reason: alignment.reason, alignment };
   }
 
-  return { p2State: 'READY', timingScore, reason: alignment.reason, alignment, st5Dir: st5.direction, st15Dir: st15.direction };
+  const trigger = classifyP2Trigger({ st5, st15 });
+  return {
+    p2State: 'READY', timingScore, reason: alignment.reason, alignment,
+    st5Dir: st5.direction, st15Dir: st15.direction,
+    p2Trigger: trigger.p2Trigger,     // 'P2-A-PULLBACK-RECLAIM' | 'P2-B-CONSOLIDATION-BREAKOUT' | 'P2-C-NORMAL'
+    p2EventKey: trigger.eventKey,     // dedupe hook, null for P2-C
+  };
 }

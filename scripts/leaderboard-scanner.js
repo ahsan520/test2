@@ -598,6 +598,40 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
     retest = pushedExtended && closes[last] >= closes[last - 1];
   }
 
+  // consolidation — P2-B (Consolidation Breakout) support, per the
+  // "P2 Continuation Strategy" dev doc §4-5 (UNI-style second leg): was a
+  // tight sideways range formed over the last P2B_RANGE_LOOKBACK CLOSED
+  // bars, and did THIS closed candle break above that range's high? The
+  // range window explicitly EXCLUDES the current bar (`last`) — per the
+  // doc's guardrail table ("exclude the current candle from the level
+  // calculation") — so recomputing this every cycle can never let a rolling
+  // level treat every candle above it as a fresh breakout; the range itself
+  // only shifts once the breakout bar itself ages out of the lookback on a
+  // later cycle. `breakout` is decided on CLOSE, not high/low, so a
+  // wick-only poke above the range never qualifies (doc §5: "wick-only
+  // breaks do not qualify"). Only meaningful in a BULL regime — left null
+  // otherwise, same graceful-degradation pattern as `retest` above.
+  const P2B_RANGE_LOOKBACK = parseInt(process.env.P2B_RANGE_LOOKBACK || '4', 10);
+  const P2B_WIDTH_ATR_MAX  = parseFloat(process.env.P2B_CONSOLIDATION_ATR_MAX || '1.0');
+  let consolidation = null;
+  if (dir[last] === 'BULL' && atrVal > 0) {
+    const rangeFrom = last - P2B_RANGE_LOOKBACK; // excludes current candle
+    if (rangeFrom >= period - 1) {
+      const rangeHigh = Math.max(...highs.slice(rangeFrom, last));
+      const rangeLow  = Math.min(...lows.slice(rangeFrom, last));
+      const widthATR  = parseFloat(((rangeHigh - rangeLow) / atrVal).toFixed(3));
+      const detected  = widthATR <= P2B_WIDTH_ATR_MAX;
+      const breakout  = detected && closes[last] > rangeHigh;
+      consolidation = {
+        detected, breakout,
+        bars:      P2B_RANGE_LOOKBACK,
+        rangeHigh: parseFloat(rangeHigh.toFixed(8)),
+        rangeLow:  parseFloat(rangeLow.toFixed(8)),
+        widthATR,
+      };
+    }
+  }
+
   return {
     period, multiplier,
     value:              parseFloat(stVal.toFixed(8)),
@@ -616,6 +650,7 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
     slopeStrength,      // 'WEAK' | 'NORMAL' | 'STRONG' | null
     candleImpulseATR,
     retest,
+    consolidation,      // { detected, breakout, bars, rangeHigh, rangeLow, widthATR } | null — P2-B support
   };
 }
 

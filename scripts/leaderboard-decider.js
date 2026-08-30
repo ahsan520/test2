@@ -965,6 +965,18 @@ async function main() {
         }
         // timing.p2State === 'READY'
         console.log(`  ✅  ${pair} — ST timing READY (score ${timing.timingScore}/95, ${timing.alignment?.alignment}) — ${timing.reason}`);
+        // ── P2-A/P2-B/P2-C trigger classification ──
+        // Per the "P2 Continuation Strategy" dev doc §8/§10: log the exact
+        // reason and carry it on `entry` so it survives to the position
+        // record below when this candidate actually gets bought. This is a
+        // label on top of READY, not an additional gate — a READY P2-C
+        // candidate buys exactly as it did before this change.
+        entry.p2Trigger = timing.p2Trigger;
+        entry.p2EventKey = timing.p2EventKey;
+        if (timing.p2Trigger !== 'P2-C-NORMAL') {
+          console.log(`  🔁  ${pair} — ${timing.p2Trigger}`);
+        }
+        logAudit('p2_trigger_classified', { pair, p2Trigger: timing.p2Trigger, p2EventKey: timing.p2EventKey });
       }
     }
 
@@ -1085,11 +1097,16 @@ async function main() {
       status:         'watching',
       source:         'headless_v11.0',
       scoreSource:    evald.source,
+      // P2-A-PULLBACK-RECLAIM | P2-B-CONSOLIDATION-BREAKOUT | P2-C-NORMAL —
+      // absent (isCapBuy / entryState-RETEST-exception / SCOUT paths never
+      // run the ST timing engine, so never set this) means "not classified",
+      // distinct from an explicit P2-C.
+      p2Trigger:      entry.p2Trigger || undefined,
     };
 
     buyAlerts.push({ pair, sym, levels, evald, price: entry.price, chg: entry.chg, d: entry.d, entry });
-    console.log(`  🟢  ${pair} [${evald.setup.label}] score:${evald.conv} → ${sym}`);
-    logAudit('position_opened', { pair, sym, setup: evald.setup.label, score: evald.conv });
+    console.log(`  🟢  ${pair} [${evald.setup.label}]${entry.p2Trigger && entry.p2Trigger !== 'P2-C-NORMAL' ? ` [${entry.p2Trigger}]` : ''} score:${evald.conv} → ${sym}`);
+    logAudit('position_opened', { pair, sym, setup: evald.setup.label, score: evald.conv, p2Trigger: entry.p2Trigger || null });
   }
 
   // ── Rank by CURRENT signal first, past spike history as a bonus only ──
