@@ -611,8 +611,8 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
   // wick-only poke above the range never qualifies (doc §5: "wick-only
   // breaks do not qualify"). Only meaningful in a BULL regime — left null
   // otherwise, same graceful-degradation pattern as `retest` above.
-  const P2B_RANGE_LOOKBACK = parseInt(process.env.P2B_RANGE_LOOKBACK || '4', 10);
-  const P2B_WIDTH_ATR_MAX  = parseFloat(process.env.P2B_CONSOLIDATION_ATR_MAX || '1.0');
+  const P2B_RANGE_LOOKBACK = parseInt(process.env.P2B_RANGE_LOOKBACK || '5', 10);
+  const P2B_WIDTH_ATR_MAX  = parseFloat(process.env.P2B_CONSOLIDATION_ATR_MAX || '1.5');
   let consolidation = null;
   if (dir[last] === 'BULL' && atrVal > 0) {
     const rangeFrom = last - P2B_RANGE_LOOKBACK; // excludes current candle
