@@ -194,32 +194,6 @@ jobs:
           EXEC_MIN_GRADE:     ${{ vars.EXEC_MIN_GRADE || 'A' }}
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
           ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
-          # Higher bar specifically for rotating OUT of a position that
-          # itself came from an ST5/ST15 priority buy — lets a real move
-          # run toward T1/T2 instead of getting harvested by the next
-          # priority cross the instant it clears the normal 0.2% floor
-          # (trade-log review: rotation exits were averaging only +0.65%,
-          # barely above that floor, while stop-hit losses ran the full
-          # -1.36% every time). Applies in both mexc-trader.js's ST5/ST15
-          # rotation-sell guards AND normal executeRotation, so an
-          # ST5/ST15-origin holding gets the same treatment either way.
-          ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT: ${{ vars.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '1' }}
-          # ── ST5 (5m) / ST15 (15m) Supertrend Priority Execution ──
-          # Detection/execution enable switches and priority buy size —
-          # these already default to 'true'/$TRADE_USD_SIZE at the JS
-          # level even unset, so this wiring exists to make them
-          # overridable via GitHub Variables, not to turn anything on.
-          ST5_ENABLE:              ${{ vars.ST5_ENABLE || 'true' }}
-          ST5_PRIORITY_USD_SIZE:   ${{ vars.ST5_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
-          ST15_ENABLE:             ${{ vars.ST15_ENABLE || 'true' }}
-          ST15_PRIORITY_USD_SIZE:  ${{ vars.ST15_PRIORITY_USD_SIZE || vars.TRADE_USD_SIZE || '25' }}
-          # Rotation-storm controls (dev-team note "ST5 / ST15 Priority Buy
-          # & Multi-Alert Rotation") — shared by both ST5 and ST15.
-          ST_EVENT_TTL_MIN:              ${{ vars.ST_EVENT_TTL_MIN || '15' }}
-          ST_MAX_DISTANCE_PCT:           ${{ vars.ST_MAX_DISTANCE_PCT || '4' }}
-          ST_ROTATION_COOLDOWN_MIN:      ${{ vars.ST_ROTATION_COOLDOWN_MIN || '10' }}
-          ST_EQUAL_ALLOCATE:             ${{ vars.ST_EQUAL_ALLOCATE || 'true' }}
-          ST_FAILED_SELL_QUARANTINE_MIN: ${{ vars.ST_FAILED_SELL_QUARANTINE_MIN || '60' }}
           STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
           T1_ATR_MULT:        ${{ vars.T1_ATR_MULT || '0.5' }}
           T2_ATR_MULT:        ${{ vars.T2_ATR_MULT || '2' }}
@@ -238,9 +212,9 @@ jobs:
           BUY_CHASE_WARN_STREAK:           ${{ vars.BUY_CHASE_WARN_STREAK || '2' }}
           BUY_CHASE_BLOCK_STREAK:          ${{ vars.BUY_CHASE_BLOCK_STREAK || '3' }}
           BUY_ENABLE_RSI_EXTENSION_CHECK:  ${{ vars.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true' }}
-          BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '75' }}
-          BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '82' }}
-          BUY_RSI_1H_HOT:                  ${{ vars.BUY_RSI_1H_HOT || '72' }}
+          BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '70' }}
+          BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '78' }}
+          BUY_RSI_1H_HOT:                  ${{ vars.BUY_RSI_1H_HOT || '68' }}
           # Signal-quality/data-confidence floor — catches thin, low-conf
           # setups (e.g. IMX: bullConf 1/10, whale 35/100, still BUILDING)
           # that aren't chasing or RSI-extended, just genuinely weak.
@@ -269,6 +243,19 @@ jobs:
           BUY_TOD_PENALTY:                    ${{ vars.BUY_TOD_PENALTY || '1' }}
           BUY_QUALITY_OFFHOURS_MIN_BULLCONF:  ${{ vars.BUY_QUALITY_OFFHOURS_MIN_BULLCONF || '5' }}
           BUY_QUALITY_OFFHOURS_MIN_WHALE:     ${{ vars.BUY_QUALITY_OFFHOURS_MIN_WHALE || '60' }}
+          # ── Short-timeframe spike trigger (calcSpikeTrigger, buy-intelligence.js)
+          # Previously entirely unwired — ran on hardcoded defaults regardless
+          # of any repo Variable set here. TRIGGER_NEAR_PCT raised from the
+          # 0.5 default to 0.6 on 2026-09-01: APTUSDT and ZECUSDT were both
+          # observed missing the 0.5% "approaching" window by under 0.06pp
+          # (0.55% and 0.53% respectively), sitting stuck in SETUP despite
+          # daily moves of 3-4%+.
+          BUY_ENABLE_SPIKE_TRIGGER:        ${{ vars.BUY_ENABLE_SPIKE_TRIGGER || 'true' }}
+          BUY_TRIGGER_LOOKBACK_15M:        ${{ vars.BUY_TRIGGER_LOOKBACK_15M || '12' }}
+          BUY_TRIGGER_BREAKOUT_BUFFER_PCT: ${{ vars.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15' }}
+          BUY_TRIGGER_NEAR_PCT:            ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.6' }}
+          BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
+          BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.3' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
@@ -296,54 +283,9 @@ jobs:
           GUARD_STOP_OVERRIDE_MAX_LOSS_PCT: ${{ vars.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5' }}
           # ── Phase 2: Smart BTC Gate (Alpha Exception) ──
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
-          # ── ST5/ST15 Timing Engine slope threshold (st-timing-engine.js /
-          # leaderboard-scanner.js) — previously an orphaned repo Variable
-          # (set to 1.5, never wired into env: so it had zero effect; the
-          # falling-knife slope gate was silently using the code default of
-          # 0.15 the whole time). Wiring it here at that SAME 0.15 default —
-          # do NOT bump the repo Variable back up to 1.5 now that this is
-          # live, since leaderboard-scanner.js's band-switch slope bug is
-          # already fixed at the source: real slope values are no longer
-          # artificially inflated, so 1.5 would make this check nearly
-          # impossible to trigger and effectively disable it.
-          ST_SLOPE_STRONG_MIN: ${{ vars.ST_SLOPE_STRONG_MIN || '0.15' }}
-          # ── ST5/ST15 extension-zone (ATR distance) thresholds
-          # (leaderboard-scanner.js calcSupertrend / st-timing-engine.js
-          # checkExhaustedEntry) — previously orphaned repo Variables, same
-          # bug pattern as ST_SLOPE_STRONG_MIN above: read via process.env
-          # in the code but never passed through this env: block, so any
-          # repo Variable set for these had zero effect and the code
-          # default (VEXT=2.0) was silently used no matter what. VEXT
-          # raised to 3 as the new default — on the 5m timeframe a single
-          # strong flip candle routinely travels 2-3 ATR on its own, so
-          # 2.0 was hard-blocking most fresh crosses in a trending market.
-          # GOOD/EXT left at their prior defaults.
-          ST_ATR_ZONE_GOOD: ${{ vars.ST_ATR_ZONE_GOOD || '0.75' }}
-          ST_ATR_ZONE_EXT:  ${{ vars.ST_ATR_ZONE_EXT || '1.25' }}
-          ST_ATR_ZONE_VEXT: ${{ vars.ST_ATR_ZONE_VEXT || '3' }}
-          # ── P2-A / P2-B / P2-C continuation-trigger classification
-          # (st-timing-engine.js classifyP2Trigger / leaderboard-scanner.js
-          # calcSupertrend consolidation field) — per the "P2 Continuation
-          # Strategy" dev doc (30 Aug 2026). Wired here from day one so
-          # these never become orphaned repo Variables like ST_SLOPE_STRONG_MIN
-          # and ST_ATR_ZONE_* were. This is a LABELING layer on top of the
-          # existing READY gate — it does not change whether a buy happens,
-          # only how it's classified/logged, so these are safe to leave at
-          # default (all effectively enabled) without changing buy behavior.
-          P2_CONTINUATION_ENABLED: ${{ vars.P2_CONTINUATION_ENABLED || 'true' }}
-          P2A_PULLBACK_ENABLED:    ${{ vars.P2A_PULLBACK_ENABLED || 'true' }}
-          P2A_REQUIRE_ST5_BULL:    ${{ vars.P2A_REQUIRE_ST5_BULL || 'true' }}
-          P2A_REQUIRE_ST15_BULL:   ${{ vars.P2A_REQUIRE_ST15_BULL || 'true' }}
-          P2B_BREAKOUT_ENABLED:    ${{ vars.P2B_BREAKOUT_ENABLED || 'true' }}
-          P2B_RANGE_LOOKBACK:      ${{ vars.P2B_RANGE_LOOKBACK || '5' }}
-          P2B_CONSOLIDATION_ATR_MAX: ${{ vars.P2B_CONSOLIDATION_ATR_MAX || '1.5' }}
-          BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN: ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
-          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
+          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.15' }}
-          # Previously hardcoded to 7 in market-guard.js with no env var —
-          # now tunable like every other Alpha Exception threshold.
-          GUARD_BTC_ALPHA_MIN_BULLCONF: ${{ vars.GUARD_BTC_ALPHA_MIN_BULLCONF || '5' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
@@ -360,17 +302,7 @@ jobs:
           BUY_DYNAMIC_BULL4H:           ${{ vars.BUY_DYNAMIC_BULL4H || 'true' }}
           BUY_REQUIRE_BREADTH:          ${{ vars.BUY_REQUIRE_BREADTH || 'true' }}
           BUY_MIN_BREADTH:              ${{ vars.BUY_MIN_BREADTH || '60' }}
-          BUY_BREADTH_ALPHA_SCORE_MIN: ${{ vars.BUY_BREADTH_ALPHA_SCORE_MIN || '7' }}
           BUY_REQUIRE_RELATIVE_STRENGTH: ${{ vars.BUY_REQUIRE_RELATIVE_STRENGTH || 'true' }}
-          # ── Entry Quality Check — trigger-age (entry-quality-check.js) ──
-          # Was previously unwired — script always fell back to the
-          # hardcoded default (25 min), which penalized sustained-trend
-          # RETESTs purely for elapsed time. Now structural (see the
-          # comment in entry-quality-check.js): age only blocks once ST5
-          # trend direction/exhaustion has actually degraded.
-          EQ_TRIGGER_STALE_ENABLE:      ${{ vars.EQ_TRIGGER_STALE_ENABLE || 'true' }}
-          EQ_TRIGGER_STALE_MAX_MIN:    ${{ vars.EQ_TRIGGER_STALE_MAX_MIN || '25' }}
-          EQ_TRIGGER_STALE_ABS_MAX_MIN: ${{ vars.EQ_TRIGGER_STALE_ABS_MAX_MIN || '720' }}
           # ── v15 Position Intelligence Engine (position-intelligence.js) ──
           SELL_ENABLE_INTELLIGENCE:    ${{ vars.SELL_ENABLE_INTELLIGENCE || 'true' }}
           SELL_FALLING_KNIFE_MAX:      ${{ vars.SELL_FALLING_KNIFE_MAX || '70' }}
@@ -394,9 +326,9 @@ jobs:
           SELL_PROFIT_RSI_EXTENDED:        ${{ vars.SELL_PROFIT_RSI_EXTENDED || '70' }}
           SELL_PROFIT_RSI_ROLLOVER_DROP:   ${{ vars.SELL_PROFIT_RSI_ROLLOVER_DROP || '5' }}
           SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '0.4' }}
-          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.35' }}
+          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.2' }}
           SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '0.6' }}
-          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '0.4' }}
+          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '0.3' }}
           SELL_PROFIT_TIER_A_PEAK:         ${{ vars.SELL_PROFIT_TIER_A_PEAK || '1.0' }}
           SELL_PROFIT_TIER_A_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_A_GIVEBACK || '0.5' }}
           SELL_PROFIT_TIER_APLUS_PEAK:     ${{ vars.SELL_PROFIT_TIER_APLUS_PEAK || '1.5' }}
@@ -410,7 +342,6 @@ jobs:
           TRADE_MODE:         ${{ vars.TRADE_MODE || 'paper' }}
           TRADE_USD_SIZE:     ${{ vars.TRADE_USD_SIZE || '25' }}
           TRADE_MAX_CONCURRENT_LIVE: ${{ vars.TRADE_MAX_CONCURRENT_LIVE || '3' }}
-          MEXC_MIN_SELL_NOTIONAL_USDT: ${{ vars.MEXC_MIN_SELL_NOTIONAL_USDT || '5' }}
           TRADE_SIZE_MODE:    ${{ vars.TRADE_SIZE_MODE || 'percent' }}
           TRADE_SIZE_PCT:     ${{ vars.TRADE_SIZE_PCT || '100' }}
           PAPER_STARTING_BALANCE: ${{ vars.PAPER_STARTING_BALANCE || '1000' }}
@@ -419,7 +350,6 @@ jobs:
           AV_API_KEY:         ${{ secrets.AV_API_KEY }}
           AV_API_KEY_NEWS:    ${{ secrets.AV_API_KEY_NEWS }}
           GNEWS_API_KEY:      ${{ secrets.GNEWS_API_KEY }}
-          FINNHUB_API_KEY:    ${{ secrets.FINNHUB_API_KEY }}
           RUN_MODE:           ${{ steps.mode.outputs.value }}
         run: |
           echo "Running in mode: $RUN_MODE"
@@ -430,7 +360,6 @@ jobs:
           echo "AV_API_KEY: $([ -n "$AV_API_KEY" ] && echo '✓ set' || echo '✗ MISSING')"
           echo "AV_API_KEY_NEWS: $([ -n "$AV_API_KEY_NEWS" ] && echo '✓ set' || echo '✗ MISSING')"
           echo "GNEWS_API_KEY: $([ -n "$GNEWS_API_KEY" ] && echo '✓ set' || echo '✗ MISSING')"
-          echo "FINNHUB_API_KEY: $([ -n "$FINNHUB_API_KEY" ] && echo '✓ set (market-wide mode)' || echo '✗ MISSING (analyst-picks-fetcher will fall back to Yahoo, watchlist-only)')"
           DRY_FLAG=""
           if [ "$DRY_RUN" = "true" ]; then
             echo "🔍 DRY RUN — no Telegram messages will be sent"
@@ -442,7 +371,6 @@ jobs:
               node market-fetcher.js
               node sentiment-fetcher.js
               node general-news-fetcher.js
-              node analyst-picks-fetcher.js
               ;;
             decide)
               # Fetch fresh market data FIRST, immediately before deciding —
@@ -496,8 +424,7 @@ jobs:
           FILES="env.js market-data.json market-state.json audit.json .alert-state.json \
                  .lb-scan-state.json lb-alert-state.json trade-state.json \
                  .cvd-decline-state.json symbol-history.json \
-                 sentiment-data.json general-news-data.json paper-balance.json \
-                 analyst-picks-data.json"
+                 sentiment-data.json general-news-data.json paper-balance.json"
           for f in $FILES; do
             [ -f "scripts/$f" ] && cp "scripts/$f" "/tmp/alpha-state/$f" || true
           done
@@ -529,7 +456,6 @@ jobs:
           git add scripts/sentiment-data.json       || true
           git add scripts/general-news-data.json    || true
           git add scripts/paper-balance.json        || true
-          git add scripts/analyst-picks-data.json    || true
 
           # STEP 6 — Safety check: verify env.js has no real tokens
           if git diff --cached -- scripts/env.js | grep -E "ghp_|ghs_|bot[0-9]+:" > /dev/null 2>&1; then
@@ -555,7 +481,7 @@ jobs:
                       scripts/.alert-state.json scripts/.lb-scan-state.json \
                       scripts/lb-alert-state.json scripts/trade-state.json \
                       scripts/.cvd-decline-state.json scripts/symbol-history.json \
-                      scripts/paper-balance.json scripts/analyst-picks-data.json 2>/dev/null || true
+                      scripts/paper-balance.json 2>/dev/null || true
               git diff --cached --quiet || git commit -m "chore: update alert state (retry) [skip ci]"
               git push origin main
             }
