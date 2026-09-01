@@ -6738,11 +6738,11 @@
     "monitored": 4
   },
   {
-    "timestamp": "2026-09-01T15:51:10.780Z",
+    "timestamp": "2026-09-01T15:51:10.771Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 36,
-    "successCount": 35,
+    "successCount": 36,
     "cryptoCount": 20,
     "stockScored": 16,
     "stockFrozen": 0,
@@ -6750,7 +6750,7 @@
       {
         "pair": "AAVEUSDT",
         "status": "ok",
-        "conv": 3,
+        "conv": 6,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -6764,7 +6764,7 @@
       {
         "pair": "AVAXUSDT",
         "status": "ok",
-        "conv": 5,
+        "conv": 4,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -6778,14 +6778,14 @@
       {
         "pair": "DOGEUSDT",
         "status": "ok",
-        "conv": 0,
+        "conv": 1,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "ETHUSDT",
         "status": "ok",
-        "conv": 0,
+        "conv": -3,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -6889,8 +6889,10 @@
       },
       {
         "pair": "AGCC.TO",
-        "status": "failed",
+        "status": "ok",
+        "conv": -5,
         "session": "open",
+        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
@@ -7014,5 +7016,127 @@
         "assetType": "stock"
       }
     ]
+  },
+  {
+    "timestamp": "2026-09-01T15:51:10.836Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-09-01T15:51:12.767Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 4
+  },
+  {
+    "timestamp": "2026-09-01T15:51:12.769Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 4,
+    "openAfter": 4,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.555Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "free": 0.25,
+    "estNotional": 0.18335
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.557Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:DOGEUSDT",
+    "base": "DOGE",
+    "free": 0.05,
+    "estNotional": 0.0041455
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.560Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.005717,
+    "estNotional": 0.0078968921
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.562Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.001,
+    "estNotional": 0.2265
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.564Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XLMUSDT",
+    "base": "XLM",
+    "free": 0.03,
+    "estNotional": 0.0053609999999999994
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.567Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "XMRUSDT",
+    "id": "ST5-XMR-20260901T153500Z",
+    "reason": "ST5 distance 2.603 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.573Z",
+    "job": "leaderboard-decider",
+    "action": "market_guard",
+    "canBuy": false,
+    "closeAll": false,
+    "sizeMult": 1,
+    "reasons": [
+      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
+    ]
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.578Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "GALAUSDT",
+    "blockers": [
+      "TRIGGER_STALE",
+      "BTC_BLOCK"
+    ]
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.615Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0
+  },
+  {
+    "timestamp": "2026-09-01T15:51:13.617Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-09-01T15:51:16.126Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 4,
+    "monitored": 4
   }
 ]
