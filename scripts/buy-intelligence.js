@@ -308,6 +308,14 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
     triggerStatus = 'BREAKOUT';
   } else if (breakoutConfirmed) {
     triggerStatus = 'TRIGGERING'; // reclaimed the level but missing volume/CVD/BTC confirmation
+  } else if (currentPrice >= breakoutLevel) {
+    // Price has already crossed the raw level but hasn't cleared the
+    // TRIGGER_BREAKOUT_BUFFER yet — pctToLevel goes negative/zero here, so
+    // the "approaching from below" branch below never catches this case on
+    // its own and it was silently falling through to SETUP even though
+    // it's arguably closer to triggering than the near-from-below case is.
+    triggerStatus = 'TRIGGERING';
+    reasons.push(`price ${currentPrice} already at/above level ${breakoutLevel} — inside confirmation buffer, not yet cleared`);
   } else if (pctToLevel > 0 && pctToLevel <= TRIGGER_NEAR_PCT) {
     triggerStatus = 'TRIGGERING'; // close enough that a trigger is imminent
     reasons.push(`${pctToLevel.toFixed(2)}% below breakout level — approaching`);
