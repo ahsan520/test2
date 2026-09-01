@@ -556,7 +556,9 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
       // cycle to retry (on failure).
       const isUnsoldLive = pos.liveOrder?.mode === 'live' && !pos.liveOrder?.closedAt;
       if (isUnsoldLive) {
-        const mKey  = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+        const mKey  = pos.assetType === 'crypto'
+          ? (sym.includes(':') ? sym.split(':').slice(1).join(':') : sym)
+          : sym;
         const mData = marketSymbols[mKey];
         const price = mData?.d ? parseFloat(mData.d.p || 0) : 0;
         if (price) pos.exitPrice = price;
@@ -608,8 +610,15 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     }
 
     // ── 3. Look up live market data for this position ──
-    // positions.json uses BINANCE:BTCUSDT — market-data.json uses BTCUSDT
-    const mKey  = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+    // market-fetcher.js keys market-data.json differently per asset type:
+    //   crypto  → BINANCE: prefix stripped at load time, key is bare "BTCUSDT"
+    //   stocks  → full exchange-prefixed symbol kept as-is, key is "NASDAQ:AAPL"
+    // positions.json always stores the full prefixed symbol (sym), so we must
+    // only strip the prefix for crypto — stripping it for stocks looks up a
+    // key ("AAPL") that never existed in market-data.json.
+    const mKey  = pos.assetType === 'crypto'
+      ? (sym.includes(':') ? sym.split(':').slice(1).join(':') : sym)
+      : sym;
     const mData = marketSymbols[mKey];
     if (!mData || !mData.d) {
       console.log(`  ⚠  ${pos.base} — no market data found (key: ${mKey})`);
@@ -837,7 +846,9 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     // hold the position and let it run to T2 — no fees, no spread, no re-entry cost.
     // Only sell if the signal has faded, meaning holding is no longer justified.
     if (isBull && t1 > 0 && price >= t1 && pos.status === 'watching') {
-      const mKey   = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+      const mKey   = pos.assetType === 'crypto'
+        ? (sym.includes(':') ? sym.split(':').slice(1).join(':') : sym)
+        : sym;
       const live   = marketSymbols[mKey];
       const liveD  = live?.d || {};
       const liveConv    = calcConviction(liveD);
