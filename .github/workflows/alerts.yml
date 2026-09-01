@@ -256,6 +256,19 @@ jobs:
           BUY_TRIGGER_NEAR_PCT:            ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.6' }}
           BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
           BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.3' }}
+          # Momentum continuation — loosened fallback TRIGGERING path (see
+          # buy-intelligence.js calcSpikeTrigger): 3+ consecutive rising 5m
+          # closes fires a TRIGGERING even without a level reclaim. Sized
+          # down via BUY_MOMENTUM_SIZE_PCT (mexc-trader.js) since it's a
+          # looser bar than the level-based/scout paths — relies on the
+          # existing downstream gates (buy intelligence penalties, sell/
+          # profit intelligence, stop loss) to catch a bad entry rather than
+          # gating hard on entry alone.
+          BUY_MOMENTUM_ENABLE:          ${{ vars.BUY_MOMENTUM_ENABLE || 'true' }}
+          BUY_MOMENTUM_STREAK_MIN:      ${{ vars.BUY_MOMENTUM_STREAK_MIN || '3' }}
+          BUY_MOMENTUM_REQUIRE_CVD_UP:  ${{ vars.BUY_MOMENTUM_REQUIRE_CVD_UP || 'true' }}
+          BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR: ${{ vars.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR || 'true' }}
+          BUY_MOMENTUM_SIZE_PCT:        ${{ vars.BUY_MOMENTUM_SIZE_PCT || '50' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
