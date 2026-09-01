@@ -268,6 +268,13 @@ jobs:
           BUY_MOMENTUM_STREAK_MIN:      ${{ vars.BUY_MOMENTUM_STREAK_MIN || '3' }}
           BUY_MOMENTUM_REQUIRE_CVD_UP:  ${{ vars.BUY_MOMENTUM_REQUIRE_CVD_UP || 'true' }}
           BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR: ${{ vars.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR || 'true' }}
+          # Broad-rally EXHAUSTED override (st-timing-engine.js checkExhaustedEntry)
+          # — previously entirely unwired despite being read via num(), so it
+          # ran on the hardcoded 85 default no matter what was set in the
+          # GitHub UI. Governs BOTH the original BREAKOUT path and the new
+          # momentum-continuation TRIGGERING path below.
+          BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN:    ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
+          BUY_MOMENTUM_ALLOW_EXHAUSTED_OVERRIDE: ${{ vars.BUY_MOMENTUM_ALLOW_EXHAUSTED_OVERRIDE || 'true' }}
           BUY_MOMENTUM_SIZE_PCT:        ${{ vars.BUY_MOMENTUM_SIZE_PCT || '50' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
@@ -296,9 +303,9 @@ jobs:
           GUARD_STOP_OVERRIDE_MAX_LOSS_PCT: ${{ vars.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5' }}
           # ── Phase 2: Smart BTC Gate (Alpha Exception) ──
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
-          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
+          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
           GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
