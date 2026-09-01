@@ -111,13 +111,17 @@ export function checkFallingKnife(entry, st5, st15) {
 // hard by default, and only relaxes given multiple independent confirming
 // signals at once, not just one.
 const EXHAUSTED_OVERRIDE_BREADTH_MIN = num('BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN', '85');
+// Separate toggle for extending the exception to momentum-continuation
+// TRIGGERING entries (see below) — lets this be turned off independently
+// of the original BREAKOUT path without touching code.
+const MOMENTUM_EXHAUSTED_OVERRIDE = (process.env.BUY_MOMENTUM_ALLOW_EXHAUSTED_OVERRIDE ?? 'true') !== 'false';
 
-// momentum = { triggerStatus, regime, breadthScore } — all optional; when
-// omitted, behaves exactly as before (hard block, no override path). This
-// lets callers that don't have market-state.json loaded (or older call
-// sites) keep the pre-existing strict behavior.
+// momentum = { triggerStatus, regime, breadthScore, momentumContinuation }
+// — all optional; when omitted, behaves exactly as before (hard block, no
+// override path). This lets callers that don't have market-state.json
+// loaded (or older call sites) keep the pre-existing strict behavior.
 export function checkExhaustedEntry(st5, st15, momentum = {}) {
-  const { triggerStatus = null, regime = null, breadthScore = null } = momentum;
+  const { triggerStatus = null, regime = null, breadthScore = null, momentumContinuation = false } = momentum;
 
   // Broad-rally exception — on a day where the whole market is running
   // (RISK_ON regime + high breadth), a fresh ST cross is often ALREADY a
@@ -126,14 +130,21 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
   // stale after the real signal (that drift case is what the frozen-at-cross
   // snapshot upstream already handles). Without this exception those crosses
   // would all sit in WAIT_RETEST market-wide, right when the trend is
-  // strongest. Require a CONFIRMED BREAKOUT trigger (not merely TRIGGERING)
-  // plus RISK_ON plus breadth above threshold — three independent
-  // confirmations — before buying immediately; a single extended cross in
-  // an otherwise normal/mixed market still has to wait for retest.
+  // strongest. Require RISK_ON plus breadth above threshold, PLUS one of:
+  // a CONFIRMED BREAKOUT trigger, OR a momentum-continuation TRIGGERING
+  // (buy-intelligence.js's rising-5m-candle path — that trigger type can
+  // never reach BREAKOUT by construction, so without this second branch it
+  // could never use this exception at all, and would sit in WAIT_RETEST
+  // on every EXHAUSTED read regardless of how strong the broader market
+  // is — the exact "no buy alerts at all" failure mode this closes).
+  const strongTrigger =
+    triggerStatus === 'BREAKOUT' ||
+    (MOMENTUM_EXHAUSTED_OVERRIDE && triggerStatus === 'TRIGGERING' && momentumContinuation === true);
   const broadRallyException =
-    triggerStatus === 'BREAKOUT' &&
+    strongTrigger &&
     regime === 'RISK_ON' &&
     breadthScore != null && breadthScore >= EXHAUSTED_OVERRIDE_BREADTH_MIN;
+  const exceptionLabel = triggerStatus === 'BREAKOUT' ? 'BREAKOUT' : 'momentum-continuation TRIGGERING';
 
   // EXHAUSTED — too extended to buy into RIGHT NOW, but not thrown away.
   // Previously a permanent hard block (the flip candle itself is very
@@ -148,7 +159,7 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
     if (broadRallyException) {
       return {
         blocked: false, waitRetest: false, overrideUsed: true,
-        reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
+        reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (${exceptionLabel} + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
       };
     }
     return { blocked: false, waitRetest: true, reason: `ST5 distance ${st5.distanceATR} ATR — EXHAUSTED zone, waiting for retest/cooldown` };
@@ -157,7 +168,7 @@ export function checkExhaustedEntry(st5, st15, momentum = {}) {
     if (broadRallyException) {
       return {
         blocked: false, waitRetest: false, overrideUsed: true,
-        reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (BREAKOUT + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
+        reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, but allowed via broad-rally exception (${exceptionLabel} + RISK_ON + breadth ${breadthScore}% ≥ ${EXHAUSTED_OVERRIDE_BREADTH_MIN}%)`,
       };
     }
     return { blocked: false, waitRetest: true, reason: `ST15 distance ${st15.distanceATR} ATR — EXHAUSTED zone, waiting for retest/cooldown` };
@@ -313,9 +324,10 @@ export function evaluateSTTiming(entry, marketState = null) {
   }
 
   const exhausted = checkExhaustedEntry(st5, st15, {
-    triggerStatus: entry.triggerStatus ?? null,
-    regime:        marketState?.marketRegime ?? null,
-    breadthScore:  marketState?.breadth?.score ?? null,
+    triggerStatus:         entry.triggerStatus ?? null,
+    regime:                marketState?.marketRegime ?? null,
+    breadthScore:          marketState?.breadth?.score ?? null,
+    momentumContinuation:  entry.momentumContinuation ?? false,
   });
   if (exhausted.blocked) {
     return { p2State: 'BLOCK', timingScore: 0, reason: exhausted.reason, exhausted };
