@@ -290,7 +290,16 @@ export function classifyP2Trigger({ st5, st15 }) {
 }
 
 // Main entry point — mirrors §14's pseudocode shape.
-export function evaluateSTTiming(entry) {
+// marketState is optional (2nd param) — when omitted, behaves exactly as
+// before this fix: checkExhaustedEntry gets no momentum context, so its
+// broad-rally exception can never fire and EXHAUSTED always falls through
+// to the plain waitRetest/blocked path. Previously this function called
+// checkExhaustedEntry(st5, st15) with NO third argument at all, which
+// meant the broad-rally exception built into checkExhaustedEntry was
+// dead code in production — a confirmed BREAKOUT on a genuine RISK_ON,
+// high-breadth day still sat in WAIT_RETEST like any other EXHAUSTED
+// cross, exactly the "good day, EXHAUSTED blocks the retest" complaint.
+export function evaluateSTTiming(entry, marketState = null) {
   const st5  = entry.supertrend5m;
   const st15 = entry.supertrend15m;
 
@@ -303,7 +312,11 @@ export function evaluateSTTiming(entry) {
     return { p2State: 'BLOCK', timingScore: 0, reason: fallingKnife.reasons.join(' · '), fallingKnife };
   }
 
-  const exhausted = checkExhaustedEntry(st5, st15);
+  const exhausted = checkExhaustedEntry(st5, st15, {
+    triggerStatus: entry.triggerStatus ?? null,
+    regime:        marketState?.marketRegime ?? null,
+    breadthScore:  marketState?.breadth?.score ?? null,
+  });
   if (exhausted.blocked) {
     return { p2State: 'BLOCK', timingScore: 0, reason: exhausted.reason, exhausted };
   }

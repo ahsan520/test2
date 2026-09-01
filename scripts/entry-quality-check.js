@@ -123,6 +123,17 @@ export function checkEntryQuality({ entry, pair, alertState, isCapBuy = false, b
   const trigger        = d.trigger || null;
 
   const retestException = entryState === 'RETEST' && triggerStatus === 'TRIGGERING';
+  // Momentum-continuation entries (buy-intelligence.js calcSpikeTrigger's
+  // rising-5m-candle fallback path) reach TRIGGERING specifically WITHOUT a
+  // volume-expansion or level-reclaim requirement — that's the whole reason
+  // the path exists. Without this exception, checks.volumeFollowThrough
+  // below would immediately re-block every momentum entry on VOLUME_THIN,
+  // silently defeating the loosening at this next gate. CVD is left
+  // required rather than advisory here (unlike RETEST) since
+  // calcSpikeTrigger already requires cvdTrend==='up' to classify momentum
+  // in the first place by default (BUY_MOMENTUM_REQUIRE_CVD_UP) — this is
+  // belt-and-suspenders for the case that flag gets turned off.
+  const momentumException = entry.momentumContinuation === true;
 
   const checks = {};
 
@@ -191,16 +202,16 @@ export function checkEntryQuality({ entry, pair, alertState, isCapBuy = false, b
 
   // 5 ── CVD (tape confirmation) — advisory during a RETEST exception ──
   const cvdUp = d.cvdTrend === 'up';
-  checks.cvd = (!CVD_WEAK_ENABLED || retestException || triggerStatus == null)
-    ? pass(retestException ? 'RETEST exception — CVD advisory only, not required' : 'CVD check disabled or trigger not yet evaluated')
+  checks.cvd = (!CVD_WEAK_ENABLED || retestException || momentumException || triggerStatus == null)
+    ? pass(retestException ? 'RETEST exception — CVD advisory only, not required' : momentumException ? 'momentum-continuation entry — CVD advisory only, not required (calcSpikeTrigger already required it upstream)' : 'CVD check disabled or trigger not yet evaluated')
     : cvdUp
       ? pass('CVD trend up')
       : fail('CVD_WEAK', 'CVD trend is not up — tape not confirming the breakout');
 
-  // 6 ── Volume follow-through — advisory during a RETEST exception ──
+  // 6 ── Volume follow-through — advisory during a RETEST or momentum exception ──
   const volExpansion = trigger?.volumeExpansion ?? false;
-  checks.volumeFollowThrough = (!VOLUME_THIN_ENABLED || retestException || triggerStatus == null)
-    ? pass(retestException ? 'RETEST exception — volume advisory only, not required' : 'volume check disabled or trigger not yet evaluated')
+  checks.volumeFollowThrough = (!VOLUME_THIN_ENABLED || retestException || momentumException || triggerStatus == null)
+    ? pass(retestException ? 'RETEST exception — volume advisory only, not required' : momentumException ? 'momentum-continuation entry — volume advisory only, not required by design' : 'volume check disabled or trigger not yet evaluated')
     : volExpansion
       ? pass('5m volume expanded on the breakout')
       : fail('VOLUME_THIN', '5m volume did not expand — breakout lacks follow-through');

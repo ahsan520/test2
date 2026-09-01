@@ -1220,7 +1220,7 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     // Kept as its own object (not folded into buyIntel/conv) since it's a
     // gating status for signal-evaluator.js/leaderboard-decider.js, not a
     // conviction penalty.
-    const trigger = calcSpikeTrigger({ k5, k15, currentPrice: price, cvdTrend, btcTriggerOk });
+    const trigger = calcSpikeTrigger({ k5, k15, currentPrice: price, cvdTrend, btcTriggerOk, st5: d.supertrend5m });
     d.trigger = trigger;
 
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);

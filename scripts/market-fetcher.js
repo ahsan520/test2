@@ -232,6 +232,8 @@ function buildEntry(r, prev, now, session) {
     breakoutLevel:      trigger?.breakoutLevel ?? null,
     triggerReasons:     trigger?.triggerReasons ?? [],
     btcTriggerOk:       trigger?.btcTriggerOk ?? null,
+    momentumContinuation: trigger?.momentumContinuation ?? false, // TRIGGERING reached via the looser rising-5m-candle path, not a level reclaim — caller must size down
+    risingStreak:       trigger?.risingStreak ?? 0,
     supertrend15m:  r.d?.supertrend15m || null,   // { value, direction, previousDirection, crossUp, close, lastClosedCandle, distancePct }
     st15Event,                                     // Priority-1 (P1) event — PENDING until leaderboard-decider.js/mexc-trader.js consume it
     supertrend5m:   r.d?.supertrend5m || null,     // same shape as supertrend15m, 5m timeframe

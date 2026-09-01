@@ -952,7 +952,7 @@ async function main() {
       // layer is meant to judge. See st-timing-engine.js for full
       // per-condition reasoning.
       if (!isCapBuyForTrigger) {
-        const timing = evaluateSTTiming(entry);
+        const timing = evaluateSTTiming(entry, marketState);
         if (timing.p2State === 'BLOCK') {
           console.log(`  📉🔪  ${pair} — ST timing BLOCK — ${timing.reason}`);
           logAudit('st_timing_blocked', { pair, p2State: timing.p2State, timingScore: timing.timingScore, reason: timing.reason });

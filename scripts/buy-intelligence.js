@@ -250,7 +250,43 @@ const TRIGGER_NEAR_PCT        = parseFloat(process.env.BUY_TRIGGER_NEAR_PCT || '
 const TRIGGER_FAIL_LOOKBACK   = parseInt(process.env.BUY_TRIGGER_FAIL_LOOKBACK || '3', 10);        // closed 5m candles scanned for a recent failed break
 const TRIGGER_VOL_EXPANSION_X = parseFloat(process.env.BUY_TRIGGER_VOL_EXPANSION_X || '1.3');      // latest 5m volume vs its own recent average
 
-export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk = null } = {}) {
+// ── Momentum continuation (NEW — a looser TRIGGERING path alongside the
+// level-reclaim logic above) ──
+// The level-based logic above only fires once price reclaims (or nearly
+// reclaims) a specific 15m resistance level — a legitimate signal, but it
+// misses the simpler "price just keeps climbing on 5m candles" case: a
+// symbol can be mid-trend, several candles in a row printing higher closes,
+// and still sit in SETUP because it's not yet back at its own recent high.
+// This path catches that case directly instead of waiting for a level
+// reclaim. Deliberately a LOOSER bar than the level-based logic (that's the
+// point — it exists because the stricter path was leaving too many
+// genuinely-moving symbols un-triggered), so callers must NOT treat it as
+// equal-confidence to a confirmed level breakout. The `momentumContinuation`
+// flag on the returned object is the caller's hook to size it down —
+// mexc-trader.js applies BUY_MOMENTUM_SIZE_PCT the same way it already
+// downsizes scout entries. Never overrides a FAILED classification (a
+// recent failed break at this level is still a real warning regardless of
+// how the last few 5m candles printed), and never fires once the level-
+// based logic already reached TRIGGERING/BREAKOUT on its own — this is a
+// fallback for the SETUP case only, not a way to double-count.
+const MOMENTUM_ENABLED    = (process.env.BUY_MOMENTUM_ENABLE ?? 'true') !== 'false';
+const MOMENTUM_STREAK_MIN = parseInt(process.env.BUY_MOMENTUM_STREAK_MIN || '3', 10); // consecutive closed 5m candles each higher than the last
+const MOMENTUM_REQUIRE_CVD_UP = (process.env.BUY_MOMENTUM_REQUIRE_CVD_UP ?? 'true') !== 'false';
+// Trap guard — a 3-candle green streak running against the prevailing
+// fast (ST5) trend is the classic bull-trap shape (small counter-trend
+// bounce inside a larger down-band — ST5's sticky bands don't flip on
+// every wiggle, so this can happen even while ST5 is still solidly BEAR),
+// not a genuine continuation. Default ON; loosening widens the funnel
+// further at higher trap risk.
+// NOTE: exhaustion is deliberately NOT checked here — st-timing-engine.js's
+// checkExhaustedEntry already runs downstream for every candidate
+// (momentum-tagged or not) with proper waitRetest/broad-rally handling;
+// duplicating a second, stricter, rally-blind EXHAUSTED check here would
+// just hard-block momentum entries on exactly the good trending days this
+// feature is meant to catch. See leaderboard-decider.js.
+const MOMENTUM_REQUIRE_ST5_NOT_BEAR = (process.env.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR ?? 'true') !== 'false';
+
+export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk = null, st5 = null } = {}) {
   if (!TRIGGER_ENABLED) {
     return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['trigger check disabled'] };
   }
@@ -272,6 +308,7 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   // ── 5m confirmation: volume expansion + failed-breakout detection ──
   let volumeExpansion = false;
   let recentFailedBreak = false;
+  let risingStreak = 0; // consecutive closed 5m candles each higher than the previous
   if (Array.isArray(k5) && k5.length >= 6) {
     const closed5 = k5.slice(0, -1); // drop the still-forming current 5m candle
     const vols5     = closed5.slice(-6).map(c => parseFloat(c[5]));
@@ -286,6 +323,15 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
     const recentCloses  = closed5.slice(-TRIGGER_FAIL_LOOKBACK).map(c => parseFloat(c[4]));
     const brokeRecently = recentCloses.some(c => c > breakoutLevel * (1 + TRIGGER_BREAKOUT_BUFFER / 100));
     recentFailedBreak   = brokeRecently && currentPrice < breakoutLevel;
+
+    // Count consecutive higher closes, walking backward from the most
+    // recent closed candle. closed5 is oldest→newest, so we walk the end
+    // of the array backward and stop at the first non-higher close.
+    const closes5 = closed5.map(c => parseFloat(c[4]));
+    for (let i = closes5.length - 1; i > 0; i--) {
+      if (closes5[i] > closes5[i - 1]) risingStreak++;
+      else break;
+    }
   }
 
   const breakoutConfirmed = currentPrice >= breakoutLevel * (1 + TRIGGER_BREAKOUT_BUFFER / 100);
@@ -301,6 +347,7 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   // BREAKOUT — btcTriggerOk===false and a missing breakout both hard-cap
   // the status below BREAKOUT regardless of how high `score` climbs.
   let triggerStatus;
+  let momentumContinuation = false;
   if (recentFailedBreak) {
     triggerStatus = 'FAILED';
     reasons.push('recent 5m close broke the level then price fell back below it — failed breakout');
@@ -319,6 +366,19 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   } else if (pctToLevel > 0 && pctToLevel <= TRIGGER_NEAR_PCT) {
     triggerStatus = 'TRIGGERING'; // close enough that a trigger is imminent
     reasons.push(`${pctToLevel.toFixed(2)}% below breakout level — approaching`);
+  } else if (
+    MOMENTUM_ENABLED &&
+    risingStreak >= MOMENTUM_STREAK_MIN &&
+    (!MOMENTUM_REQUIRE_CVD_UP || cvdTrend === 'up') &&
+    (!MOMENTUM_REQUIRE_ST5_NOT_BEAR || st5?.direction !== 'BEAR')
+  ) {
+    // Fallback path — hasn't reclaimed or approached its own recent-high
+    // level, but 5m candles are printing a real consecutive-higher-close
+    // streak right now. Looser than every path above by design; caller
+    // must size this down (momentumContinuation flag).
+    triggerStatus = 'TRIGGERING';
+    momentumContinuation = true;
+    reasons.push(`momentum continuation — ${risingStreak} consecutive rising 5m closes (min ${MOMENTUM_STREAK_MIN}), ST5 ${st5?.direction ?? 'n/a'}/${st5?.extensionZone ?? 'n/a'}${cvdTrend === 'up' ? ', CVD confirming' : ''}`);
   } else {
     triggerStatus = 'SETUP';
   }
@@ -330,6 +390,8 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
     breakoutLevel: parseFloat(breakoutLevel.toFixed(8)),
     volumeExpansion,
     btcTriggerOk,
+    momentumContinuation,
+    risingStreak,
     triggerReasons: reasons,
   };
 }

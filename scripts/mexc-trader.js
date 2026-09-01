@@ -1924,6 +1924,16 @@ async function executeAutoBuys({
   // data exists in symbol-history.json to justify it).
   const BUY_SCOUT_SIZE_PCT = parseFloat(process.env.BUY_SCOUT_SIZE_PCT || '30');
 
+  // ── Momentum-continuation entries (leaderboard-decider.js: entry via
+  // buy-intelligence.js's calcSpikeTrigger momentum-continuation path) also
+  // get sized down — same reasoning as scout entries: a rising-5m-candle
+  // streak is a real signal but a looser bar than an actual confirmed level
+  // reclaim, so it doesn't get full size. Independent of BUY_SCOUT_SIZE_PCT
+  // (a pick can be a scout entry OR a momentum entry, never both — see
+  // calcSpikeTrigger, momentum only fires once the level-based paths have
+  // already been ruled out for that cycle).
+  const BUY_MOMENTUM_SIZE_PCT = parseFloat(process.env.BUY_MOMENTUM_SIZE_PCT || '50');
+
   console.log(`  ⚡  Exec strategy: ${effectiveExecStrategy} (${effectiveSizeMode === 'percent' ? effectiveSizePct + '%' : '$' + effectiveUsdSize}) — ${picks.length} pick(s), $${totalUsd} total → [${pickWeights.map(w => '$' + w).join(', ')}] (${availableSlots} slot(s) available, ${currentLiveOpen}/${effectiveMaxLive} live)`);
 
   if (!tradeState.tradingEnabled) {
@@ -1938,9 +1948,12 @@ async function executeAutoBuys({
     const pos    = positions[pick.sym];
     const symbol = pick.pair.replace(/[^A-Z]/g, '') + (pick.pair.includes('USDT') ? '' : 'USDT');
     const isScout   = pick.entry?.scoutBuy === true;
+    const isMomentum = !isScout && pick.entry?.momentumContinuation === true;
     const perPickUsd = isScout
       ? parseFloat((basePerPickUsd * (BUY_SCOUT_SIZE_PCT / 100)).toFixed(2))
-      : basePerPickUsd;
+      : isMomentum
+        ? parseFloat((basePerPickUsd * (BUY_MOMENTUM_SIZE_PCT / 100)).toFixed(2))
+        : basePerPickUsd;
 
     // Re-count AFTER each buy — topN must not exceed effectiveMaxLive
     // even if rotation just freed some slots at the start of this cycle.
@@ -1992,7 +2005,7 @@ async function executeAutoBuys({
     }
 
     if (effectiveTradeMode === 'paper') {
-      console.log(`  📝  PAPER BUY${isScout ? ' (SCOUT)' : ''} — ${symbol} $${perPickUsd} USDT`);
+      console.log(`  📝  PAPER BUY${isScout ? ' (SCOUT)' : isMomentum ? ' (MOMENTUM)' : ''} — ${symbol} $${perPickUsd} USDT`);
       pos.liveOrder = {
         mode: 'paper', buyAt: Date.now(), usdSize: perPickUsd,
         qty: perPickUsd / (pick.levels ? parseFloat(pick.levels.entry) : pick.price),
@@ -2031,14 +2044,15 @@ async function executeAutoBuys({
       await pushTradeLogToGitHub(loadTradeLog());
       if (effectiveSizeMode === 'percent') adjustPaperBalance(-perPickUsd);
       await sendTelegram(
-        `📝 *PAPER BUY${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} $${perPickUsd} USDT @ ~$${pos.liveOrder.fillPrice.toFixed(6)}\n` +
+        `📝 *PAPER BUY${isScout ? ' — SCOUT' : isMomentum ? ' — MOMENTUM' : ''}* — ${pick.pair.replace('USDT','')} $${perPickUsd} USDT @ ~$${pos.liveOrder.fillPrice.toFixed(6)}\n` +
         `  Strategy: ${effectiveExecStrategy === 'topN' ? `top${picks.length}${isWeightedSplit ? ' weighted split' : ' split'}` : 'top 1'}\n` +
         (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
+        (isMomentum ? `  📈 _Momentum entry — ${pick.entry?.risingStreak ?? '?'} consecutive rising 5m closes, no level reclaim yet. Sized at ${BUY_MOMENTUM_SIZE_PCT}% of normal._\n` : '') +
         `  _Paper mode — no real order placed. Set TRADE\\_MODE=live to trade for real._`
       );
     } else {
       // Live mode — real MEXC market buy
-      console.log(`  ⚡  LIVE BUY${isScout ? ' (SCOUT)' : ''} — ${symbol} $${perPickUsd} USDT via MEXC...`);
+      console.log(`  ⚡  LIVE BUY${isScout ? ' (SCOUT)' : isMomentum ? ' (MOMENTUM)' : ''} — ${symbol} $${perPickUsd} USDT via MEXC...`);
       try {
         const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, symbol, perPickUsd);
         pos.liveOrder = {
@@ -2075,11 +2089,12 @@ async function executeAutoBuys({
         await pushTradeLogToGitHub(loadTradeLog());
 
         await sendTelegram(
-          `⚡ *LIVE BUY PLACED${isScout ? ' — SCOUT' : ''}* — ${pick.pair.replace('USDT','')} — ${utc}\n` +
+          `⚡ *LIVE BUY PLACED${isScout ? ' — SCOUT' : isMomentum ? ' — MOMENTUM' : ''}* — ${pick.pair.replace('USDT','')} — ${utc}\n` +
           `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated — MEXC did not report a fill qty)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
           `  Size: $${perPickUsd} USDT  Order ID: \`${buy.orderId}\`\n` +
           (effectiveExecStrategy === 'topN' ? `  Strategy: top${picks.length}${isWeightedSplit ? ' weighted split' : ' split'} ($${totalUsd} → [${pickWeights.map(w => '$' + w).join(', ')}])\n` : '') +
           (isScout ? `  🔎 _Scout entry — TRIGGERING, not yet confirmed BREAKOUT. Sized at ${BUY_SCOUT_SIZE_PCT}% of normal — no automatic top-up if it confirms._\n` : '') +
+          (isMomentum ? `  📈 _Momentum entry — ${pick.entry?.risingStreak ?? '?'} consecutive rising 5m closes, no level reclaim yet. Sized at ${BUY_MOMENTUM_SIZE_PCT}% of normal._\n` : '') +
           `  🛡 Watched by the 15-min software stop check.\n` +
           `  Stop/T2 exits will close this position automatically.\n` +
           (buy.estimated ? `  ⚠️ _MEXC didn't confirm a fill quantity yet — verify the actual holding on MEXC matches before trusting auto-sells._\n` : '') +
