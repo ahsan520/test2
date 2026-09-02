@@ -68,8 +68,11 @@ jobs:
         run: npm install
 
       # ── Determine run mode ──────────────────────────────────────────────
-      # */5        → fetch   (market-fetcher.js — Job A, data only)
-      # 2,19,36,53 → decide  (leaderboard-decider.js + positions check — Job B)
+      # */5        → fetch   (sentiment-fetcher.js + general-news-fetcher.js
+      #                       ONLY — market-fetcher.js moved to decide below;
+      #                       see the fetch case's own comment for why)
+      # 2,19,36,53 → decide  (market-fetcher.js + leaderboard-decider.js +
+      #                       positions check — market data now lives here)
       # :15 hourly → full    (alert-runner.js full watchlist/overnight scan)
       # workflow_dispatch    → whatever the "mode" input says (default: full)
       #
@@ -407,7 +410,18 @@ jobs:
 
           case "$RUN_MODE" in
             fetch)
-              node market-fetcher.js
+              # market-fetcher.js deliberately NOT called here anymore —
+              # decide now fetches fresh market data unconditionally on
+              # every run of its own (see the decide case below), so a
+              # separate market-data.json refresh here was pure duplicate
+              # work: same exchange calls, same file, same commit, twice.
+              # This case now exists purely to keep news current — see the
+              # worker.js side of this: the Cloudflare Worker's fetch-dispatch
+              # staleness check was repointed from market-data.json to
+              # sentiment-data.json's fetchedAt for exactly this reason (a
+              # check against market-data.json would now be checking a file
+              # this case no longer touches, and would rarely trigger once
+              # decide is reliably keeping market-data.json fresh on its own).
               node sentiment-fetcher.js
               node general-news-fetcher.js
               ;;
