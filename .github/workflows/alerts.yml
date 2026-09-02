@@ -303,15 +303,34 @@ jobs:
           GUARD_STOP_OVERRIDE_MAX_LOSS_PCT: ${{ vars.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5' }}
           # ── Phase 2: Smart BTC Gate (Alpha Exception) ──
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
-          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
-          GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
+          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
+          GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '65' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1' }}
+          # Previously entirely unwired despite being read via env in
+          # market-guard.js — ran on hardcoded in-code defaults (7 and 3
+          # respectively) regardless of any repo Variable. Wired now, with
+          # BULLCONF loosened in proportion to the SCORE_MIN change above.
+          GUARD_BTC_ALPHA_MIN_BULLCONF: ${{ vars.GUARD_BTC_ALPHA_MIN_BULLCONF || '6' }}
+          GUARD_ALPHA_MAX_BUYINTEL_PENALTY: ${{ vars.GUARD_ALPHA_MAX_BUYINTEL_PENALTY || '3' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_4H_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_4H_BULL || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL || 'false' }}
-          GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS: ${{ vars.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '3' }}
+          GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS: ${{ vars.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '2' }}
+          # ── Breadth Exception (separate from the BTC-bear Alpha Exception
+          # above — fires when BTC itself is fine but overall watchlist
+          # breadth is thin). Previously entirely unwired: none of these five
+          # were ever read by the workflow, so BUY_BREADTH_ALPHA_SCORE_MIN=6
+          # (set as a repo Variable) never actually took effect — the code's
+          # own fallback silently substituted the BTC-alpha score min instead
+          # (which was still 8 until this session's changes above).
+          BUY_BREADTH_ALPHA_MIN_VOLUME:   ${{ vars.BUY_BREADTH_ALPHA_MIN_VOLUME   || '1.1' }}
+          BUY_BREADTH_ALPHA_MIN_WHALE:    ${{ vars.BUY_BREADTH_ALPHA_MIN_WHALE    || '65' }}
+          BUY_BREADTH_ALPHA_SCORE_MIN:    ${{ vars.BUY_BREADTH_ALPHA_SCORE_MIN    || '6' }}
+          BUY_BREADTH_ALPHA_MIN_BULLCONF: ${{ vars.BUY_BREADTH_ALPHA_MIN_BULLCONF || '6' }}
+          BUY_BREADTH_ALPHA_BULL4H_MIN:   ${{ vars.BUY_BREADTH_ALPHA_BULL4H_MIN   || '3' }}
+          BUY_BREADTH_ALPHA_FLEXIBLE_MIN: ${{ vars.BUY_BREADTH_ALPHA_FLEXIBLE_MIN || '2' }}
           # ── Relative Strength vs BTC ──
           GUARD_BTC_RS_ENABLED: ${{ vars.GUARD_BTC_RS_ENABLED || 'true' }}
           GUARD_BTC_RS_MIN: ${{ vars.GUARD_BTC_RS_MIN || '2.0' }}
