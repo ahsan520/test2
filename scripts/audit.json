@@ -5965,11 +5965,11 @@
     "monitored": 2
   },
   {
-    "timestamp": "2026-09-02T11:46:12.513Z",
+    "timestamp": "2026-09-02T11:46:18.213Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
     "totalPairs": 36,
-    "successCount": 30,
+    "successCount": 17,
     "cryptoCount": 20,
     "stockScored": 10,
     "stockFrozen": 6,
@@ -6005,7 +6005,7 @@
       {
         "pair": "DOGEUSDT",
         "status": "ok",
-        "conv": -3,
+        "conv": -2,
         "session": "24/7",
         "assetType": "crypto"
       },
@@ -6075,43 +6075,33 @@
       {
         "pair": "TAOUSDT",
         "status": "ok",
-        "conv": -6,
+        "conv": -9,
         "session": "24/7",
         "assetType": "crypto"
       },
       {
         "pair": "UNIUSDT",
-        "status": "ok",
-        "conv": -4,
-        "session": "24/7",
+        "status": "failed",
         "assetType": "crypto"
       },
       {
         "pair": "XLMUSDT",
-        "status": "ok",
-        "conv": -4,
-        "session": "24/7",
+        "status": "failed",
         "assetType": "crypto"
       },
       {
         "pair": "XMRUSDT",
-        "status": "ok",
-        "conv": -3,
-        "session": "24/7",
+        "status": "failed",
         "assetType": "crypto"
       },
       {
         "pair": "XRPUSDT",
-        "status": "ok",
-        "conv": -4,
-        "session": "24/7",
+        "status": "failed",
         "assetType": "crypto"
       },
       {
         "pair": "ZECUSDT",
-        "status": "ok",
-        "conv": -12,
-        "session": "24/7",
+        "status": "failed",
         "assetType": "crypto"
       },
       {
@@ -6168,68 +6158,187 @@
       },
       {
         "pair": "NASDAQ:GOOG",
-        "status": "ok",
-        "conv": 0,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
         "pair": "NASDAQ:META",
-        "status": "ok",
-        "conv": 4,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
         "pair": "NASDAQ:MRVL",
-        "status": "ok",
-        "conv": -13,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "SHORT SETUP",
         "assetType": "stock"
       },
       {
         "pair": "NASDAQ:MSFT",
-        "status": "ok",
-        "conv": 6,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "BREAKOUT",
         "assetType": "stock"
       },
       {
         "pair": "NASDAQ:MU",
-        "status": "ok",
-        "conv": -5,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
         "pair": "NASDAQ:NVDA",
-        "status": "ok",
-        "conv": 2,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
         "pair": "NYSE:GE",
-        "status": "ok",
-        "conv": -3,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       },
       {
         "pair": "NYSE:GEV",
-        "status": "ok",
-        "conv": -3,
+        "status": "failed",
         "session": "pre_market",
-        "setup": "WATCHING",
         "assetType": "stock"
       }
     ]
+  },
+  {
+    "timestamp": "2026-09-02T11:46:18.280Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-09-02T11:46:19.765Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 2
+  },
+  {
+    "timestamp": "2026-09-02T11:46:19.767Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 2,
+    "openAfter": 2,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.136Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "free": 0.25,
+    "estNotional": 0.17785
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.138Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:DOGEUSDT",
+    "base": "DOGE",
+    "free": 0.05,
+    "estNotional": 0.0040555
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.140Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.001,
+    "estNotional": 0.2167
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.142Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XLMUSDT",
+    "base": "XLM",
+    "free": 0.03,
+    "estNotional": 0.0051719999999999995
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.315Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "APTUSDT",
+    "id": "ST5-APT-20260902T113000Z",
+    "reason": "ST5 distance 2.853 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.317Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "AVAXUSDT",
+    "id": "ST5-AVAX-20260902T113000Z",
+    "reason": "ST5 distance 2.362 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.319Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "DOGEUSDT",
+    "id": "ST5-DOGE-20260902T113000Z",
+    "reason": "ST5 distance 2.845 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.320Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "LINKUSDT",
+    "id": "ST5-LINK-20260902T113500Z",
+    "reason": "ST5 distance 2.805 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.322Z",
+    "job": "leaderboard-decider",
+    "action": "st5_wait_retest",
+    "pair": "NEARUSDT",
+    "id": "ST5-NEAR-20260902T113500Z",
+    "reason": "ST5 distance 2.665 ATR — EXHAUSTED zone, waiting for retest/cooldown"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.329Z",
+    "job": "leaderboard-decider",
+    "action": "market_guard",
+    "canBuy": false,
+    "closeAll": false,
+    "sizeMult": 1,
+    "reasons": [
+      "BTC 4H bias is BEAR 4H — new buys paused (market-regime gate)"
+    ]
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.336Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0
+  },
+  {
+    "timestamp": "2026-09-02T11:46:20.338Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-09-02T11:46:21.813Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 2,
+    "monitored": 2
   }
 ]
