@@ -68,11 +68,8 @@ jobs:
         run: npm install
 
       # ── Determine run mode ──────────────────────────────────────────────
-      # */5        → fetch   (sentiment-fetcher.js + general-news-fetcher.js
-      #                       ONLY — market-fetcher.js moved to decide below;
-      #                       see the fetch case's own comment for why)
-      # 2,19,36,53 → decide  (market-fetcher.js + leaderboard-decider.js +
-      #                       positions check — market data now lives here)
+      # */5        → fetch   (market-fetcher.js — Job A, data only)
+      # 2,19,36,53 → decide  (leaderboard-decider.js + positions check — Job B)
       # :15 hourly → full    (alert-runner.js full watchlist/overnight scan)
       # workflow_dispatch    → whatever the "mode" input says (default: full)
       #
@@ -176,6 +173,14 @@ jobs:
           LB_MIN_SCORE:       ${{ vars.LB_MIN_SCORE || '6' }}
           LB_BULL_CONF_MIN:   ${{ vars.LB_BULL_CONF_MIN || '5' }}
           LB_COOLDOWN_MIN:    ${{ vars.LB_COOLDOWN_MIN || '60' }}
+          # ── MOM WATCH — separate, lower-bar momentum heads-up alert
+          # (leaderboard-decider.js: collectMomWatchAlerts), independent of
+          # LB_MIN_SCORE. Informational only, never auto-buys. Added
+          # 2026-09-03 after the XRP/BTC session where price kept climbing
+          # on 5m closes but conv (whale/CVD-driven) hadn't caught up yet.
+          LB_MOM_WATCH_ENABLE:        ${{ vars.LB_MOM_WATCH_ENABLE || 'true' }}
+          LB_MOM_MIN_SCORE:           ${{ vars.LB_MOM_MIN_SCORE || '0' }}
+          LB_MOM_WATCH_COOLDOWN_MIN:  ${{ vars.LB_MOM_WATCH_COOLDOWN_MIN || '20' }}
           LB_HOLD_LOCK:       ${{ vars.LB_HOLD_LOCK || '20' }}
           LB_EXIT_CVD_CYCLES: ${{ vars.LB_EXIT_CVD_CYCLES || vars.LB_CVD_CYCLES || '3' }}
           LB_EXIT_SCORE_MIN:  ${{ vars.LB_EXIT_SCORE_MIN || '3' }}
@@ -214,6 +219,13 @@ jobs:
           BUY_ENABLE_CHASE_CHECK:          ${{ vars.BUY_ENABLE_CHASE_CHECK || 'true' }}
           BUY_CHASE_WARN_STREAK:           ${{ vars.BUY_CHASE_WARN_STREAK || '2' }}
           BUY_CHASE_BLOCK_STREAK:          ${{ vars.BUY_CHASE_BLOCK_STREAK || '3' }}
+          # Falling-knife check — same streak mechanics as chase, on RED
+          # candles instead of green. Was never wired despite existing
+          # since the chase check — found during the 2026-09-03 MOM WATCH
+          # redesign audit.
+          BUY_ENABLE_FALLING_KNIFE_CHECK:  ${{ vars.BUY_ENABLE_FALLING_KNIFE_CHECK || 'true' }}
+          BUY_FALLING_KNIFE_WARN_STREAK:   ${{ vars.BUY_FALLING_KNIFE_WARN_STREAK || '2' }}
+          BUY_FALLING_KNIFE_BLOCK_STREAK:  ${{ vars.BUY_FALLING_KNIFE_BLOCK_STREAK || '3' }}
           BUY_ENABLE_RSI_EXTENSION_CHECK:  ${{ vars.BUY_ENABLE_RSI_EXTENSION_CHECK || 'true' }}
           BUY_RSI_15M_HOT:                 ${{ vars.BUY_RSI_15M_HOT || '70' }}
           BUY_RSI_15M_VHOT:                ${{ vars.BUY_RSI_15M_VHOT || '78' }}
@@ -246,39 +258,49 @@ jobs:
           BUY_TOD_PENALTY:                    ${{ vars.BUY_TOD_PENALTY || '1' }}
           BUY_QUALITY_OFFHOURS_MIN_BULLCONF:  ${{ vars.BUY_QUALITY_OFFHOURS_MIN_BULLCONF || '5' }}
           BUY_QUALITY_OFFHOURS_MIN_WHALE:     ${{ vars.BUY_QUALITY_OFFHOURS_MIN_WHALE || '60' }}
-          # ── Short-timeframe spike trigger (calcSpikeTrigger, buy-intelligence.js)
-          # Previously entirely unwired — ran on hardcoded defaults regardless
-          # of any repo Variable set here. TRIGGER_NEAR_PCT raised from the
-          # 0.5 default to 0.6 on 2026-09-01: APTUSDT and ZECUSDT were both
-          # observed missing the 0.5% "approaching" window by under 0.06pp
-          # (0.55% and 0.53% respectively), sitting stuck in SETUP despite
-          # daily moves of 3-4%+.
-          BUY_ENABLE_SPIKE_TRIGGER:        ${{ vars.BUY_ENABLE_SPIKE_TRIGGER || 'true' }}
-          BUY_TRIGGER_LOOKBACK_15M:        ${{ vars.BUY_TRIGGER_LOOKBACK_15M || '12' }}
-          BUY_TRIGGER_BREAKOUT_BUFFER_PCT: ${{ vars.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15' }}
-          BUY_TRIGGER_NEAR_PCT:            ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.6' }}
-          BUY_TRIGGER_FAIL_LOOKBACK:       ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
-          BUY_TRIGGER_VOL_EXPANSION_X:     ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.3' }}
-          # Momentum continuation — loosened fallback TRIGGERING path (see
-          # buy-intelligence.js calcSpikeTrigger): 3+ consecutive rising 5m
-          # closes fires a TRIGGERING even without a level reclaim. Sized
-          # down via BUY_MOMENTUM_SIZE_PCT (mexc-trader.js) since it's a
-          # looser bar than the level-based/scout paths — relies on the
-          # existing downstream gates (buy intelligence penalties, sell/
-          # profit intelligence, stop loss) to catch a bad entry rather than
-          # gating hard on entry alone.
-          BUY_MOMENTUM_ENABLE:          ${{ vars.BUY_MOMENTUM_ENABLE || 'true' }}
-          BUY_MOMENTUM_STREAK_MIN:      ${{ vars.BUY_MOMENTUM_STREAK_MIN || '3' }}
-          BUY_MOMENTUM_REQUIRE_CVD_UP:  ${{ vars.BUY_MOMENTUM_REQUIRE_CVD_UP || 'true' }}
-          BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR: ${{ vars.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR || 'true' }}
-          # Broad-rally EXHAUSTED override (st-timing-engine.js checkExhaustedEntry)
-          # — previously entirely unwired despite being read via num(), so it
-          # ran on the hardcoded 85 default no matter what was set in the
-          # GitHub UI. Governs BOTH the original BREAKOUT path and the new
-          # momentum-continuation TRIGGERING path below.
-          BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN:    ${{ vars.BUY_EXHAUSTED_OVERRIDE_BREADTH_MIN || '85' }}
-          BUY_MOMENTUM_ALLOW_EXHAUSTED_OVERRIDE: ${{ vars.BUY_MOMENTUM_ALLOW_EXHAUSTED_OVERRIDE || 'true' }}
-          BUY_MOMENTUM_SIZE_PCT:        ${{ vars.BUY_MOMENTUM_SIZE_PCT || '50' }}
+          # ── Pre-spike short-timeframe trigger (buy-intelligence.js:
+          # calcSpikeTrigger) — has it actually broken out yet, not just
+          # "does the setup look good on 15m/1h/4h". Was fully unwired
+          # (found during the 2026-09-03 MOM WATCH audit) — running on
+          # code defaults only until now.
+          BUY_ENABLE_SPIKE_TRIGGER:           ${{ vars.BUY_ENABLE_SPIKE_TRIGGER || 'true' }}
+          BUY_TRIGGER_LOOKBACK_15M:           ${{ vars.BUY_TRIGGER_LOOKBACK_15M || '12' }}
+          BUY_TRIGGER_BREAKOUT_BUFFER_PCT:    ${{ vars.BUY_TRIGGER_BREAKOUT_BUFFER_PCT || '0.15' }}
+          BUY_TRIGGER_NEAR_PCT:               ${{ vars.BUY_TRIGGER_NEAR_PCT || '0.5' }}
+          BUY_TRIGGER_FAIL_LOOKBACK:          ${{ vars.BUY_TRIGGER_FAIL_LOOKBACK || '3' }}
+          BUY_TRIGGER_VOL_EXPANSION_X:        ${{ vars.BUY_TRIGGER_VOL_EXPANSION_X || '1.3' }}
+          # ── Momentum continuation (buy-intelligence.js) — looser TRIGGERING
+          # fallback for "5m candles keep printing higher closes" even when
+          # price hasn't reclaimed its own recent-high level yet. Also
+          # unwired until now. BUY_MOMENTUM_CVD_DOWN_STRENGTH_MIN is new
+          # (2026-09-03) — only treats a CVD-down read as a real
+          # disqualifying reversal once it clears a real magnitude, not a
+          # near-zero flip.
+          BUY_MOMENTUM_ENABLE:                    ${{ vars.BUY_MOMENTUM_ENABLE || 'true' }}
+          BUY_MOMENTUM_STREAK_MIN:                ${{ vars.BUY_MOMENTUM_STREAK_MIN || '3' }}
+          BUY_MOMENTUM_REQUIRE_CVD_UP:            ${{ vars.BUY_MOMENTUM_REQUIRE_CVD_UP || 'true' }}
+          BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR:       ${{ vars.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR || 'true' }}
+          BUY_MOMENTUM_CVD_DOWN_STRENGTH_MIN:      ${{ vars.BUY_MOMENTUM_CVD_DOWN_STRENGTH_MIN || '0.3' }}
+          # Momentum-continuation entries get sized down in mexc-trader.js —
+          # both this and BUY_SCOUT_SIZE_PCT (below) were also unwired,
+          # meaning real position sizing on these entry types was silently
+          # running on code defaults (50% / 30%) with no repo-Variable
+          # override ever actually reaching the process.
+          BUY_MOMENTUM_SIZE_PCT:                   ${{ vars.BUY_MOMENTUM_SIZE_PCT || '50' }}
+          BUY_SCOUT_SIZE_PCT:                       ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
+          # ── Stock-calibrated entry check (buy-intelligence.js:
+          # evaluateStockBuyReadiness) — same checks as above, rescaled for
+          # daily bars instead of 15m candles. Also unwired until now.
+          BUY_STOCK_CHASE_WARN_STREAK:              ${{ vars.BUY_STOCK_CHASE_WARN_STREAK || '2' }}
+          BUY_STOCK_CHASE_BLOCK_STREAK:             ${{ vars.BUY_STOCK_CHASE_BLOCK_STREAK || '3' }}
+          BUY_STOCK_FALLING_KNIFE_WARN_STREAK:      ${{ vars.BUY_STOCK_FALLING_KNIFE_WARN_STREAK || '2' }}
+          BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK:     ${{ vars.BUY_STOCK_FALLING_KNIFE_BLOCK_STREAK || '3' }}
+          BUY_STOCK_RSI_HOT:                        ${{ vars.BUY_STOCK_RSI_HOT || '70' }}
+          BUY_STOCK_RSI_VHOT:                       ${{ vars.BUY_STOCK_RSI_VHOT || '80' }}
+          BUY_STOCK_RSI_CONFIRM_HOT:                 ${{ vars.BUY_STOCK_RSI_CONFIRM_HOT || '70' }}
+          BUY_STOCK_PULLBACK_LOOKBACK:               ${{ vars.BUY_STOCK_PULLBACK_LOOKBACK || '5' }}
+          BUY_STOCK_PULLBACK_WARN_PCT:               ${{ vars.BUY_STOCK_PULLBACK_WARN_PCT || '2.0' }}
+          BUY_STOCK_PULLBACK_BLOCK_PCT:              ${{ vars.BUY_STOCK_PULLBACK_BLOCK_PCT || '4.0' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
@@ -306,34 +328,15 @@ jobs:
           GUARD_STOP_OVERRIDE_MAX_LOSS_PCT: ${{ vars.GUARD_STOP_OVERRIDE_MAX_LOSS_PCT || '1.5' }}
           # ── Phase 2: Smart BTC Gate (Alpha Exception) ──
           GUARD_BTC_ALLOW_ALPHA_EXCEPTION: ${{ vars.GUARD_BTC_ALLOW_ALPHA_EXCEPTION || 'true' }}
-          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '6' }}
-          GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '65' }}
-          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1' }}
-          # Previously entirely unwired despite being read via env in
-          # market-guard.js — ran on hardcoded in-code defaults (7 and 3
-          # respectively) regardless of any repo Variable. Wired now, with
-          # BULLCONF loosened in proportion to the SCORE_MIN change above.
-          GUARD_BTC_ALPHA_MIN_BULLCONF: ${{ vars.GUARD_BTC_ALPHA_MIN_BULLCONF || '6' }}
-          GUARD_ALPHA_MAX_BUYINTEL_PENALTY: ${{ vars.GUARD_ALPHA_MAX_BUYINTEL_PENALTY || '3' }}
+          GUARD_BTC_ALPHA_SCORE_MIN: ${{ vars.GUARD_BTC_ALPHA_SCORE_MIN || '8' }}
+          GUARD_BTC_ALPHA_MIN_WHALE: ${{ vars.GUARD_BTC_ALPHA_MIN_WHALE || '70' }}
+          GUARD_BTC_ALPHA_MIN_VOLUME: ${{ vars.GUARD_BTC_ALPHA_MIN_VOLUME || '1.8' }}
           GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_OI_CONFIRM || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_POSITIVE_CVD || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_EMA_ABOVE || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_4H_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_4H_BULL || 'true' }}
           GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL: ${{ vars.GUARD_BTC_ALPHA_REQUIRE_DAILY_BULL || 'false' }}
-          GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS: ${{ vars.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '2' }}
-          # ── Breadth Exception (separate from the BTC-bear Alpha Exception
-          # above — fires when BTC itself is fine but overall watchlist
-          # breadth is thin). Previously entirely unwired: none of these five
-          # were ever read by the workflow, so BUY_BREADTH_ALPHA_SCORE_MIN=6
-          # (set as a repo Variable) never actually took effect — the code's
-          # own fallback silently substituted the BTC-alpha score min instead
-          # (which was still 8 until this session's changes above).
-          BUY_BREADTH_ALPHA_MIN_VOLUME:   ${{ vars.BUY_BREADTH_ALPHA_MIN_VOLUME   || '1.1' }}
-          BUY_BREADTH_ALPHA_MIN_WHALE:    ${{ vars.BUY_BREADTH_ALPHA_MIN_WHALE    || '65' }}
-          BUY_BREADTH_ALPHA_SCORE_MIN:    ${{ vars.BUY_BREADTH_ALPHA_SCORE_MIN    || '6' }}
-          BUY_BREADTH_ALPHA_MIN_BULLCONF: ${{ vars.BUY_BREADTH_ALPHA_MIN_BULLCONF || '6' }}
-          BUY_BREADTH_ALPHA_BULL4H_MIN:   ${{ vars.BUY_BREADTH_ALPHA_BULL4H_MIN   || '3' }}
-          BUY_BREADTH_ALPHA_FLEXIBLE_MIN: ${{ vars.BUY_BREADTH_ALPHA_FLEXIBLE_MIN || '2' }}
+          GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS: ${{ vars.GUARD_BTC_ALPHA_FLEXIBLE_MIN_PASS || '3' }}
           # ── Relative Strength vs BTC ──
           GUARD_BTC_RS_ENABLED: ${{ vars.GUARD_BTC_RS_ENABLED || 'true' }}
           GUARD_BTC_RS_MIN: ${{ vars.GUARD_BTC_RS_MIN || '2.0' }}
@@ -375,6 +378,13 @@ jobs:
           SELL_PROFIT_TIER_A_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_A_GIVEBACK || '0.5' }}
           SELL_PROFIT_TIER_APLUS_PEAK:     ${{ vars.SELL_PROFIT_TIER_APLUS_PEAK || '1.5' }}
           SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75' }}
+          # Regime-aware widening (2026-09-03) — mirrors the buy-side
+          # EXHAUSTED broad-rally exception. Only widens the give-back
+          # distance on a genuinely broad RISK_ON day; a choppy/NEUTRAL day
+          # still gets the tight tiers above, unchanged.
+          SELL_PROFIT_REGIME_SCALE_ENABLE:  ${{ vars.SELL_PROFIT_REGIME_SCALE_ENABLE || 'true' }}
+          SELL_PROFIT_REGIME_MIN_BREADTH:   ${{ vars.SELL_PROFIT_REGIME_MIN_BREADTH || '70' }}
+          SELL_PROFIT_REGIME_GIVEBACK_MULT: ${{ vars.SELL_PROFIT_REGIME_GIVEBACK_MULT || '2.0' }}
           # Off by default on purpose — this executes real partial sells via
           # reduceLiveOrder() in position-monitor.js. Flip to 'true' as a
           # repo variable only after watching it fire correctly on test2 in
@@ -410,18 +420,7 @@ jobs:
 
           case "$RUN_MODE" in
             fetch)
-              # market-fetcher.js deliberately NOT called here anymore —
-              # decide now fetches fresh market data unconditionally on
-              # every run of its own (see the decide case below), so a
-              # separate market-data.json refresh here was pure duplicate
-              # work: same exchange calls, same file, same commit, twice.
-              # This case now exists purely to keep news current — see the
-              # worker.js side of this: the Cloudflare Worker's fetch-dispatch
-              # staleness check was repointed from market-data.json to
-              # sentiment-data.json's fetchedAt for exactly this reason (a
-              # check against market-data.json would now be checking a file
-              # this case no longer touches, and would rarely trigger once
-              # decide is reliably keeping market-data.json fresh on its own).
+              node market-fetcher.js
               node sentiment-fetcher.js
               node general-news-fetcher.js
               ;;
