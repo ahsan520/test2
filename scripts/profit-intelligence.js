@@ -66,6 +66,30 @@ const TIERS = [
   { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.2') },
 ];
 
+// ── Regime-aware widening (2026-09-03) ──────────────────────────────────
+// The tiers above are calibrated for a normal ~2% intraday range. On a
+// genuinely broad, trending day (BTC 4h bias bull, RISK_ON regime, breadth
+// still high) that same tight band clips winners early against a move
+// that's still running — observed 2026-09-03: FET/LINK both exited via
+// Profit Protection on a day BTC ran +5.59% and both symbols independently
+// moved 4-8% after exit. Mirrors the buy-side EXHAUSTED broad-rally
+// exception (st-timing-engine.js) — same idea, sell side: don't apply the
+// choppy-day band on a day that isn't choppy. Only the give-back distance
+// widens; minPeak floors are untouched, so this never makes the engine
+// start protecting profit earlier — only lets it tolerate more pullback
+// before pulling the trigger once it's already watching.
+const REGIME_SCALE_ENABLED     = (process.env.SELL_PROFIT_REGIME_SCALE_ENABLE ?? 'true') !== 'false';
+const REGIME_MIN_BREADTH       = parseFloat(process.env.SELL_PROFIT_REGIME_MIN_BREADTH || '70');
+const REGIME_GIVEBACK_MULT     = parseFloat(process.env.SELL_PROFIT_REGIME_GIVEBACK_MULT || '2.0');
+
+function regimeGivebackMultiplier(marketState) {
+  if (!REGIME_SCALE_ENABLED) return 1;
+  const isRiskOn      = marketState?.marketRegime === 'RISK_ON';
+  const breadthScore  = marketState?.breadth?.score;
+  const broadBreadth  = breadthScore != null && breadthScore >= REGIME_MIN_BREADTH;
+  return (isRiskOn && broadBreadth) ? REGIME_GIVEBACK_MULT : 1;
+}
+
 export function profitIntelligenceEnabled() { return ENABLED; }
 
 function pickTier(highestPnLSeen) {
@@ -150,8 +174,14 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
     };
   }
 
+  // Regime-aware widening — only the tolerated give-back distance scales,
+  // the tier the position qualified for (based on its own peak) doesn't
+  // change.
+  const regimeMult      = regimeGivebackMultiplier(marketState);
+  const effectiveGiveBack = tier.giveBack * regimeMult;
+
   // ── Step 5: sell only if BOTH drawdown and weakening momentum confirm ──
-  const drawdownConfirmed = drawdownFromPeak >= tier.giveBack;
+  const drawdownConfirmed = drawdownFromPeak >= effectiveGiveBack;
 
   if (drawdownConfirmed && momentum.weak) {
     const signals = [
@@ -163,16 +193,16 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
 
     return {
       action: 'EXIT',
-      reason: `Profit Protection Triggered: peak +${highestPnLSeen.toFixed(2)}% (tier ${tier.label}) → now +${pnlPct.toFixed(2)}%, gave back ${drawdownFromPeak.toFixed(2)}% ≥ ${tier.giveBack}% with weakening momentum [${signals}]`,
-      highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: tier.giveBack, momentum,
+      reason: `Profit Protection Triggered: peak +${highestPnLSeen.toFixed(2)}% (tier ${tier.label}) → now +${pnlPct.toFixed(2)}%, gave back ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}%${regimeMult > 1 ? ` (${tier.giveBack}% × ${regimeMult} regime-widened)` : ''} with weakening momentum [${signals}]`,
+      highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum,
     };
   }
 
   return {
     action: 'HOLD',
     reason: !drawdownConfirmed
-      ? `drawdown ${drawdownFromPeak.toFixed(2)}% below tier ${tier.label} give-back ${tier.giveBack}%`
-      : `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${tier.giveBack}% but momentum not yet weak — holding, letting it run`,
-    highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: tier.giveBack, momentum,
+      ? `drawdown ${drawdownFromPeak.toFixed(2)}% below tier ${tier.label} give-back ${effectiveGiveBack.toFixed(2)}%${regimeMult > 1 ? ' (regime-widened)' : ''}`
+      : `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}% but momentum not yet weak — holding, letting it run`,
+    highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum,
   };
 }

@@ -126,6 +126,46 @@ function isOnCooldown(state, cdKey, assetType) {
 }
 function markCooldown(state, cdKey) { state[cdKey] = Date.now(); }
 
+// ── MOM WATCH — separate, lower-bar heads-up tier (2026-09-03 redesign) ──
+// Fires independently of LB_MIN_SCORE — the whole point is to surface a
+// genuine 5m momentum burst (calcSpikeTrigger's momentumBurstActive,
+// buy-intelligence.js) even on a cycle where NOTHING clears the real buy
+// bar, which is exactly the XRP/BTC 2026-09-03 case: price kept climbing on
+// 5m closes with BTC also up, but conv (whale/CVD-driven) hadn't caught up
+// yet. Purely informational — never feeds execution, never auto-buys, never
+// bypasses LB_MIN_SCORE for the real buy path below.
+const MOM_WATCH_ENABLED          = (process.env.LB_MOM_WATCH_ENABLE ?? 'true') !== 'false';
+const LB_MOM_MIN_SCORE           = parseInt(process.env.LB_MOM_MIN_SCORE           || '0', 10);  // floor to skip clearly-broken setups — far below LB_MIN_SCORE by design
+const LB_MOM_WATCH_COOLDOWN_MIN  = parseInt(process.env.LB_MOM_WATCH_COOLDOWN_MIN  || '20', 10); // shorter than LB_COOLDOWN_MIN — fast informational tier
+
+// Builds MOM WATCH alert lines and marks each hit's own cooldown key
+// (`lb_mom_<pair>`, independent of the buy-alert cooldown). Does NOT send —
+// caller composes the final Telegram message and calls sendTelegram, same
+// pattern as every other alert block in main().
+function collectMomWatchAlerts(entries, cooldowns) {
+  if (!MOM_WATCH_ENABLED) return [];
+  const lines = [];
+  for (const [pair, entry] of entries) {
+    if (entry.assetType !== 'crypto' || entry.marketClosed) continue;
+    if (!entry.trigger?.momentumBurstActive) continue;
+    if ((entry.conv ?? -Infinity) < LB_MOM_MIN_SCORE) continue;
+    if (entry.signal === 'FALLING KNIFE') continue; // safety floor
+
+    const momKey = `lb_mom_${pair}`;
+    const ts = cooldowns[momKey] || 0;
+    if ((Date.now() - ts) < LB_MOM_WATCH_COOLDOWN_MIN * 60000) continue;
+
+    const st5 = entry.d?.supertrend5m || entry.supertrend5m;
+    lines.push([
+      `⚡ *${pair.replace('USDT', '')}* — $${entry.price}  [conv ${entry.conv}, bullConf ${entry.bullConf}/10]`,
+      `  ${entry.trigger.risingStreak} consecutive rising 5m closes · CVD ${entry.d?.cvdTrend ?? 'n/a'} · ST5 ${st5?.direction ?? 'n/a'}/${st5?.extensionZone ?? 'n/a'} · whale ${entry.whale?.score ?? '—'}/100 ${entry.whale?.zone ?? ''}`,
+      `  Below buy bar (conv ${entry.conv} < ${LB_MIN_SCORE}) — watch, not a buy signal`,
+    ].join('\n'));
+    cooldowns[momKey] = Date.now();
+  }
+  return lines;
+}
+
 // Dedicated post-stop-loss cooldown — see the STEP 1 comment where it's
 // set. Deliberately independent of LB_COOLDOWN_MIN (and typically longer)
 // so it isn't just re-deriving the same window a stop-out already lives
@@ -583,6 +623,11 @@ async function main() {
 
   console.log(`\n🔍  Scanning for buy signals...`);
 
+  // Loaded here (not further below, where it used to live) so MOM WATCH —
+  // see below — has cooldown state available on the early no-candidate
+  // return path too, not just the normal buy path.
+  const cooldowns = loadCooldowns();
+
   // Pre-screen — bail early if nothing clears min score
   const anyCandidate = entries.some(([, entry]) => {
     if (entry.marketClosed) return false;
@@ -595,11 +640,26 @@ async function main() {
   if (!anyCandidate) {
     const bestConv = Math.max(...entries.map(([, e]) => e.conv ?? -Infinity));
     console.log(`  Pre-screen: nothing reaches ${LB_MIN_SCORE} (best conv: ${bestConv}) — no buys this cycle.`);
-    logAudit('no_candidates', { bestConv });
+
+    // MOM WATCH — this is exactly the 2026-09-03 XRP/BTC case: pre-screen
+    // finds nothing at real buy-bar conviction, but a genuine 5m momentum
+    // burst may still be underway. Fires here specifically so it's never
+    // silently swallowed by this early return.
+    const momLines = collectMomWatchAlerts(entries, cooldowns);
+    if (momLines.length) {
+      await sendTelegram([
+        `⚡ *Alpha Terminal — MOM WATCH*`,
+        `_informational only — not a buy signal, no execution triggered · min score ${LB_MIN_SCORE} not cleared this cycle_`,
+        '', momLines.join('\n\n'),
+      ].join('\n'));
+      saveCooldowns(cooldowns);
+    }
+
+    logAudit('no_candidates', { bestConv, momWatchAlerts: momLines.length });
     saveMarketData(resetPeaks(market));
     logAudit('job_complete');
     await pushHeartbeatToGitHub(Date.now());
-    console.log('\n✅  Job B complete.\n');
+    console.log(`\n✅  Job B complete${momLines.length ? ` (${momLines.length} MOM WATCH heads-up sent)` : ''}.\n`);
     return;
   }
 
@@ -702,7 +762,6 @@ async function main() {
     console.log('  🛡  BTC 4H regime block active — only symbols passing the Alpha Exception can buy this cycle.');
   }
 
-  const cooldowns  = loadCooldowns();
   const alertState = pruneAlertState(loadAlertState());
   const candidates = [];
   const buyHistory = loadHistory(); // for the bad-history gate below — separate load from the post-close save above, this file only reads it
@@ -1047,13 +1106,28 @@ async function main() {
 
   if (!candidates.length) {
     console.log('  ✓  No new buy signals this cycle (blocked by cooldown/gates)');
+
+    // MOM WATCH — covers the case that produced today's log: a candidate
+    // reached the pre-screen (anyCandidate true), but market guard / MI
+    // gate / persistence / cooldown filtered every one of them out before
+    // candidates was built. A real momentum burst on a filtered symbol
+    // would otherwise vanish here with zero visibility.
+    const momLines = collectMomWatchAlerts(entries, cooldowns);
+    if (momLines.length) {
+      await sendTelegram([
+        `⚡ *Alpha Terminal — MOM WATCH*`,
+        `_informational only — not a buy signal, no execution triggered · candidates were filtered by guard/gates this cycle_`,
+        '', momLines.join('\n\n'),
+      ].join('\n'));
+    }
+
     saveMarketData(resetPeaks(market));
     saveCooldowns(cooldowns);
     saveAlertState(alertState);
-    logAudit('buy_cycle_complete', { signalsFound: 0 });
+    logAudit('buy_cycle_complete', { signalsFound: 0, momWatchAlerts: momLines.length });
     logAudit('job_complete');
     await pushHeartbeatToGitHub(Date.now());
-    console.log('\n✅  Job B complete.\n');
+    console.log(`\n✅  Job B complete${momLines.length ? ` (${momLines.length} MOM WATCH heads-up sent)` : ''}.\n`);
     return;
   }
 

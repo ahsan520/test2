@@ -272,6 +272,14 @@ const TRIGGER_VOL_EXPANSION_X = parseFloat(process.env.BUY_TRIGGER_VOL_EXPANSION
 const MOMENTUM_ENABLED    = (process.env.BUY_MOMENTUM_ENABLE ?? 'true') !== 'false';
 const MOMENTUM_STREAK_MIN = parseInt(process.env.BUY_MOMENTUM_STREAK_MIN || '3', 10); // consecutive closed 5m candles each higher than the last
 const MOMENTUM_REQUIRE_CVD_UP = (process.env.BUY_MOMENTUM_REQUIRE_CVD_UP ?? 'true') !== 'false';
+// A cvdTrend flip alone can be near-zero net bias (calcCVD sums %-body-move
+// across the last 6 15m candles — a read of +0.02% and -0.02% both flip the
+// up/down label despite being noise, not a real reversal). Only treat CVD
+// as actively disqualifying momentum when the DOWN read also clears a real
+// magnitude — otherwise a borderline flip kills an otherwise-valid burst
+// for no material reason (2026-09-03: XRP/BTC both cvdTrend flipped down on
+// a single cycle while price kept climbing — see MOMENTUM_BURST below).
+const MOMENTUM_CVD_DOWN_STRENGTH_MIN = parseFloat(process.env.BUY_MOMENTUM_CVD_DOWN_STRENGTH_MIN || '0.3');
 // Trap guard — a 3-candle green streak running against the prevailing
 // fast (ST5) trend is the classic bull-trap shape (small counter-trend
 // bounce inside a larger down-band — ST5's sticky bands don't flip on
@@ -286,12 +294,12 @@ const MOMENTUM_REQUIRE_CVD_UP = (process.env.BUY_MOMENTUM_REQUIRE_CVD_UP ?? 'tru
 // feature is meant to catch. See leaderboard-decider.js.
 const MOMENTUM_REQUIRE_ST5_NOT_BEAR = (process.env.BUY_MOMENTUM_REQUIRE_ST5_NOT_BEAR ?? 'true') !== 'false';
 
-export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk = null, st5 = null } = {}) {
+export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, cvdStrength = null, btcTriggerOk = null, st5 = null } = {}) {
   if (!TRIGGER_ENABLED) {
-    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['trigger check disabled'] };
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, momentumBurstActive: false, triggerReasons: ['trigger check disabled'] };
   }
   if (!Array.isArray(k15) || k15.length < TRIGGER_LOOKBACK_15M + 1 || currentPrice == null) {
-    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['insufficient 15m data'] };
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, momentumBurstActive: false, triggerReasons: ['insufficient 15m data'] };
   }
 
   // Breakout level = recent-high resistance on CLOSED 15m candles (same
@@ -299,7 +307,7 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   const closed15 = k15.slice(0, -1).slice(-TRIGGER_LOOKBACK_15M);
   const breakoutLevel = Math.max(...closed15.map(c => parseFloat(c[2]))); // candle high
   if (!isFinite(breakoutLevel) || breakoutLevel <= 0) {
-    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, triggerReasons: ['no valid breakout level'] };
+    return { triggerStatus: 'WAIT', triggerScore: 0, breakoutConfirmed: false, breakoutLevel: null, volumeExpansion: false, btcTriggerOk, momentumBurstActive: false, triggerReasons: ['no valid breakout level'] };
   }
 
   const reasons = [];
@@ -343,6 +351,28 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   if (btcTriggerOk)                   { score += 15; reasons.push('BTC short-term trigger OK'); }
   else if (btcTriggerOk === false)    { reasons.push('BTC short-term trigger NOT confirmed'); }
 
+  // ── Momentum burst — decoupled from triggerStatus below (§ redesign,
+  // 2026-09-03: XRP/BTC both had a genuine rising-5m-close streak but
+  // triggerStatus resolved via the "approaching breakout level" branch
+  // first, so the old momentumContinuation flag under-reported — it only
+  // means "the fallback branch specifically fired," not "a momentum burst
+  // is happening." This flag is computed unconditionally and independently
+  // so callers (e.g. a lower-bar MOM WATCH alert) can see a real burst
+  // regardless of which triggerStatus branch ultimately wins below.
+  // CVD check is strength-aware, not a bare up/down flip — calcCVD sums
+  // %-body-move across the last 6 15m candles, so a near-zero net bias can
+  // flip the label on noise alone; only a DOWN read past
+  // MOMENTUM_CVD_DOWN_STRENGTH_MIN counts as a real disqualifying reversal.
+  const cvdOkForMomentum =
+    !MOMENTUM_REQUIRE_CVD_UP ||
+    cvdTrend === 'up' ||
+    (cvdTrend === 'down' && cvdStrength != null && cvdStrength < MOMENTUM_CVD_DOWN_STRENGTH_MIN);
+  const momentumBurstActive =
+    MOMENTUM_ENABLED &&
+    risingStreak >= MOMENTUM_STREAK_MIN &&
+    cvdOkForMomentum &&
+    (!MOMENTUM_REQUIRE_ST5_NOT_BEAR || st5?.direction !== 'BEAR');
+
   // A strong Whale/CVD reading alone must never flip FAILED/SETUP into
   // BREAKOUT — btcTriggerOk===false and a missing breakout both hard-cap
   // the status below BREAKOUT regardless of how high `score` climbs.
@@ -366,12 +396,7 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
   } else if (pctToLevel > 0 && pctToLevel <= TRIGGER_NEAR_PCT) {
     triggerStatus = 'TRIGGERING'; // close enough that a trigger is imminent
     reasons.push(`${pctToLevel.toFixed(2)}% below breakout level — approaching`);
-  } else if (
-    MOMENTUM_ENABLED &&
-    risingStreak >= MOMENTUM_STREAK_MIN &&
-    (!MOMENTUM_REQUIRE_CVD_UP || cvdTrend === 'up') &&
-    (!MOMENTUM_REQUIRE_ST5_NOT_BEAR || st5?.direction !== 'BEAR')
-  ) {
+  } else if (momentumBurstActive) {
     // Fallback path — hasn't reclaimed or approached its own recent-high
     // level, but 5m candles are printing a real consecutive-higher-close
     // streak right now. Looser than every path above by design; caller
@@ -391,6 +416,11 @@ export function calcSpikeTrigger({ k5, k15, currentPrice, cvdTrend, btcTriggerOk
     volumeExpansion,
     btcTriggerOk,
     momentumContinuation,
+    // True whenever a real 5m momentum burst is underway, independent of
+    // which branch above claimed triggerStatus — the field a lower-bar
+    // "heads up" alert should key off, since momentumContinuation only
+    // means "this exact fallback branch decided triggerStatus."
+    momentumBurstActive,
     risingStreak,
     triggerReasons: reasons,
   };

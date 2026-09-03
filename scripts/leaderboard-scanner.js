@@ -27,6 +27,11 @@ const TG_ENABLED      = (process.env.TELEGRAM_ENABLED ?? 'true') === 'true';
 const DRY_RUN         = process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
 const LB_MIN_SCORE    = parseInt(process.env.LB_MIN_SCORE    || '9');
 const LB_COOLDOWN_MIN = parseInt(process.env.LB_COOLDOWN_MIN || '60');
+// NOTE: MOM WATCH (the lower-bar momentum heads-up alert) lives in
+// leaderboard-decider.js, not here — runLeaderboardScanner() below is not
+// invoked anywhere in alerts.yml's pipeline (only scoreSymbol/scoreStock
+// are imported from this file, by market-fetcher.js). Adding the alert
+// logic here would be dead code.
 const STATE_PATH      = path.join(__dirname, '.lb-scan-state.json');
 const WATCHLIST_PATH  = path.join(__dirname, '..', 'watchlist.json');
 
@@ -1220,7 +1225,7 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     // Kept as its own object (not folded into buyIntel/conv) since it's a
     // gating status for signal-evaluator.js/leaderboard-decider.js, not a
     // conviction penalty.
-    const trigger = calcSpikeTrigger({ k5, k15, currentPrice: price, cvdTrend, btcTriggerOk, st5: d.supertrend5m });
+    const trigger = calcSpikeTrigger({ k5, k15, currentPrice: price, cvdTrend, cvdStrength: d.cvdStrength, btcTriggerOk, st5: d.supertrend5m });
     d.trigger = trigger;
 
     const gradeInfo = calcGrade(bullConf.count, whale.score, 1, buyIntel.penalty);
