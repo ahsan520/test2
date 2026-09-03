@@ -25,16 +25,16 @@
     "histWinRate": 0.5,
     "histSample": 2,
     "caution": false,
-    "highestPnLSeen": -0.03,
+    "highestPnLSeen": -0.02,
     "lastR15": 53.8,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -0.03% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.03,
+      "reason": "peak -0.02% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.02,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788452152749
+      "evaluatedAt": 1788452176683
     }
   },
   "NASDAQ:AAPL": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788452152749
+      "evaluatedAt": 1788452176683
     }
   },
   "BINANCE:FETUSDT": {
@@ -139,7 +139,7 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": -3,
+      "thesisDrop": -9,
       "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
@@ -149,18 +149,18 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788452152749
+      "evaluatedAt": 1788452176683
     },
     "highestPnLSeen": 2.13,
-    "lastR15": 65.6,
+    "lastR15": 64.9,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.63% below tier A+ give-back 0.75%",
+      "reason": "drawdown 0.70% below tier A+ give-back 0.75%",
       "highestPnLSeen": 2.13,
-      "drawdownFromPeak": 0.6299999999999999,
+      "drawdownFromPeak": 0.7,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1788452152749
+      "evaluatedAt": 1788452176683
     }
   },
   "BINANCE:XMRUSDT": {
@@ -179,9 +179,9 @@
     "t2": 557.07,
     "score": 13,
     "spikeScore": 0.9214406635329243,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788452176683,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "p2Trigger": "P2-C-NORMAL",
@@ -197,7 +197,10 @@
       "qty": 2.05,
       "fillPrice": 525.5379024390244,
       "buyOrderId": "C02__724225185435045889036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724230227550502913036",
+      "exitFillPrice": 523.581336585366,
+      "closedAt": 1788452178326
     },
     "entrySnapshot": {
       "at": 1788450976123,
@@ -229,31 +232,33 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "DIP BUY",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 25 below 50 threshold (recovery detected, risk softened) (breakout-fail boost +18 applied, still below threshold)",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 100 → current 27 (drop 73 > 60) — price also back below entry breakout level",
       "fallingKnifeScore": 3,
-      "thesisDrop": 57,
+      "thesisDrop": 73,
       "confidenceDecay": 44,
-      "exitProbability": 42,
-      "dynamicPositionRisk": 25,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 29,
       "recovery": {
         "recovering": true,
         "sustainedMin": 5
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788452152749
+      "evaluatedAt": 1788452176683
     },
-    "highestPnLSeen": -0.18,
-    "lastR15": 63,
+    "highestPnLSeen": -0.27,
+    "lastR15": 61.3,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -0.18% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.18,
+      "reason": "peak -0.27% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.27,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788452152749
-    }
+      "evaluatedAt": 1788451868755
+    },
+    "exitPrice": 524.36,
+    "statusChangedAt": 1788452176683
   }
 }
