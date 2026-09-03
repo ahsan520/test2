@@ -247,6 +247,20 @@ async function init() {
     if (document.getElementById('tab-market-data')?.classList.contains('on')) refreshMarketData();
   }, 60_000);
 
+  // Browsers throttle (sometimes near-fully pause) setInterval in a
+  // backgrounded/minimized tab — the 60s poll above can silently fall
+  // behind for many minutes with nothing to catch it up. Force an
+  // immediate refresh the moment the tab becomes visible again, so
+  // reopening/refocusing never shows data staler than one real fetch
+  // cycle. (2026-09-03: observed GUI showing 9min-old data 3min after
+  // a decide run — the committed file was actually fresh; this was a
+  // stalled client-side poll, not a backend git race.)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && document.getElementById('tab-market-data')?.classList.contains('on')) {
+      refreshMarketData();
+    }
+  });
+
   renderJournal();
   initAlertCfg();
   renderAlertCfgPage();
