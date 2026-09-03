@@ -1584,20 +1584,16 @@ function _applyDefaultChartView(widget) {
   widget.onChartReady(() => {
     let chart;
     try {
-      chart = widget.chart();
+      // activeChart() is the documented method for study/API calls;
+      // chart() (pane index) is an alias but activeChart is what
+      // TradingView's own examples use for createStudy.
+      chart = typeof widget.activeChart === 'function' ? widget.activeChart() : widget.chart();
     } catch (e) {
-      console.log('[chart] widget.chart() unavailable:', e.message);
+      console.log('[chart] active chart unavailable:', e.message);
       return;
     }
 
-    const addStudiesAndRange = () => {
-      // Studies and visible-range are independent — one failing (e.g. a
-      // symbol without 24h of history yet) must never block the other.
-      DEFAULT_STUDIES.forEach(name => {
-        try { chart.createStudy(name, false, false); }
-        catch (e) { console.log(`[chart] createStudy('${name}') failed:`, e.message); }
-      });
-
+    const setDefaultRange = () => {
       try {
         const nowSec = Math.floor(Date.now() / 1000);
         chart.setVisibleRange({ from: nowSec - DEFAULT_VISIBLE_RANGE_S, to: nowSec });
@@ -1606,26 +1602,42 @@ function _applyDefaultChartView(widget) {
       }
     };
 
-    let applied = false;
-    const runOnce = () => {
-      if (applied) return;
-      applied = true;
-      addStudiesAndRange();
+    // The iframe postMessage bridge can silently drop createStudy calls
+    // made before it's fully able to receive them — no error is thrown,
+    // the study just never appears (matches what's reported: no error,
+    // no indicator). Verify each study actually landed via
+    // getStudiesList(), and retry the ones that didn't, a few times with
+    // backoff, before giving up.
+    let attempt = 0;
+    const maxAttempts = 6;
+    const tryAddMissingStudies = () => {
+      attempt++;
+      let existing = [];
+      try { existing = chart.getStudiesList() || []; }
+      catch (e) { console.log('[chart] getStudiesList failed:', e.message); }
+
+      const missing = DEFAULT_STUDIES.filter(name => !existing.includes(name));
+      if (missing.length === 0) return;
+
+      missing.forEach(name => {
+        try {
+          chart.createStudy(name, false, false, {}, (result) => {
+            console.log(`[chart] createStudy('${name}') callback:`, result);
+          });
+        } catch (e) {
+          console.log(`[chart] createStudy('${name}') threw:`, e.message);
+        }
+      });
+
+      if (attempt < maxAttempts) {
+        setTimeout(tryAddMissingStudies, 700 * attempt);
+      } else {
+        console.log('[chart] gave up adding studies after', maxAttempts, 'attempts; still missing:', missing);
+      }
     };
 
-    // onChartReady fires once the widget shell exists, not once the
-    // symbol's actual bar data is in — createStudy can silently no-op if
-    // called too early. onDataLoaded (single-shot) fires once real data
-    // has loaded for the symbol, so prefer that.
-    try {
-      chart.onDataLoaded().subscribe(null, runOnce, true);
-    } catch (e) {
-      console.log('[chart] onDataLoaded subscribe failed:', e.message);
-    }
-    // Fallback: if data loaded before we subscribed, a single-shot
-    // subscription can miss the event entirely and never fire. Guarantee
-    // studies still get applied.
-    setTimeout(runOnce, 1200);
+    setDefaultRange();
+    tryAddMissingStudies();
   });
 }
 
