@@ -94,6 +94,19 @@ export const EXCHANGES = {
     providers:   { price: ['yahoo', 'stooq'], extras: ['yahoo'] },
     stooqSuffix: '.us',
   },
+  CBOE: {
+    name:        'Cboe BZX (ETFs)',
+    suffixes:    [],                  // detected by explicit 'CBOE:' prefix only
+    tz:          'America/New_York',
+    currency:    'USD',
+    sessions: {
+      pre_market:  { open: '04:00', close: '09:30' },
+      regular:     { open: '09:30', close: '16:00' },
+      after_hours: { open: '16:00', close: '20:00' },
+    },
+    providers:   { price: ['yahoo', 'stooq'], extras: ['yahoo'] },
+    stooqSuffix: '.us',
+  },
   LSE: {
     name:        'London Stock Exchange',
     suffixes:    ['.L'],
