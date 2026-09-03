@@ -1570,13 +1570,13 @@ function sortBy(k) {
 }
 
 // ── CHART SETUP — shared by single view and both compare panes ──
-// Default view: last 5 minutes visible, with Supertrend + Bull Bear Power
-// pre-loaded. Interval defaults to 1-minute candles — a 5-minute window of
-// 30-minute candles would show well under one bar, so granularity has to
-// match the window. The person can still change interval/indicators by hand
-// afterward; this only sets what loads initially.
-const DEFAULT_CHART_INTERVAL   = '1';       // 1-minute candles
-const DEFAULT_VISIBLE_RANGE_S  = 5 * 60;    // last 5 minutes
+// Default view: 5-minute candles, with Supertrend + Bull Bear Power
+// pre-loaded. Visible window is wide enough to actually show a useful
+// number of 5m bars (a day's worth) rather than clipping to a handful.
+// The person can still change interval/indicators/range by hand afterward;
+// this only sets what loads initially.
+const DEFAULT_CHART_INTERVAL   = '5';           // 5-minute candles
+const DEFAULT_VISIBLE_RANGE_S  = 24 * 60 * 60;  // last 24 hours
 const DEFAULT_STUDIES          = ['Supertrend', 'Bull Bear Power'];
 
 function _applyDefaultChartView(widget) {
