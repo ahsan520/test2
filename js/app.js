@@ -1582,16 +1582,26 @@ const DEFAULT_STUDIES          = ['Supertrend', 'Bull Bear Power'];
 function _applyDefaultChartView(widget) {
   if (!widget || typeof widget.onChartReady !== 'function') return;
   widget.onChartReady(() => {
+    let chart;
     try {
-      const chart  = widget.chart();
+      chart = widget.chart();
+    } catch (e) {
+      console.log('[chart] widget.chart() unavailable:', e.message);
+      return;
+    }
+
+    // Studies and visible-range are independent — one failing (e.g. a
+    // symbol without 24h of history yet) must never block the other.
+    DEFAULT_STUDIES.forEach(name => {
+      try { chart.createStudy(name, false, false); }
+      catch (e) { console.log(`[chart] createStudy('${name}') failed:`, e.message); }
+    });
+
+    try {
       const nowSec = Math.floor(Date.now() / 1000);
       chart.setVisibleRange({ from: nowSec - DEFAULT_VISIBLE_RANGE_S, to: nowSec });
-      DEFAULT_STUDIES.forEach(name => {
-        try { chart.createStudy(name, false, false); }
-        catch (e) { console.log(`[chart] createStudy('${name}') failed:`, e.message); }
-      });
     } catch (e) {
-      console.log('[chart] default view setup failed:', e.message);
+      console.log('[chart] setVisibleRange failed:', e.message);
     }
   });
 }
