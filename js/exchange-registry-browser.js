@@ -47,6 +47,12 @@ const EXCHANGES = {
     // Same 24/7 treatment as NASDAQ/NYSE above — no FROZEN state, always live.
     sessions: { regular: null },
   },
+  CBOE: {
+    name: 'Cboe BZX (ETFs)', suffixes: [],
+    tz: 'America/New_York', currency: 'USD',
+    // Same 24/7 treatment as NASDAQ/NYSE/AMEX above — no FROZEN state, always live.
+    sessions: { regular: null },
+  },
   LSE: {
     name: 'London Stock Exchange', suffixes: ['.L'],
     tz: 'Europe/London', currency: 'GBP',
