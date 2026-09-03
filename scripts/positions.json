@@ -26,7 +26,7 @@
     "histSample": 2,
     "caution": false,
     "highestPnLSeen": -0.02,
-    "lastR15": 53.8,
+    "lastR15": 53.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.02% below 0.35% floor — not evaluated yet",
@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788452176683
+      "evaluatedAt": 1788452446483
     }
   },
   "NASDAQ:AAPL": {
@@ -64,7 +64,7 @@
     "histSample": 0,
     "caution": false,
     "highestPnLSeen": 0.09,
-    "lastR15": 65.7,
+    "lastR15": 65.3,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.09% below 0.35% floor — not evaluated yet",
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788452176683
+      "evaluatedAt": 1788452446483
     }
   },
   "BINANCE:FETUSDT": {
@@ -91,9 +91,9 @@
     "t2": 0.1664,
     "score": 5,
     "spikeScore": 0.8752758958436057,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788452446483,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-FET-20260903T142000Z",
@@ -104,7 +104,10 @@
       "qty": 2276.21,
       "fillPrice": 0.15694927752711743,
       "buyOrderId": "C02__724205044588576768036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724231357403709440036",
+      "exitFillPrice": 0.15879931508955678,
+      "closedAt": 1788452447813
     },
     "entrySnapshot": {
       "at": 1788446174142,
@@ -137,31 +140,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -9,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 26 below 50 threshold",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 31,
+      "confidenceDecay": 33,
+      "exitProbability": 26,
+      "dynamicPositionRisk": 26,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788452176683
+      "evaluatedAt": 1788452446483
     },
     "highestPnLSeen": 2.13,
-    "lastR15": 64.9,
+    "lastR15": 62.1,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.70% below tier A+ give-back 0.75%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +2.13% (tier A+) → now +1.18%, gave back 0.95% ≥ 0.75% with weakening momentum [CVD fading]",
       "highestPnLSeen": 2.13,
-      "drawdownFromPeak": 0.7,
+      "drawdownFromPeak": 0.95,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1788452176683
-    }
+      "evaluatedAt": 1788452446483
+    },
+    "exitPrice": 0.1588,
+    "statusChangedAt": 1788452446483
   },
   "BINANCE:XMRUSDT": {
     "sym": "BINANCE:XMRUSDT",
