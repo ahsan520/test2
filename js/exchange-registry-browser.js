@@ -41,6 +41,12 @@ const EXCHANGES = {
     // Same 24/7 treatment as NASDAQ above — no FROZEN state, always live.
     sessions: { regular: null },
   },
+  AMEX: {
+    name: 'NYSE American / ARCA (ETFs)', suffixes: [],
+    tz: 'America/New_York', currency: 'USD',
+    // Same 24/7 treatment as NASDAQ/NYSE above — no FROZEN state, always live.
+    sessions: { regular: null },
+  },
   LSE: {
     name: 'London Stock Exchange', suffixes: ['.L'],
     tz: 'Europe/London', currency: 'GBP',
