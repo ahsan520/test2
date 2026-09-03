@@ -1590,19 +1590,42 @@ function _applyDefaultChartView(widget) {
       return;
     }
 
-    // Studies and visible-range are independent — one failing (e.g. a
-    // symbol without 24h of history yet) must never block the other.
-    DEFAULT_STUDIES.forEach(name => {
-      try { chart.createStudy(name, false, false); }
-      catch (e) { console.log(`[chart] createStudy('${name}') failed:`, e.message); }
-    });
+    const addStudiesAndRange = () => {
+      // Studies and visible-range are independent — one failing (e.g. a
+      // symbol without 24h of history yet) must never block the other.
+      DEFAULT_STUDIES.forEach(name => {
+        try { chart.createStudy(name, false, false); }
+        catch (e) { console.log(`[chart] createStudy('${name}') failed:`, e.message); }
+      });
 
+      try {
+        const nowSec = Math.floor(Date.now() / 1000);
+        chart.setVisibleRange({ from: nowSec - DEFAULT_VISIBLE_RANGE_S, to: nowSec });
+      } catch (e) {
+        console.log('[chart] setVisibleRange failed:', e.message);
+      }
+    };
+
+    let applied = false;
+    const runOnce = () => {
+      if (applied) return;
+      applied = true;
+      addStudiesAndRange();
+    };
+
+    // onChartReady fires once the widget shell exists, not once the
+    // symbol's actual bar data is in — createStudy can silently no-op if
+    // called too early. onDataLoaded (single-shot) fires once real data
+    // has loaded for the symbol, so prefer that.
     try {
-      const nowSec = Math.floor(Date.now() / 1000);
-      chart.setVisibleRange({ from: nowSec - DEFAULT_VISIBLE_RANGE_S, to: nowSec });
+      chart.onDataLoaded().subscribe(null, runOnce, true);
     } catch (e) {
-      console.log('[chart] setVisibleRange failed:', e.message);
+      console.log('[chart] onDataLoaded subscribe failed:', e.message);
     }
+    // Fallback: if data loaded before we subscribed, a single-shot
+    // subscription can miss the event entirely and never fire. Guarantee
+    // studies still get applied.
+    setTimeout(runOnce, 1200);
   });
 }
 
