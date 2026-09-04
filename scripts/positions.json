@@ -25,16 +25,16 @@
     "histWinRate": 0.5,
     "histSample": 2,
     "caution": false,
-    "highestPnLSeen": 1.17,
+    "highestPnLSeen": 1.23,
     "lastR15": 54.1,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.06% below tier A give-back 1.00% (regime-widened)",
-      "highestPnLSeen": 1.17,
-      "drawdownFromPeak": 0.05999999999999983,
+      "reason": "drawdown 0.00% below tier A give-back 1.00% (regime-widened)",
+      "highestPnLSeen": 1.23,
+      "drawdownFromPeak": 0,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     }
   },
   "NASDAQ:AAPL": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     }
   },
   "BINANCE:TAOUSDT": {
@@ -109,28 +109,28 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "no entry snapshot — falling-knife-only score 20 below 75 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 33,
+      "exitProbability": 33,
+      "dynamicPositionRisk": 20,
       "recovery": {
         "recovering": true,
         "sustainedMin": 14
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     },
     "highestPnLSeen": 0.69,
-    "lastR15": 57.5,
+    "lastR15": 53.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.17% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.44% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.69,
-      "drawdownFromPeak": 0.16999999999999993,
+      "drawdownFromPeak": 0.43999999999999995,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     }
   },
   "BINANCE:UNIUSDT": {
@@ -168,8 +168,8 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "no entry snapshot — falling-knife-only score 8 below 75 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 14,
-      "exitProbability": 14,
+      "fallingKnifeScore": 13,
+      "exitProbability": 13,
       "dynamicPositionRisk": 8,
       "recovery": {
         "recovering": true,
@@ -177,18 +177,18 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     },
-    "highestPnLSeen": -1,
-    "lastR15": 52.1,
+    "highestPnLSeen": -0.67,
+    "lastR15": 53.5,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -1.00% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -1,
+      "reason": "peak -0.67% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.67,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     }
   },
   "BINANCE:ZECUSDT": {
@@ -207,9 +207,9 @@
     "t2": 1117.78,
     "score": 9,
     "spikeScore": 5.119868551503764,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788510736472,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "p2Trigger": "P2-C-NORMAL",
@@ -225,7 +225,10 @@
       "qty": 1.413247,
       "fillPrice": 968.9528112141757,
       "buyOrderId": "C02__724456216335458304036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724475843857833984036",
+      "exitFillPrice": 965.5544652016985,
+      "closedAt": 1788510738125
     },
     "entrySnapshot": {
       "at": 1788506058246,
@@ -257,31 +260,33 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "HIGH SHOCK",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 6 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 26,
-      "confidenceDecay": 13,
-      "exitProbability": 6,
-      "dynamicPositionRisk": 6,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 92 → current 30 (drop 62 > 60)",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 62,
+      "confidenceDecay": 38,
+      "exitProbability": 38,
+      "dynamicPositionRisk": 38,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788510330237
+      "evaluatedAt": 1788510736472
     },
     "highestPnLSeen": 0.55,
-    "lastR15": 60.4,
+    "lastR15": 63.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.76% ≥ 0.40% but momentum not yet weak — holding, letting it run",
+      "reason": "drawdown 0.50% ≥ 0.40% but momentum not yet weak — holding, letting it run",
       "highestPnLSeen": 0.55,
-      "drawdownFromPeak": 0.76,
+      "drawdownFromPeak": 0.5,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1788510330237
-    }
+      "evaluatedAt": 1788509910142
+    },
+    "exitPrice": 968.08,
+    "statusChangedAt": 1788510736472
   }
 }
