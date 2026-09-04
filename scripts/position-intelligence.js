@@ -37,6 +37,9 @@ const PARTIAL_EXIT_LEVEL2     = parseFloat(process.env.SELL_PARTIAL_EXIT_LEVEL2 
 const EMERGENCY_EXIT_LEVEL    = parseFloat(process.env.SELL_EMERGENCY_EXIT_LEVEL    || '85');
 const USE_MARKET_REGIME       = (process.env.SELL_USE_MARKET_REGIME    || 'true') !== 'false';
 const REQUIRE_BTC_RECOVERY    = (process.env.SELL_REQUIRE_BTC_RECOVERY || 'true') !== 'false';
+const RUNNER_SHIELD_ENABLED   = (process.env.SELL_RUNNER_SHIELD_ENABLE || 'true') !== 'false';
+const RUNNER_SHIELD_MIN_PCT   = parseFloat(process.env.SELL_RUNNER_SHIELD_MIN_PCT || '0.6');
+const RUNNER_MOMENTUM_MIN     = parseInt(process.env.SELL_RUNNER_MOMENTUM_MIN || '2', 10);
 
 // ── Breakout-failure boost — dev-team note "Sell Intelligence / Leaderboard
 // Decider" (UPDATED), written up after the UNI incident (bought on a
@@ -175,6 +178,21 @@ function calcConfidenceDecay(entryChecks = {}, currentChecks = {}) {
 
 // ── Recovery Detector — is price bouncing back over the recent history
 // window (market-state's per-symbol rolling history) after a dip? ──
+function detectStrongContinuation({ pnlPct, symbolState, marketState, history = [] }) {
+  if (!RUNNER_SHIELD_ENABLED || pnlPct == null || pnlPct < RUNNER_SHIELD_MIN_PCT) return false;
+  const trends = [
+    symbolState?.cvdMomentum?.trend,
+    symbolState?.oiMomentum?.trend,
+    marketState?.breadthMomentum?.trend,
+    symbolState?.whaleMomentum?.trend,
+  ];
+  const accelerating = trends.filter(t => t === 'ACCELERATING' || t === 'IMPROVING').length;
+  const prices = (history || []).map(h => h?.price).filter(v => v != null);
+  const priceRising = prices.length >= 2 && prices[prices.length - 1] > prices[0];
+  const riskOff = marketState?.marketRegime === 'RISK_OFF';
+  return !riskOff && priceRising && accelerating >= RUNNER_MOMENTUM_MIN;
+}
+
 function detectRecovery(history = [], recoveryWaitMin) {
   if (history.length < 2) return { recovering: false, sustainedMin: 0 };
   const cutoff  = Date.now() - recoveryWaitMin * 60 * 1000;
@@ -232,6 +250,9 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
     });
 
     const recovery = detectRecovery(symbolState?.history, RECOVERY_WAIT_MIN);
+  const strongContinuation = detectStrongContinuation({
+    pnlPct, symbolState, marketState, history: symbolState?.history,
+  });
     const btcOkForRecovery = !REQUIRE_BTC_RECOVERY || (marketState?.btcRiskScore ?? 100) < FALLING_KNIFE_MAX;
     const recoveryConfirmed = recovery.recovering && recovery.sustainedMin >= RECOVERY_WAIT_MIN && btcOkForRecovery;
     const dynamicKnifeScore = recoveryConfirmed ? Math.round(fallingKnifeScore * 0.6) : fallingKnifeScore;
@@ -276,6 +297,9 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   const confidenceDecay = calcConfidenceDecay(snap.bullChecks, currentEntry?.bullChecks || {});
 
   const recovery = detectRecovery(symbolState?.history, RECOVERY_WAIT_MIN);
+  const strongContinuation = detectStrongContinuation({
+    pnlPct, symbolState, marketState, history: symbolState?.history,
+  });
 
   // ── Breakout-failure check — see BREAKOUT_FAIL_BOOST comment above.
   // Only meaningful when the position was actually entered on a breakout
@@ -327,7 +351,7 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   }
 
   // ── Confidence decay hard override ──
-  if (confidenceDecay > CONFIDENCE_DECAY_MAX && fallingKnifeScore > PARTIAL_EXIT_LEVEL1) {
+  if (!strongContinuation && confidenceDecay > CONFIDENCE_DECAY_MAX && fallingKnifeScore > PARTIAL_EXIT_LEVEL1) {
     return {
       action: 'REDUCE_50',
       reason: `Confidence decay ${confidenceDecay}% > ${CONFIDENCE_DECAY_MAX}% with falling-knife ${fallingKnifeScore}${breakoutFailed ? ' — price also back below entry breakout level' : ''}`,
@@ -339,8 +363,8 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   // ── Primary decision ladder — dynamicPositionRisk (recovery-aware) ──
   let action = 'HOLD';
   if (dynamicPositionRisk >= EMERGENCY_EXIT_LEVEL)      action = 'EMERGENCY_EXIT';
-  else if (dynamicPositionRisk >= PARTIAL_EXIT_LEVEL2)  action = 'REDUCE_50';
-  else if (dynamicPositionRisk >= PARTIAL_EXIT_LEVEL1)  action = 'REDUCE_25';
+  else if (!strongContinuation && dynamicPositionRisk >= PARTIAL_EXIT_LEVEL2)  action = 'REDUCE_50';
+  else if (!strongContinuation && dynamicPositionRisk >= PARTIAL_EXIT_LEVEL1)  action = 'REDUCE_25';
 
   const reason = action === 'HOLD'
     ? `dynamicPositionRisk ${dynamicPositionRisk} below ${PARTIAL_EXIT_LEVEL1} threshold${recoveryConfirmed ? ' (recovery detected, risk softened)' : ''}${isStaleAndFlat ? ` (stale+flat nudge applied, +${STALE_NUDGE_AMOUNT})` : ''}${breakoutFailed ? ` (breakout-fail boost +${BREAKOUT_FAIL_BOOST} applied, still below threshold)` : ''}`
@@ -349,6 +373,6 @@ export function evaluatePosition({ pos, currentEntry, symbolState, marketState, 
   return {
     action, reason,
     fallingKnifeScore, thesisDrop, currentThesisScore, confidenceDecay, breakoutFailed,
-    exitProbability, dynamicPositionRisk, positionAgeMin: ageMin, recovery, isStaleAndFlat,
+    exitProbability, dynamicPositionRisk, positionAgeMin: ageMin, recovery, isStaleAndFlat, strongContinuation,
   };
 }

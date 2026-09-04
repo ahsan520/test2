@@ -48,6 +48,8 @@ const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true'
 const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '0.4');
 const RSI_ROLLOVER_DROP = parseFloat(process.env.SELL_PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
 const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      || '70');
+const MIN_WEAK_SIGNALS  = parseInt(process.env.SELL_PROFIT_MIN_WEAK_SIGNALS || '2', 10);
+const RUNNER_MIN_PCT     = parseFloat(process.env.SELL_PROFIT_RUNNER_MIN_PCT || '0.6');
 
 // ── Adaptive give-back thresholds, keyed by how high the peak ran ──
 // { minPeak: highestPnLSeen must be >= this to use this tier, giveBack: how
@@ -118,8 +120,10 @@ export function isMomentumWeak({ symbolState, marketState, r15, lastR15 }) {
     lastR15 >= RSI_EXTENDED &&
     (lastR15 - r15) >= RSI_ROLLOVER_DROP;
 
+  const weakSignalCount = [cvdFading, oiFading, breadthFading, rsiRollingOver].filter(Boolean).length;
   return {
-    weak: cvdFading || oiFading || breadthFading || rsiRollingOver,
+    weak: weakSignalCount >= MIN_WEAK_SIGNALS,
+    weakSignalCount,
     cvdFading, oiFading, breadthFading, rsiRollingOver,
   };
 }
@@ -180,10 +184,17 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
   const regimeMult      = regimeGivebackMultiplier(marketState);
   const effectiveGiveBack = tier.giveBack * regimeMult;
 
-  // ── Step 5: sell only if BOTH drawdown and weakening momentum confirm ──
+  // ── Step 5: sell only if BOTH drawdown and CONFIRMED weakening momentum. ──
+  // A single fading feed is not enough to stop a strong runner. This engine
+  // requires MIN_WEAK_SIGNALS independent deterioration signals.
   const drawdownConfirmed = drawdownFromPeak >= effectiveGiveBack;
+  const strongContinuation =
+    pnlPct >= RUNNER_MIN_PCT &&
+    pnlPct >= (pos.prevPnLPct ?? pnlPct) &&
+    !momentum.weak;
+  pos.prevPnLPct = pnlPct;
 
-  if (drawdownConfirmed && momentum.weak) {
+  if (drawdownConfirmed && momentum.weak && !strongContinuation) {
     const signals = [
       momentum.cvdFading     ? 'CVD fading'        : null,
       momentum.oiFading      ? 'OI fading'          : null,
@@ -194,7 +205,7 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
     return {
       action: 'EXIT',
       reason: `Profit Protection Triggered: peak +${highestPnLSeen.toFixed(2)}% (tier ${tier.label}) → now +${pnlPct.toFixed(2)}%, gave back ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}%${regimeMult > 1 ? ` (${tier.giveBack}% × ${regimeMult} regime-widened)` : ''} with weakening momentum [${signals}]`,
-      highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum,
+      highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum, strongContinuation,
     };
   }
 
@@ -202,7 +213,9 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
     action: 'HOLD',
     reason: !drawdownConfirmed
       ? `drawdown ${drawdownFromPeak.toFixed(2)}% below tier ${tier.label} give-back ${effectiveGiveBack.toFixed(2)}%${regimeMult > 1 ? ' (regime-widened)' : ''}`
-      : `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}% but momentum not yet weak — holding, letting it run`,
-    highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum,
+      : strongContinuation
+        ? `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}% but momentum/price continuation is still strong — holding, letting it run`
+        : `drawdown ${drawdownFromPeak.toFixed(2)}% ≥ ${effectiveGiveBack.toFixed(2)}% but confirmed momentum weakness not met (${momentum.weakSignalCount}/${MIN_WEAK_SIGNALS}) — holding, letting it run`,
+    highestPnLSeen, drawdownFromPeak, tier: tier.label, giveBack: effectiveGiveBack, regimeMult, momentum, strongContinuation,
   };
 }
