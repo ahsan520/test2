@@ -441,6 +441,7 @@ jobs:
           AV_API_KEY:         ${{ secrets.AV_API_KEY }}
           AV_API_KEY_NEWS:    ${{ secrets.AV_API_KEY_NEWS }}
           GNEWS_API_KEY:      ${{ secrets.GNEWS_API_KEY }}
+          FINNHUB_API_KEY:    ${{ secrets.FINNHUB_API_KEY }}
           RUN_MODE:           ${{ steps.mode.outputs.value }}
         run: |
           echo "Running in mode: $RUN_MODE"
@@ -473,6 +474,7 @@ jobs:
               # decide is reliably keeping market-data.json fresh on its own).
               node sentiment-fetcher.js
               node general-news-fetcher.js
+              node analyst-picks-fetcher.js
               ;;
             decide)
               # Fetch fresh market data FIRST, immediately before deciding —
@@ -526,7 +528,7 @@ jobs:
           FILES="env.js market-data.json market-state.json audit.json .alert-state.json \
                  .lb-scan-state.json lb-alert-state.json trade-state.json \
                  .cvd-decline-state.json symbol-history.json \
-                 sentiment-data.json general-news-data.json paper-balance.json"
+                 sentiment-data.json general-news-data.json paper-balance.json analyst-picks-data.json"
           for f in $FILES; do
             [ -f "scripts/$f" ] && cp "scripts/$f" "/tmp/alpha-state/$f" || true
           done
