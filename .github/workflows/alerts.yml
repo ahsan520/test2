@@ -399,6 +399,9 @@ jobs:
           SELL_EMERGENCY_EXIT_LEVEL:   ${{ vars.SELL_EMERGENCY_EXIT_LEVEL || '85' }}
           SELL_USE_MARKET_REGIME:      ${{ vars.SELL_USE_MARKET_REGIME || 'true' }}
           SELL_REQUIRE_BTC_RECOVERY:   ${{ vars.SELL_REQUIRE_BTC_RECOVERY || 'true' }}
+          SELL_RUNNER_SHIELD_ENABLE:   ${{ vars.SELL_RUNNER_SHIELD_ENABLE || 'true' }}
+          SELL_RUNNER_SHIELD_MIN_PCT:   ${{ vars.SELL_RUNNER_SHIELD_MIN_PCT || '0.6' }}
+          SELL_RUNNER_MOMENTUM_MIN:     ${{ vars.SELL_RUNNER_MOMENTUM_MIN || '2' }}
           # ── Profit Intelligence Engine (profit-intelligence.js) ──
           # Independent sell reason — protects unrealized profit giving
           # itself back, separate from Position Intelligence above (which
@@ -409,6 +412,8 @@ jobs:
           SELL_PROFIT_MIN_PCT:             ${{ vars.SELL_PROFIT_MIN_PCT || '0.4' }}
           SELL_PROFIT_RSI_EXTENDED:        ${{ vars.SELL_PROFIT_RSI_EXTENDED || '70' }}
           SELL_PROFIT_RSI_ROLLOVER_DROP:   ${{ vars.SELL_PROFIT_RSI_ROLLOVER_DROP || '5' }}
+          SELL_PROFIT_MIN_WEAK_SIGNALS:     ${{ vars.SELL_PROFIT_MIN_WEAK_SIGNALS || '2' }}
+          SELL_PROFIT_RUNNER_MIN_PCT:       ${{ vars.SELL_PROFIT_RUNNER_MIN_PCT || '0.6' }}
           SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '0.4' }}
           SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.2' }}
           SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '0.6' }}
