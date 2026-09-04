@@ -62,7 +62,7 @@ const LB_EXIT_SCORE_MIN  = parseInt(process.env.LB_EXIT_SCORE_MIN  || '3');
 // skips the sell attempt entirely and closes the position out of tracking
 // as dust instead of retrying (and re-alerting) the same failed order every
 // cycle forever. Set via repo Variable MEXC_MIN_SELL_NOTIONAL_USDT.
-const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USDT || '1');
+const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USDT || '5');
 const QUOTE_ASSETS = new Set(['USDT', 'USDC', 'BUSD', 'TUSD', 'DAI', 'FDUSD']);
 
 // Position Intelligence's REDUCE_25/REDUCE_50 actions are recommend-only

@@ -109,7 +109,7 @@ const QUOTE_ASSETS = new Set(['USDT', 'USDC', 'BUSD', 'TUSD', 'DAI', 'FDUSD']);
 // guard — a balance worth less than this can't be sold on MEXC at all, so
 // skip attempting it here too rather than retrying (and re-alerting) a
 // doomed order every rotation cycle.
-const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USDT || '1');
+const MIN_SELL_NOTIONAL_USDT = parseFloat(process.env.MEXC_MIN_SELL_NOTIONAL_USDT || '5');
 
 
 // ── Rotation — sell anything held that's not in THIS cycle's buy alert ──
