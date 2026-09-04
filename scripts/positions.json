@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0.1499999999999999,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1788511109261
+      "evaluatedAt": 1788511954110
     }
   },
   "NASDAQ:AAPL": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788511109261
+      "evaluatedAt": 1788511954110
     }
   },
   "BINANCE:TAOUSDT": {
@@ -105,7 +105,8 @@
       "fillPrice": 228.62,
       "buyOrderId": "MANUAL_ADOPTED_1788501038326",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "staleZeroBalanceStrikes": 1
     },
     "lastPI": {
       "action": "HOLD",
@@ -167,20 +168,20 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 34 below 75 threshold",
-      "fallingKnifeScore": 34,
-      "exitProbability": 34,
-      "dynamicPositionRisk": 34,
+      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold",
+      "fallingKnifeScore": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788511109261
+      "evaluatedAt": 1788511954110
     },
     "highestPnLSeen": -0.94,
-    "lastR15": 51.5,
+    "lastR15": 51.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.94% below 0.35% floor — not evaluated yet",
@@ -188,106 +189,8 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788511109261
+      "evaluatedAt": 1788511954110
     }
-  },
-  "BINANCE:ZECUSDT": {
-    "sym": "BINANCE:ZECUSDT",
-    "base": "ZEC",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "SQUEEZE NOW",
-    "dir": "bull",
-    "alertedAt": 1788506052180,
-    "holdLockUntil": 1788507252180,
-    "entryPrice": 968.9528112141757,
-    "stop": 956.84,
-    "t1": 1043.37,
-    "t2": 1117.78,
-    "score": 9,
-    "spikeScore": 5.119868551503764,
-    "exitAlertedAt": 1788510801593,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "p2Trigger": "P2-C-NORMAL",
-    "recommended": true,
-    "rankScore": 0.644,
-    "histWinRate": 0.3888888888888889,
-    "histSample": 18,
-    "caution": false,
-    "liveOrder": {
-      "mode": "live",
-      "buyAt": 1788506058246,
-      "usdSize": 1369.37,
-      "qty": 1.413247,
-      "fillPrice": 968.9528112141757,
-      "buyOrderId": "C02__724456216335458304036",
-      "qtyEstimated": false,
-      "closedAt": 1788510802363,
-      "exitFillPrice": 967.05,
-      "dustIgnored": true
-    },
-    "entrySnapshot": {
-      "at": 1788506058246,
-      "price": 970.42,
-      "conv": 8,
-      "whaleScore": 100,
-      "bullConfCount": 8,
-      "bullChecks": {
-        "dailyBiasBull": true,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": false,
-        "cvdRising": true,
-        "volExpansion": true,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": false,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 92,
-      "btcRiskScore": 0,
-      "breadthScore": 95,
-      "marketRegime": "RISK_ON",
-      "triggerStatus": "BREAKOUT",
-      "breakoutLevel": 962.17
-    },
-    "entryTriggerStatus": "BREAKOUT",
-    "entryStateAtBuy": "HIGH SHOCK",
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 92 → current 8 (drop 84 > 60)",
-      "fallingKnifeScore": 33,
-      "thesisDrop": 84,
-      "confidenceDecay": 50,
-      "exitProbability": 48,
-      "dynamicPositionRisk": 29,
-      "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
-      },
-      "breakoutFailed": false,
-      "noSnapshotFallback": false,
-      "evaluatedAt": 1788510801593
-    },
-    "highestPnLSeen": 0.55,
-    "lastR15": 60.4,
-    "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.76% ≥ 0.40% but momentum not yet weak — holding, letting it run",
-      "highestPnLSeen": 0.55,
-      "drawdownFromPeak": 0.76,
-      "tier": "C",
-      "giveBack": 0.4,
-      "evaluatedAt": 1788510330237
-    },
-    "exitPrice": 967.05,
-    "statusChangedAt": 1788510801593
   },
   "BINANCE:XLMUSDT": {
     "sym": "BINANCE:XLMUSDT",
@@ -320,6 +223,31 @@
       "buyOrderId": "MANUAL_ADOPTED_1788511111921",
       "adopted": true,
       "priceSource": "trade_history"
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "no entry snapshot — falling-knife-only score 2 below 75 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 3,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 2,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 19
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": true,
+      "evaluatedAt": 1788511954110
+    },
+    "highestPnLSeen": 0.33,
+    "lastR15": 61.2,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak 0.33% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": 0.33,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1788511954110
     }
   }
 }
