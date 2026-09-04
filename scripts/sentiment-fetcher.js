@@ -150,7 +150,7 @@ async function main() {
   const existing  = loadExisting();
 
   const now = new Date();
-  const hourKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}`;
+  const hourKey = `${now.getUTCFullYear()}-${now.getUTCMonth() + 1}-${now.getUTCDate()}-${now.getUTCHours()}`;
 
   let items          = existing.items || [];
   let bySymbol       = existing.bySymbol || {};
