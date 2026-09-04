@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0.24,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788500592912
+      "evaluatedAt": 1788501033274
     }
   },
   "NASDAQ:AAPL": {
@@ -72,7 +72,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788500592912
+      "evaluatedAt": 1788501033274
     }
   },
   "BINANCE:TAOUSDT": {
@@ -91,9 +91,9 @@
     "t2": 242.41,
     "score": 5,
     "spikeScore": 0.7769048394980808,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788501033274,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-TAO-20260904T023500Z",
@@ -104,7 +104,10 @@
       "qty": 1.396,
       "fillPrice": 228.69319484240688,
       "buyOrderId": "C02__724391005079388160036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724435145972461568036",
+      "exitFillPrice": 228.09,
+      "closedAt": 1788501034656
     },
     "entrySnapshot": {
       "at": 1788490510643,
@@ -137,31 +140,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -18,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 40 below 50 threshold (stale+flat nudge applied, +15)",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 27,
+      "confidenceDecay": 33,
+      "exitProbability": 40,
+      "dynamicPositionRisk": 40,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788500592912
+      "evaluatedAt": 1788501033274
     },
     "highestPnLSeen": 0.75,
-    "lastR15": 59.7,
+    "lastR15": 49.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.44% below tier B give-back 0.60% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.75% (tier B) → now +-0.26%, gave back 1.01% ≥ 0.60% (0.3% × 2 regime-widened) with weakening momentum [CVD fading]",
       "highestPnLSeen": 0.75,
-      "drawdownFromPeak": 0.44,
+      "drawdownFromPeak": 1.01,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788500592912
-    }
+      "evaluatedAt": 1788501033274
+    },
+    "exitPrice": 228.1,
+    "statusChangedAt": 1788501033274
   },
   "BINANCE:AVAXUSDT": {
     "sym": "BINANCE:AVAXUSDT",
@@ -197,20 +202,20 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 13 below 75 threshold",
-      "fallingKnifeScore": 13,
-      "exitProbability": 13,
-      "dynamicPositionRisk": 13,
+      "reason": "no entry snapshot — falling-knife-only score 34 below 75 threshold",
+      "fallingKnifeScore": 34,
+      "exitProbability": 34,
+      "dynamicPositionRisk": 34,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788500592912
+      "evaluatedAt": 1788501033274
     },
     "highestPnLSeen": -0.07,
-    "lastR15": 38.4,
+    "lastR15": 33.5,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.07% below 0.35% floor — not evaluated yet",
@@ -218,7 +223,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788500592912
+      "evaluatedAt": 1788501033274
     }
   }
 }
