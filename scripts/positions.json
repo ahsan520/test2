@@ -15,9 +15,9 @@
     "t2": 139.4,
     "score": 6,
     "spikeScore": 1.9008436751353506,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788627935345,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-AAVE-20260905T151500Z",
@@ -28,7 +28,10 @@
       "qty": 2.218,
       "fillPrice": 131.51000000000002,
       "buyOrderId": "C02__724946047930937344036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724967411123437569036",
+      "exitFillPrice": 131.59225428313798,
+      "closedAt": 1788627936579
     },
     "entrySnapshot": {
       "at": 1788622843133,
@@ -60,20 +63,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 33 below 50 threshold",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 80 → current 11 (drop 69 > 60)",
       "fallingKnifeScore": 33,
-      "thesisDrop": 47,
+      "thesisDrop": 69,
       "confidenceDecay": 38,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "exitProbability": 41,
+      "dynamicPositionRisk": 41,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788627632832
+      "evaluatedAt": 1788627935345
     },
     "highestPnLSeen": 0.79,
     "lastR15": 62.7,
@@ -86,6 +89,8 @@
       "giveBack": 0.6,
       "evaluatedAt": 1788627632832
     },
-    "prevPnLPct": 0.3
+    "prevPnLPct": 0.3,
+    "exitPrice": 131.61,
+    "statusChangedAt": 1788627935345
   }
 }
