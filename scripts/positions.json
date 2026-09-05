@@ -111,9 +111,9 @@
     "t2": 7.0296,
     "score": 3,
     "spikeScore": 3.673146605632753,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788623341995,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-UNI-20260905T140000Z",
@@ -124,7 +124,10 @@
       "qty": 176.52,
       "fillPrice": 6.331838431905733,
       "buyOrderId": "C02__724922622533410816036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724948145498144769036",
+      "exitFillPrice": 6.313421312032631,
+      "closedAt": 1788623343303
     },
     "entrySnapshot": {
       "at": 1788617258151,
@@ -157,32 +160,34 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 4 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 15,
-      "confidenceDecay": 25,
-      "exitProbability": 4,
-      "dynamicPositionRisk": 4,
+      "reason": "dynamicPositionRisk 24 below 50 threshold",
+      "fallingKnifeScore": 30,
+      "thesisDrop": 24,
+      "confidenceDecay": 38,
+      "exitProbability": 24,
+      "dynamicPositionRisk": 24,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788623037464
+      "evaluatedAt": 1788623341995
     },
     "highestPnLSeen": 0.6,
-    "lastR15": 59,
+    "lastR15": 54.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.49% below tier B give-back 0.60% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.60% (tier B) → now +-0.27%, gave back 0.87% ≥ 0.60% (0.3% × 2 regime-widened) with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.6,
-      "drawdownFromPeak": 0.49,
+      "drawdownFromPeak": 0.87,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788623037464
+      "evaluatedAt": 1788623341995
     },
-    "prevPnLPct": 0.11
+    "prevPnLPct": -0.27,
+    "exitPrice": 6.315,
+    "statusChangedAt": 1788623341995
   },
   "BINANCE:AAVEUSDT": {
     "sym": "BINANCE:AAVEUSDT",
