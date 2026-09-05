@@ -24,7 +24,7 @@ const OUT_PATH = path.join(process.cwd(), 'general-news-data.json');
 
 const GNEWS_QUERY        = '"Iran" OR "White House" OR "Federal Reserve" OR "interest rate" OR "jobs report" OR crypto OR bitcoin';
 const GNEWS_MAX_ARTICLES = 25;
-const GNEWS_WINDOW_MIN   = 30; // only fetch once per this many minutes
+const GNEWS_WINDOW_MIN   = 60; // only fetch once per this many minutes
 
 function loadExisting() {
   try { return JSON.parse(fs.readFileSync(OUT_PATH, 'utf8')); }
