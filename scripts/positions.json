@@ -61,22 +61,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 17 below 50 threshold",
-      "fallingKnifeScore": 17,
-      "thesisDrop": 30,
+      "reason": "dynamicPositionRisk 13 below 50 threshold",
+      "fallingKnifeScore": 12,
+      "thesisDrop": 26,
       "confidenceDecay": 22,
-      "exitProbability": 17,
-      "dynamicPositionRisk": 17,
+      "exitProbability": 13,
+      "dynamicPositionRisk": 13,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 5
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
     "highestPnLSeen": 0.26,
-    "lastR15": 68.6,
+    "lastR15": 54.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.26% below 0.35% floor — not evaluated yet",
@@ -84,7 +84,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     }
   },
   "BINANCE:IMXUSDT": {
@@ -112,8 +112,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1788611969333,
-      "usdSize": 175.73,
-      "qty": 1390.04,
+      "usdSize": 131.8,
+      "qty": 1042.53,
       "fillPrice": 0.12642,
       "buyOrderId": "C02__724900443603296256036",
       "qtyEstimated": false
@@ -148,23 +148,23 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 18 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 6,
-      "thesisDrop": 10,
-      "confidenceDecay": 0,
-      "exitProbability": 18,
-      "dynamicPositionRisk": 18,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 61 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 51,
+      "thesisDrop": 56,
+      "confidenceDecay": 33,
+      "exitProbability": 61,
+      "dynamicPositionRisk": 61,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
     "highestPnLSeen": 0.3,
-    "lastR15": 51.7,
+    "lastR15": 48.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.30% below 0.35% floor — not evaluated yet",
@@ -172,8 +172,9 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788615695637
-    }
+      "evaluatedAt": 1788616253194
+    },
+    "piPartialLevel": 1
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -191,9 +192,9 @@
     "t2": 0.0956,
     "score": 8,
     "spikeScore": 3.1156092454193867,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788616253194,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "p2Trigger": "P2-C-NORMAL",
@@ -209,7 +210,10 @@
       "qty": 12351.06,
       "fillPrice": 0.08739000000000001,
       "buyOrderId": "C02__724900477472309248036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724918420872572930036",
+      "exitFillPrice": 0.08709,
+      "closedAt": 1788616256327
     },
     "entrySnapshot": {
       "at": 1788611978345,
@@ -245,7 +249,7 @@
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
       "thesisDrop": 9,
-      "confidenceDecay": 0,
+      "confidenceDecay": 14,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
@@ -254,20 +258,22 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
     "highestPnLSeen": 0.72,
-    "lastR15": 83.3,
+    "lastR15": 63.8,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.04% below tier B give-back 0.60% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.72% (tier B) → now +-0.40%, gave back 1.12% ≥ 0.60% (0.3% × 2 regime-widened) with weakening momentum [Breadth weakening · RSI rolling over (83→64)]",
       "highestPnLSeen": 0.72,
-      "drawdownFromPeak": 0.039999999999999925,
+      "drawdownFromPeak": 1.12,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
-    "prevPnLPct": 0.68
+    "prevPnLPct": -0.4,
+    "exitPrice": 0.08704,
+    "statusChangedAt": 1788616253194
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -308,19 +314,19 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
     "highestPnLSeen": 0.4,
-    "lastR15": 63.2,
+    "lastR15": 51.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.28% below tier C give-back 0.40% (regime-widened)",
+      "reason": "drawdown 0.69% ≥ 0.40% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.4,
-      "drawdownFromPeak": 0.28,
+      "drawdownFromPeak": 0.69,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1788615695637
+      "evaluatedAt": 1788616253194
     },
-    "prevPnLPct": 0.12
+    "prevPnLPct": -0.29
   }
 }
