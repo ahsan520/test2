@@ -17,7 +17,7 @@
     "spikeScore": 3.079062254044751,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XRP-20260905T123000Z",
@@ -28,7 +28,11 @@
       "qty": 81.645717,
       "fillPrice": 1.4145617052554207,
       "buyOrderId": "C02__724900457574481920036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724946024556089344036",
+      "exitFillPrice": 1.4124044607843138,
+      "closedAt": 1788622837538,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1788611973612,
@@ -87,7 +91,9 @@
       "evaluatedAt": 1788622606836
     },
     "piPartialLevel": 1,
-    "piReduceAlertedAt": 1788622606836
+    "piReduceAlertedAt": 1788622606836,
+    "exitPrice": 1.4126,
+    "statusChangedAt": 1788622836575
   },
   "BINANCE:UNIUSDT": {
     "sym": "BINANCE:UNIUSDT",
@@ -151,31 +157,31 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 33 below 50 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 43,
-      "confidenceDecay": 38,
-      "exitProbability": 33,
-      "dynamicPositionRisk": 33,
+      "reason": "dynamicPositionRisk 13 below 50 threshold",
+      "fallingKnifeScore": 20,
+      "thesisDrop": 15,
+      "confidenceDecay": 25,
+      "exitProbability": 13,
+      "dynamicPositionRisk": 13,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 4
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788622606836
+      "evaluatedAt": 1788622836575
     },
     "highestPnLSeen": 0.6,
-    "lastR15": 52.9,
+    "lastR15": 59.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.10% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "reason": "drawdown 0.46% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.6,
-      "drawdownFromPeak": 1.1,
+      "drawdownFromPeak": 0.45999999999999996,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788622606836
+      "evaluatedAt": 1788622836575
     },
-    "prevPnLPct": -0.5
+    "prevPnLPct": 0.14
   }
 }
