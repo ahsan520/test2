@@ -38,25 +38,25 @@
       "exitProbability": 33,
       "dynamicPositionRisk": 33,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 5
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1788633036744
+      "evaluatedAt": 1788633337349
     },
     "highestPnLSeen": 0.46,
-    "lastR15": 60.5,
+    "lastR15": 58.8,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.28% below tier C give-back 0.40% (regime-widened)",
+      "reason": "drawdown 0.38% below tier C give-back 0.40% (regime-widened)",
       "highestPnLSeen": 0.46,
-      "drawdownFromPeak": 0.28,
+      "drawdownFromPeak": 0.38,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1788633036744
+      "evaluatedAt": 1788633337349
     },
-    "prevPnLPct": 0.18
+    "prevPnLPct": 0.08
   },
   "BINANCE:NEARUSDT": {
     "sym": "BINANCE:NEARUSDT",
@@ -76,7 +76,7 @@
     "spikeScore": 1.0620657925940296,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-NEAR-20260905T173000Z",
@@ -87,7 +87,10 @@
       "qty": 618.48,
       "fillPrice": 2.256014124951494,
       "buyOrderId": "C02__724980026570620928036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__724990070032924672036",
+      "exitFillPrice": 2.220050776096236,
+      "closedAt": 1788633338892
     },
     "entrySnapshot": {
       "at": 1788630944323,
@@ -145,7 +148,9 @@
       "tier": "C",
       "giveBack": 0.4,
       "evaluatedAt": 1788633036744
-    }
+    },
+    "exitPrice": 2.224,
+    "statusChangedAt": 1788633337349
   },
   "BINANCE:APTUSDT": {
     "sym": "BINANCE:APTUSDT",
@@ -208,7 +213,7 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "highestPnLSeen": 0.2,
-    "lastR15": 64,
+    "lastR15": 62.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.20% below 0.35% floor — not evaluated yet",
@@ -216,7 +221,23 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788633036744
+      "evaluatedAt": 1788633337349
+    },
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 4,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
+      "recovery": {
+        "recovering": false,
+        "sustainedMin": 0
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1788633337349
     }
   }
 }
