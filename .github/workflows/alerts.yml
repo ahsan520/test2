@@ -321,6 +321,16 @@ jobs:
           # (found 2026-09-03), running on mexc-trader.js's hardcoded
           # default with no repo-Variable override ever reaching it.
           BUY_SCOUT_SIZE_PCT:           ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
+          # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
+          # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
+          # the whole scout-entry feature has been silently off this whole
+          # time regardless of any repo Variable set for it. Turning on at
+          # conservative defaults: 30% size (above), bullConf >= 7, whale
+          # >= 60 — stricter than a normal buy's bar, to compensate for
+          # TRIGGERING being less confirmed than a full BREAKOUT.
+          BUY_SCOUT_ENABLE:             ${{ vars.BUY_SCOUT_ENABLE || 'true' }}
+          BUY_SCOUT_MIN_BULLCONF:       ${{ vars.BUY_SCOUT_MIN_BULLCONF || '7' }}
+          BUY_SCOUT_MIN_WHALE:          ${{ vars.BUY_SCOUT_MIN_WHALE || '60' }}
           # ── Market guard (market-guard.js) — Layer 1: BTC hard gate ──
           GUARD_BTC_CLOSE_PCT: ${{ vars.GUARD_BTC_CLOSE_PCT || '-3' }}
           GUARD_BTC_FULL_PCT:  ${{ vars.GUARD_BTC_FULL_PCT || '-0.5' }}
