@@ -968,6 +968,13 @@ export async function executeSTPriorityRotation({
     if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
       event.status = 'BLOCKED_MAX_LIVE';
       logAudit('st15_blocked_max_live', { pair, id: event.id, protectedPositions });
+      // Was never engaging the rotation cooldown here (only `if (changed)`
+      // further down did) — a starved event just re-fired and re-alerted
+      // on every single decide cycle with no backoff until a slot freed up
+      // or the event's own TTL expired. Marking it here doesn't touch
+      // `changed`, so it still won't trigger a spurious savePositions/
+      // GitHub push — it only starts the ST_ROTATION_COOLDOWN_MIN clock.
+      markSTRotationExecuted(tradeState);
       await sendTelegram(
         `🚫 *ST15 CROSS — ${base}* — still at ${effectiveMaxLive}/${effectiveMaxLive} live trade cap after rotation sells — BUY skipped this cycle.\n` +
         (protectedPositions.length
@@ -989,6 +996,11 @@ export async function executeSTPriorityRotation({
     if (st15UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st15_blocked_zero_balance', { pair, id: event.id });
+      // Same cooldown gap as BLOCKED_MAX_LIVE above — a thin/near-zero
+      // live balance would otherwise get re-checked and re-alerted on
+      // every decide cycle until it either frees up or the event expires
+      // via ST_EVENT_TTL_MIN. Doesn't touch `changed`.
+      markSTRotationExecuted(tradeState);
       await sendTelegram(`🚫 *ST15 CROSS — ${base}* — $0 available after rotation sells (percent sizing) — BUY skipped this cycle.`);
       continue;
     }
@@ -1434,6 +1446,10 @@ export async function executeST5PriorityRotation({
     if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
       event.status = 'BLOCKED_MAX_LIVE';
       logAudit('st5_blocked_max_live', { pair, id: event.id, protectedPositions });
+      // See the matching ST15/P1 comment above — engages the rotation
+      // cooldown on a skip, not just a real execution, so this doesn't
+      // re-fire and re-alert every cycle. Doesn't touch `changed`.
+      markSTRotationExecuted(tradeState);
       await sendTelegram(
         `🚫 *ST5 CROSS — ${base}* — still at ${effectiveMaxLive}/${effectiveMaxLive} live trade cap after rotation sells — BUY skipped this cycle.\n` +
         (protectedPositions.length
@@ -1455,6 +1471,8 @@ export async function executeST5PriorityRotation({
     if (st5UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
+      // See the matching ST15/P1 comment above. Doesn't touch `changed`.
+      markSTRotationExecuted(tradeState);
       await sendTelegram(`🚫 *ST5 CROSS — ${base}* — $0 available after rotation sells (percent sizing) — BUY skipped this cycle.`);
       continue;
     }
