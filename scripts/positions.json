@@ -15,9 +15,9 @@
     "t2": 1.5728,
     "score": 7,
     "spikeScore": 1.7974129503282006,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788663040598,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-RENDER-20260906T010500Z",
@@ -28,7 +28,10 @@
       "qty": 347.36,
       "fillPrice": 1.4837551258759407,
       "buyOrderId": "C02__725091994530959361036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__725114653289431040036",
+      "exitFillPrice": 1.4777246397694523,
+      "closedAt": 1788663041848
     },
     "entrySnapshot": {
       "at": 1788657639517,
@@ -60,20 +63,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 50 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
-      "fallingKnifeScore": 33,
-      "thesisDrop": 44,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 81 → current 17 (drop 64 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 34,
+      "thesisDrop": 64,
       "confidenceDecay": 38,
-      "exitProbability": 50,
-      "dynamicPositionRisk": 50,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662834424
+      "evaluatedAt": 1788663040598
     },
     "highestPnLSeen": 0.69,
     "lastR15": 56.6,
@@ -88,7 +91,9 @@
     },
     "prevPnLPct": -0.19,
     "piPartialLevel": 1,
-    "piReduceAlertedAt": 1788662834424
+    "piReduceAlertedAt": 1788662834424,
+    "exitPrice": 1.478,
+    "statusChangedAt": 1788663040598
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -154,20 +159,20 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": -4,
+      "thesisDrop": -10,
       "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 5
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662834424
+      "evaluatedAt": 1788663040598
     },
     "highestPnLSeen": 0.26,
-    "lastR15": 58.5,
+    "lastR15": 60.3,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.26% below 0.35% floor — not evaluated yet",
@@ -175,7 +180,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788662834424
+      "evaluatedAt": 1788663040598
     }
   },
   "BINANCE:SOLUSDT": {
@@ -242,29 +247,29 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 3,
-      "thesisDrop": -22,
-      "confidenceDecay": 0,
+      "thesisDrop": 2,
+      "confidenceDecay": 17,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 5
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662834424
+      "evaluatedAt": 1788663040598
     },
     "highestPnLSeen": 0.79,
-    "lastR15": 68.1,
+    "lastR15": 70.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.42% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.29% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.79,
-      "drawdownFromPeak": 0.42000000000000004,
+      "drawdownFromPeak": 0.29000000000000004,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788662834424
+      "evaluatedAt": 1788663040598
     },
-    "prevPnLPct": 0.37
+    "prevPnLPct": 0.5
   }
 }
