@@ -61,22 +61,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 15 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -9,
+      "reason": "dynamicPositionRisk 19 below 50 threshold (recovery detected, risk softened) (stale+flat nudge applied, +15) (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 3,
+      "thesisDrop": -6,
       "confidenceDecay": 13,
-      "exitProbability": 15,
-      "dynamicPositionRisk": 15,
+      "exitProbability": 31,
+      "dynamicPositionRisk": 19,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788695133268
+      "evaluatedAt": 1788695436834
     },
     "highestPnLSeen": -0.06,
-    "lastR15": 52.8,
+    "lastR15": 55.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.06% below 0.35% floor — not evaluated yet",
@@ -84,7 +84,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788695133268
+      "evaluatedAt": 1788695436834
     }
   },
   "BINANCE:TAOUSDT": {
@@ -149,30 +149,31 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -8,
-      "confidenceDecay": 13,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 2 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 7,
+      "confidenceDecay": 25,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 2,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788695133268
+      "evaluatedAt": 1788695436834
     },
-    "highestPnLSeen": 0.24,
-    "lastR15": 67.2,
+    "highestPnLSeen": 0.66,
+    "lastR15": 71.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak 0.24% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": 0.24,
+      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "highestPnLSeen": 0.66,
       "drawdownFromPeak": 0,
-      "tier": null,
-      "giveBack": null,
-      "evaluatedAt": 1788695133268
-    }
+      "tier": "B",
+      "giveBack": 0.6,
+      "evaluatedAt": 1788695436834
+    },
+    "prevPnLPct": 0.66
   }
 }
