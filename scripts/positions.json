@@ -61,31 +61,32 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "reason": "dynamicPositionRisk 5 below 50 threshold (recovery detected, risk softened)",
       "fallingKnifeScore": 0,
-      "thesisDrop": 11,
-      "confidenceDecay": 13,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "thesisDrop": 26,
+      "confidenceDecay": 25,
+      "exitProbability": 8,
+      "dynamicPositionRisk": 5,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 10
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788659440336
+      "evaluatedAt": 1788659531894
     },
-    "highestPnLSeen": 0.35,
-    "lastR15": 68.8,
+    "highestPnLSeen": 0.56,
+    "lastR15": 73.1,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak 0.35% did not clear a give-back tier",
-      "highestPnLSeen": 0.35,
-      "drawdownFromPeak": 0.06,
-      "tier": null,
-      "giveBack": null,
-      "evaluatedAt": 1788659440336
-    }
+      "reason": "drawdown 0.00% below tier C give-back 0.40% (regime-widened)",
+      "highestPnLSeen": 0.56,
+      "drawdownFromPeak": 0,
+      "tier": "C",
+      "giveBack": 0.4,
+      "evaluatedAt": 1788659531894
+    },
+    "prevPnLPct": 0.56
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -146,7 +147,34 @@
       "breakoutLevel": 0.09063
     },
     "entryTriggerStatus": "BREAKOUT",
-    "entryStateAtBuy": "ST5_CROSS_UP"
+    "entryStateAtBuy": "ST5_CROSS_UP",
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 0 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 0,
+      "thesisDrop": -13,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 10
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1788659531894
+    },
+    "highestPnLSeen": 0.13,
+    "lastR15": 59.8,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak 0.13% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": 0.13,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1788659531894
+    }
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -207,6 +235,33 @@
       "breakoutLevel": 103.75
     },
     "entryTriggerStatus": "BREAKOUT",
-    "entryStateAtBuy": "ST5_CROSS_UP"
+    "entryStateAtBuy": "ST5_CROSS_UP",
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 0 below 50 threshold (recovery detected, risk softened)",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 0,
+      "confidenceDecay": 0,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 10
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1788659531894
+    },
+    "highestPnLSeen": 0.21,
+    "lastR15": 65,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak 0.21% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": 0.21,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1788659531894
+    }
   }
 }
