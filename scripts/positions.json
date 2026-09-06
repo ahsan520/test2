@@ -15,9 +15,9 @@
     "t2": 563.74,
     "score": -6,
     "spikeScore": 1.44468211631022,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788722537507,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XMR-20260906T175000Z",
@@ -28,7 +28,10 @@
       "qty": 2.572,
       "fillPrice": 531.8287363919129,
       "buyOrderId": "C02__725342413568049153036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__725364201538686977036",
+      "exitFillPrice": 527.1424611197511,
+      "closedAt": 1788722538789
     },
     "entrySnapshot": {
       "at": 1788717344114,
@@ -61,22 +64,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 20 below 50 threshold",
-      "fallingKnifeScore": 36,
+      "reason": "dynamicPositionRisk 39 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 37,
       "thesisDrop": 0,
       "confidenceDecay": 50,
-      "exitProbability": 20,
-      "dynamicPositionRisk": 20,
+      "exitProbability": 39,
+      "dynamicPositionRisk": 39,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788722447939
+      "evaluatedAt": 1788722537507
     },
     "highestPnLSeen": -0.02,
-    "lastR15": 46.7,
+    "lastR15": 38.8,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.02% below 0.35% floor — not evaluated yet",
@@ -84,8 +87,10 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788722447939
-    }
+      "evaluatedAt": 1788722537507
+    },
+    "exitPrice": 526.5,
+    "statusChangedAt": 1788722537507
   },
   "BINANCE:FETUSDT": {
     "sym": "BINANCE:FETUSDT",
@@ -149,22 +154,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 10 below 50 threshold",
-      "fallingKnifeScore": 6,
+      "reason": "dynamicPositionRisk 11 below 50 threshold",
+      "fallingKnifeScore": 7,
       "thesisDrop": 26,
       "confidenceDecay": 22,
-      "exitProbability": 10,
-      "dynamicPositionRisk": 10,
+      "exitProbability": 11,
+      "dynamicPositionRisk": 11,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788722447939
+      "evaluatedAt": 1788722537507
     },
     "highestPnLSeen": -0.29,
-    "lastR15": 63.5,
+    "lastR15": 61.8,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.29% below 0.35% floor — not evaluated yet",
@@ -172,7 +177,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788722447939
+      "evaluatedAt": 1788722537507
     }
   }
 }
