@@ -24,8 +24,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1788657638691,
-      "usdSize": 686.04,
-      "qty": 462.36,
+      "usdSize": 515.4,
+      "qty": 347.36,
       "fillPrice": 1.4837551258759407,
       "buyOrderId": "C02__725091994530959361036",
       "qtyEstimated": false
@@ -60,33 +60,34 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 9 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 25,
-      "confidenceDecay": 25,
-      "exitProbability": 9,
-      "dynamicPositionRisk": 9,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 51 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 47,
+      "confidenceDecay": 38,
+      "exitProbability": 51,
+      "dynamicPositionRisk": 51,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     },
     "highestPnLSeen": 0.69,
-    "lastR15": 64.3,
+    "lastR15": 56.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.40% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.88% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.69,
-      "drawdownFromPeak": 0.39999999999999997,
+      "drawdownFromPeak": 0.8799999999999999,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     },
-    "prevPnLPct": 0.29
+    "prevPnLPct": -0.19,
+    "piPartialLevel": 1
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -152,20 +153,20 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": -10,
+      "thesisDrop": 2,
       "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     },
     "highestPnLSeen": 0.26,
-    "lastR15": 61.5,
+    "lastR15": 58.7,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.26% below 0.35% floor — not evaluated yet",
@@ -173,7 +174,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     }
   },
   "BINANCE:SOLUSDT": {
@@ -239,30 +240,30 @@
     "lastPI": {
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -16,
-      "confidenceDecay": 17,
+      "fallingKnifeScore": 3,
+      "thesisDrop": -13,
+      "confidenceDecay": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     },
     "highestPnLSeen": 0.79,
-    "lastR15": 73.9,
+    "lastR15": 68.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.40% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.79,
-      "drawdownFromPeak": 0,
+      "drawdownFromPeak": 0.4,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1788662440083
+      "evaluatedAt": 1788662756726
     },
-    "prevPnLPct": 0.79
+    "prevPnLPct": 0.39
   }
 }
