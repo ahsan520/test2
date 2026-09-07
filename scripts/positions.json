@@ -15,9 +15,9 @@
     "t2": 112.15,
     "score": 5,
     "spikeScore": 0.08011718853007105,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788751956234,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-SOL-20260907T023000Z",
@@ -28,7 +28,10 @@
       "qty": 6.459,
       "fillPrice": 105.80000000000001,
       "buyOrderId": "C02__725479592080408576036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__725487593549946880036",
+      "exitFillPrice": 105.10000000000001,
+      "closedAt": 1788751957725
     },
     "entrySnapshot": {
       "at": 1788750050032,
@@ -60,20 +63,20 @@
     "entryTriggerStatus": "SETUP",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 1 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 15,
-      "confidenceDecay": 11,
-      "exitProbability": 1,
-      "dynamicPositionRisk": 1,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 76 → current 9 (drop 67 > 60)",
+      "fallingKnifeScore": 73,
+      "thesisDrop": 67,
+      "confidenceDecay": 44,
+      "exitProbability": 65,
+      "dynamicPositionRisk": 65,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788751835723
+      "evaluatedAt": 1788751956234
     },
     "highestPnLSeen": -0.3,
     "lastR15": 43.6,
@@ -85,6 +88,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1788751835723
-    }
+    },
+    "exitPrice": 105.1,
+    "statusChangedAt": 1788751956234
   }
 }
