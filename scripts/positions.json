@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1788932438065
+      "evaluatedAt": 1788932739407
     }
   },
   "NASDAQ:META": {
@@ -67,12 +67,12 @@
     "lastR15": 55.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.38% ≥ 0.50% but confirmed momentum weakness not met (0/2) — holding, letting it run",
+      "reason": "drawdown 1.38% ≥ 0.50% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 1.08,
       "drawdownFromPeak": 1.3800000000000001,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1788932438065
+      "evaluatedAt": 1788932739407
     },
     "prevPnLPct": -0.3
   },
@@ -220,7 +220,7 @@
       "drawdownFromPeak": 0.5,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1788932438065
+      "evaluatedAt": 1788932739407
     }
   },
   "TSX:ETHY.TO": {
@@ -266,9 +266,9 @@
     "t2": 13.68,
     "score": 6,
     "spikeScore": 2.9295643547239414,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1788932739407,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-LINK-20260909T043000Z",
@@ -279,7 +279,10 @@
       "qty": 11.64,
       "fillPrice": 12.575,
       "buyOrderId": "C02__726232032828420096036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__726245851726254080036",
+      "exitFillPrice": 12.486495704467352,
+      "closedAt": 1788932740576
     },
     "entrySnapshot": {
       "at": 1788929445820,
@@ -311,20 +314,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 30 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 27,
-      "confidenceDecay": 11,
-      "exitProbability": 30,
-      "dynamicPositionRisk": 30,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 84 → current 0 (drop 84 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 78,
+      "thesisDrop": 84,
+      "confidenceDecay": 67,
+      "exitProbability": 96,
+      "dynamicPositionRisk": 96,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1788932438065
+      "evaluatedAt": 1788932739407
     },
     "highestPnLSeen": 0.14,
     "lastR15": 50.1,
@@ -337,6 +340,8 @@
       "giveBack": null,
       "evaluatedAt": 1788932438065
     },
-    "piPartialLevel": 1
+    "piPartialLevel": 1,
+    "exitPrice": 12.489,
+    "statusChangedAt": 1788932739407
   }
 }
