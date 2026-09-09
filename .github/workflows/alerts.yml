@@ -206,6 +206,13 @@ jobs:
           ROTATION_MIN_HOLD_MIN: ${{ vars.ROTATION_MIN_HOLD_MIN || '6' }}
           ROTATION_MIN_PROFIT_PCT: ${{ vars.ROTATION_MIN_PROFIT_PCT || '0.2' }}
           STOP_LOSS_PCT:      ${{ vars.STOP_LOSS_PCT || '1' }}
+          # Added with the FET/ZEC slippage-guard fix (2026-09-07) —
+          # checkBuySlippage()/mexc-trader.js. Was missing its env: wiring
+          # entirely (same class of gap as ST_PRIORITY_BLOCK_RISK_OFF and
+          # the analyst-picks-data.json git-add miss earlier) — the code's
+          # own `|| '0.5'` fallback meant it wasn't BROKEN, just impossible
+          # to tune without editing code.
+          MEXC_MAX_BUY_SLIPPAGE_PCT: ${{ vars.MEXC_MAX_BUY_SLIPPAGE_PCT || '0.5' }}
           T1_ATR_MULT:        ${{ vars.T1_ATR_MULT || '0.5' }}
           T2_ATR_MULT:        ${{ vars.T2_ATR_MULT || '2' }}
           GUARD_BTC_BUY_GATE: ${{ vars.GUARD_BTC_BUY_GATE || 'true' }}
@@ -321,6 +328,20 @@ jobs:
           # (found 2026-09-03), running on mexc-trader.js's hardcoded
           # default with no repo-Variable override ever reaching it.
           BUY_SCOUT_SIZE_PCT:           ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
+          # ── ST5/ST15 Priority Rotation (P0/P1) — new RISK_OFF gate ──
+          # NOTE: none of this path's other vars (ST_EVENT_TTL_MIN,
+          # ST_MAX_DISTANCE_PCT, ST_ROTATION_COOLDOWN_MIN, ST_EQUAL_ALLOCATE,
+          # ST_FAILED_SELL_QUARANTINE_MIN, ST5_ENABLE, ST15_ENABLE,
+          # ST5_PRIORITY_USD_SIZE, ST15_PRIORITY_USD_SIZE,
+          # ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT) are wired into this
+          # workflow at all (found 2026-09-06) — the whole P0/P1 system has
+          # been running purely on mexc-trader.js's hardcoded defaults this
+          # entire time, with no way to tune any of it via a repo Variable.
+          # Only wiring the one requested here for now; flag if you want the
+          # rest wired too (same-default, zero-behavior-change additions).
+          # Off by default — see mexc-trader.js's ST_PRIORITY_BLOCK_RISK_OFF
+          # comment for what this does once enabled.
+          ST_PRIORITY_BLOCK_RISK_OFF:   ${{ vars.ST_PRIORITY_BLOCK_RISK_OFF || 'false' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
