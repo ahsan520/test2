@@ -45,17 +45,71 @@ import {
 // stayed pinned to the pre-fill estimate for the position's whole
 // lifetime. Same formula as calcEntryLevels(), just anchored to the real
 // fill instead of the estimate, and with no chase markup to undo.
-function recalcLevelsFromFill(fillPrice, shock = 1) {
+//
+// signalPrice (added after the FET/ZEC incident, 2026-09-07): the price
+// that actually justified taking the trade (event.close for ST5/ST15,
+// the pre-fill calcEntryLevels() estimate for the regular path) — NOT
+// the same thing as the fill price above. mexcMarketBuy is an uncapped
+// market order; on a thin/fast book the fill can land meaningfully above
+// signal (FET: signal $0.1746 -> filled $0.176635, +1.17%; ZEC: signal
+// $1206.40 -> filled $1217.81, +0.95%). Anchoring the stop to fill price
+// alone silently shrinks the intended risk cushion by however much the
+// entry slipped — both FET and ZEC then got stopped out on an entirely
+// ordinary retracement back toward the ORIGINAL signal price, not a real
+// reversal. Using whichever of the two stops sits further below current
+// price (min()) preserves the full intended cushion measured from
+// whichever price actually justified the trade: if fill > signal
+// (slipped up, the bad case), this picks the wider signal-anchored stop;
+// if fill < signal (a favorable fill), it's a no-op — falls back to
+// today's fill-anchored stop exactly as before, since there's nothing to
+// correct in that direction. entryPrice/P&L reporting are untouched —
+// still the real fill price, only the STOP distance is protected here.
+function recalcLevelsFromFill(fillPrice, shock = 1, signalPrice = null) {
   const p = parseFloat(fillPrice) || 0;
   if (!p) return null;
   const atr = p * 0.015 * Math.max(1, shock * 0.5);
   const dp  = p < 10 ? 4 : 2;
   const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1');
+  const stopFromFill = p * (1 - STOP_LOSS_PCT / 100);
+  const sig = parseFloat(signalPrice) || 0;
+  const stop = sig > 0 ? Math.min(stopFromFill, sig * (1 - STOP_LOSS_PCT / 100)) : stopFromFill;
   return {
-    stop: parseFloat((p * (1 - STOP_LOSS_PCT / 100)).toFixed(dp)),
+    stop: parseFloat(stop.toFixed(dp)),
     t1:   parseFloat((p + atr * 2).toFixed(dp)),
     t2:   parseFloat((p + atr * 4).toFixed(dp)),
   };
+}
+
+// ── Pre-buy slippage guard ──────────────────────────────────────────────
+// mexcMarketBuy is a plain, uncapped MARKET order (mexc-client.js) — no
+// limit price, no max-slippage protection at all. On a thin/fast-moving
+// book, MEXC fills at whatever's available, however far that's drifted
+// from the signal price. This checks the LIVE price (mexcGetLivePrice —
+// same exchange, same moment the buy is about to use, not a
+// market-data.json snapshot that can be a market-fetcher cycle stale)
+// immediately before placing the order, and skips the buy outright if
+// price has already run more than MEXC_MAX_BUY_SLIPPAGE_PCT beyond
+// signal. This is the FIRST line of defense (stops a badly-slipped entry
+// from happening at all); recalcLevelsFromFill's signalPrice param above
+// is the SECOND (widens the stop if a fast final tick between this check
+// and order placement still lets some slippage through). Fails OPEN on a
+// live-price-fetch error — a transient API hiccup here shouldn't block a
+// legitimate signal; the stop-anchoring backstop still applies either way.
+const MEXC_MAX_BUY_SLIPPAGE_PCT = parseFloat(process.env.MEXC_MAX_BUY_SLIPPAGE_PCT || '0.5');
+async function checkBuySlippage(pair, signalPrice, label) {
+  const sig = parseFloat(signalPrice) || 0;
+  if (sig <= 0) return { ok: true }; // no signal price available — nothing to compare, don't block
+  let curPrice = null;
+  try { curPrice = await mexcGetLivePrice(pair); }
+  catch (e) {
+    console.log(`  ⚠️  ${label}: live price fetch failed for ${pair} (${e.message}) — proceeding without slippage check`);
+    return { ok: true };
+  }
+  if (!curPrice) return { ok: true };
+  const driftPct = ((curPrice - sig) / sig) * 100;
+  return driftPct > MEXC_MAX_BUY_SLIPPAGE_PCT
+    ? { ok: false, driftPct, curPrice, sig }
+    : { ok: true, driftPct, curPrice, sig };
 }
 
 // ── Symbols that can alert/star normally but must NEVER be auto-traded ──
@@ -539,6 +593,19 @@ const ST_ROTATION_COOLDOWN_MIN       = parseFloat(process.env.ST_ROTATION_COOLDO
 const ST_EQUAL_ALLOCATE              = (process.env.ST_EQUAL_ALLOCATE ?? 'true') === 'true';
 const ST_FAILED_SELL_QUARANTINE_MIN  = parseFloat(process.env.ST_FAILED_SELL_QUARANTINE_MIN || '60');
 
+// P0/P1 bypass checkMarketIntelligence entirely by design (breadth,
+// relative-strength-vs-regime, BTC-bear block — see the big comment above
+// executeSTPriorityRotation) — the ONLY place marketRegime touches either
+// function is inside checkExhaustedEntry's override, which only ever
+// WIDENS an entry (RISK_ON + high breadth lets an overextended cross
+// through). There was no symmetric narrowing for a confirmed bad regime —
+// P0/P1 bought identically in a falling market as a rising one. Off by
+// default until validated; when on, blocks (not downsizes — keeping this
+// binary and simple for the first trial) a fresh P0/P1 cross when regime
+// reads RISK_OFF. RISK_ON and NEUTRAL are untouched, preserving the whole
+// point of a priority path (speed) outside the one clearly-bad case.
+const ST_PRIORITY_BLOCK_RISK_OFF     = (process.env.ST_PRIORITY_BLOCK_RISK_OFF || 'false') === 'true';
+
 function isSTRotationOnCooldown(tradeState) {
   const last = tradeState.lastSTRotationAt || 0;
   return (Date.now() - last) < ST_ROTATION_COOLDOWN_MIN * 60000;
@@ -666,6 +733,21 @@ export async function executeSTPriorityRotation({
       event.status = 'NOOP_ALREADY_HELD';
       logAudit('st15_noop', { pair, id: event.id, reason: 'already_held' });
       await sendTelegram(`ℹ️ *ST15 CROSS — ${base}* — already held, no rotation needed. Event marked handled.`);
+      continue;
+    }
+
+    // ── RISK_OFF regime gate (opt-in via ST_PRIORITY_BLOCK_RISK_OFF) ──
+    // Placed BEFORE any rotation-sells below, so a blocked buy never
+    // forces selling another position to fund a purchase we're about to
+    // skip anyway. Engages the same rotation cooldown as the other skip
+    // paths (BLOCKED_ZERO_BALANCE/BLOCKED_MAX_LIVE above) so a persistent
+    // RISK_OFF regime doesn't re-fire and re-alert on this same event
+    // every decide cycle.
+    if (ST_PRIORITY_BLOCK_RISK_OFF && marketState?.marketRegime === 'RISK_OFF') {
+      event.status = 'BLOCKED_RISK_OFF';
+      logAudit('st15_blocked_risk_off', { pair, id: event.id });
+      markSTRotationExecuted(tradeState);
+      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — market regime is RISK_OFF — priority BUY skipped this cycle (ST_PRIORITY_BLOCK_RISK_OFF).`);
       continue;
     }
 
@@ -987,6 +1069,7 @@ export async function executeSTPriorityRotation({
     // ── BUY the ST candidate ──
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
+    const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
     const { totalUsd: st15TotalUsd } = await computeSTPriorityUsdSize({
       effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
@@ -1019,10 +1102,10 @@ export async function executeSTPriorityRotation({
     };
 
     if (effectiveTradeMode === 'paper') {
-      const fillPrice = parseFloat(entry?.d?.p || event.close || 0);
+      const fillPrice = signalPrice;
       const qty        = fillPrice > 0 ? st15UsdSize / fillPrice : 0;
       positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st15UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST15_${now}` };
-      const lvl = recalcLevelsFromFill(fillPrice, shock);
+      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1039,6 +1122,15 @@ export async function executeSTPriorityRotation({
         (protectedPositions.length ? `\n  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._` : '')
       );
     } else {
+      const slip = await checkBuySlippage(pair, signalPrice, 'ST15');
+      if (!slip.ok) {
+        delete positions[sym];
+        event.status = 'BLOCKED_SLIPPAGE';
+        logAudit('st15_blocked_slippage', { pair, id: event.id, signalPrice, curPrice: slip.curPrice, driftPct: slip.driftPct });
+        markSTRotationExecuted(tradeState);
+        await sendTelegram(`🚫 *ST15 CROSS — ${base}* — price already ${slip.driftPct.toFixed(2)}% above signal ($${signalPrice} → $${slip.curPrice}, max ${MEXC_MAX_BUY_SLIPPAGE_PCT}%) — BUY skipped this cycle to avoid chasing.`);
+        continue;
+      }
       console.log(`  🟣  ST15 PRIORITY LIVE BUY — ${pair} $${st15UsdSize} USDT via MEXC...`);
       try {
         // NOTE: MEXC's REST API wants the bare pair ("TAOUSDT"), not the
@@ -1050,7 +1142,7 @@ export async function executeSTPriorityRotation({
           mode: 'live', buyAt: now, usdSize: st15UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
-        const lvl = recalcLevelsFromFill(buy.fillPrice, shock);
+        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice);
         if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1188,6 +1280,15 @@ export async function executeST5PriorityRotation({
       event.status = 'NOOP_ALREADY_HELD';
       logAudit('st5_noop', { pair, id: event.id, reason: 'already_held' });
       await sendTelegram(`ℹ️ *ST5 CROSS — ${base}* — already held, no rotation needed. Event marked handled.`);
+      continue;
+    }
+
+    // ── RISK_OFF regime gate — see the matching ST15/P1 comment above. ──
+    if (ST_PRIORITY_BLOCK_RISK_OFF && marketState?.marketRegime === 'RISK_OFF') {
+      event.status = 'BLOCKED_RISK_OFF';
+      logAudit('st5_blocked_risk_off', { pair, id: event.id });
+      markSTRotationExecuted(tradeState);
+      await sendTelegram(`🚫 *ST5 CROSS — ${base}* — market regime is RISK_OFF — priority BUY skipped this cycle (ST_PRIORITY_BLOCK_RISK_OFF).`);
       continue;
     }
 
@@ -1462,6 +1563,7 @@ export async function executeST5PriorityRotation({
     // ── BUY the ST candidate ──
     const now   = Date.now();
     const shock = entry?.d?.shock ?? 1;
+    const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
     const { totalUsd: st5TotalUsd } = await computeSTPriorityUsdSize({
       effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
@@ -1491,10 +1593,10 @@ export async function executeST5PriorityRotation({
     };
 
     if (effectiveTradeMode === 'paper') {
-      const fillPrice = parseFloat(entry?.d?.p || event.close || 0);
+      const fillPrice = signalPrice;
       const qty        = fillPrice > 0 ? st5UsdSize / fillPrice : 0;
       positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st5UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST5_${now}` };
-      const lvl = recalcLevelsFromFill(fillPrice, shock);
+      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1511,6 +1613,15 @@ export async function executeST5PriorityRotation({
         (protectedPositions.length ? `\n  🛡 _${protectedPositions.join(', ')} kept — at/below buy price, not sold at a loss._` : '')
       );
     } else {
+      const slip = await checkBuySlippage(pair, signalPrice, 'ST5');
+      if (!slip.ok) {
+        delete positions[sym];
+        event.status = 'BLOCKED_SLIPPAGE';
+        logAudit('st5_blocked_slippage', { pair, id: event.id, signalPrice, curPrice: slip.curPrice, driftPct: slip.driftPct });
+        markSTRotationExecuted(tradeState);
+        await sendTelegram(`🚫 *ST5 CROSS — ${base}* — price already ${slip.driftPct.toFixed(2)}% above signal ($${signalPrice} → $${slip.curPrice}, max ${MEXC_MAX_BUY_SLIPPAGE_PCT}%) — BUY skipped this cycle to avoid chasing.`);
+        continue;
+      }
       console.log(`  🟢  ST5 PRIORITY LIVE BUY — ${pair} $${st5UsdSize} USDT via MEXC...`);
       try {
         // NOTE: MEXC's REST API wants the bare pair ("TAOUSDT"), not the
@@ -1522,7 +1633,7 @@ export async function executeST5PriorityRotation({
           mode: 'live', buyAt: now, usdSize: st5UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
-        const lvl = recalcLevelsFromFill(buy.fillPrice, shock);
+        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice);
         if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -2022,12 +2133,24 @@ async function executeAutoBuys({
       continue;
     }
 
+    const entrySignalPrice = pick.levels ? parseFloat(pick.levels.entry) : pick.price; // see checkBuySlippage/recalcLevelsFromFill
+    // Computed once, up front, and reused below — matching the ST5/ST15
+    // pattern. This used to call checkBuySlippage() twice (once in the
+    // `else if` condition, once more on the next line to get the full
+    // result for logging/alerting) — wasteful, and not fully safe: each
+    // call fetches a fresh live price, so the two calls could disagree if
+    // price moved between them, meaning the alert could report a
+    // curPrice/driftPct that wasn't actually what the `.ok` decision was
+    // based on. Only checked outside paper mode — paper trades never hit
+    // the exchange, so there's nothing to protect against slippage-wise.
+    const slippageCheck = effectiveTradeMode === 'paper' ? { ok: true } : await checkBuySlippage(symbol, entrySignalPrice, 'regular buy');
+
     if (effectiveTradeMode === 'paper') {
       console.log(`  📝  PAPER BUY${isScout ? ' (SCOUT)' : isMomentum ? ' (MOMENTUM)' : ''} — ${symbol} $${perPickUsd} USDT`);
       pos.liveOrder = {
         mode: 'paper', buyAt: Date.now(), usdSize: perPickUsd,
-        qty: perPickUsd / (pick.levels ? parseFloat(pick.levels.entry) : pick.price),
-        fillPrice: pick.levels ? parseFloat(pick.levels.entry) : pick.price,
+        qty: perPickUsd / entrySignalPrice,
+        fillPrice: entrySignalPrice,
         buyOrderId: `PAPER_${Date.now()}`,
       };
       // Resync entryPrice/stop/t1/t2 to the simulated fill price — a no-op
@@ -2035,7 +2158,7 @@ async function executeAutoBuys({
       // fillPrice === the same pre-fill estimate), but keeps paper and live
       // on one code path instead of the two silently drifting apart again
       // if either formula changes later.
-      const paperLevels = recalcLevelsFromFill(pos.liveOrder.fillPrice, pick.evald?.shock ?? 1);
+      const paperLevels = recalcLevelsFromFill(pos.liveOrder.fillPrice, pick.evald?.shock ?? 1, entrySignalPrice);
       if (paperLevels) {
         pos.entryPrice = pos.liveOrder.fillPrice;
         pos.stop = paperLevels.stop; pos.t1 = paperLevels.t1; pos.t2 = paperLevels.t2;
@@ -2068,6 +2191,11 @@ async function executeAutoBuys({
         (isMomentum ? `  📈 _Momentum entry — ${pick.entry?.risingStreak ?? '?'} consecutive rising 5m closes, no level reclaim yet. Sized at ${BUY_MOMENTUM_SIZE_PCT}% of normal._\n` : '') +
         `  _Paper mode — no real order placed. Set TRADE\\_MODE=live to trade for real._`
       );
+    } else if (!slippageCheck.ok) {
+      const slip = slippageCheck;
+      logAudit('mexc_blocked_slippage', { sym: symbol, signalPrice: entrySignalPrice, curPrice: slip.curPrice, driftPct: slip.driftPct });
+      delete positions[pick.sym];
+      await sendTelegram(`🚫 *BUY SKIPPED — SLIPPAGE* — ${pick.pair.replace('USDT','')} — price already ${slip.driftPct?.toFixed(2)}% above signal ($${entrySignalPrice} → $${slip.curPrice}, max ${MEXC_MAX_BUY_SLIPPAGE_PCT}%) — avoiding a chase.`);
     } else {
       // Live mode — real MEXC market buy
       console.log(`  ⚡  LIVE BUY${isScout ? ' (SCOUT)' : isMomentum ? ' (MOMENTUM)' : ''} — ${symbol} $${perPickUsd} USDT via MEXC...`);
@@ -2085,7 +2213,7 @@ async function executeAutoBuys({
         // this order was even placed. Without this, stop distance and
         // reported P&L on every live trade were anchored to a price that
         // was never actually paid.
-        const liveLevels = recalcLevelsFromFill(buy.fillPrice, pick.evald?.shock ?? 1);
+        const liveLevels = recalcLevelsFromFill(buy.fillPrice, pick.evald?.shock ?? 1, entrySignalPrice);
         if (liveLevels) {
           pos.entryPrice = buy.fillPrice;
           pos.stop = liveLevels.stop; pos.t1 = liveLevels.t1; pos.t2 = liveLevels.t2;

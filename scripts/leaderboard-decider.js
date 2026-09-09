@@ -969,6 +969,12 @@ async function main() {
           } else {
             const rs = calcRelativeStrength(entry, market.global || {});
             console.log(`  ✅  ${pair} — Alpha Exception passed (${alpha.passedChecks.join(', ')})${rs.rs !== null ? ` — RS vs BTC: ${rs.rs > 0 ? '+' : ''}${rs.rs}%` : ''}`);
+            // Was only ever console.log'd, never persisted — meant there
+            // was no way to tell from audit.json alone whether the
+            // exception is firing at all, or how often, without grepping
+            // GH Actions logs. Symmetric with the failure-path logging
+            // added below.
+            logAudit('alpha_exception_passed', { pair, passedChecks: alpha.passedChecks, rs: rs.rs });
           }
         }
       }
@@ -994,7 +1000,17 @@ async function main() {
       if (!eq.pass) {
         const summary = eq.blockers.map(b => `${b.code}: ${b.reason}`).join(' · ');
         console.log(`  🛑  ${pair} — Entry Quality Check FAILED — ${summary}`);
-        logAudit('entry_quality_blocked', { pair, blockers: eq.blockers.map(b => b.code) });
+        // Was only logging b.code (e.g. just "BTC_BLOCK") — the actual
+        // useful detail for a BTC_BLOCK entry is in b.reason, which for a
+        // failed Alpha/Breadth Exception already contains the specific
+        // failedChecks list (e.g. "failed: Whale >=70, BullConf >=7") —
+        // that detail was being computed in market-guard.js and then
+        // discarded before ever reaching audit.json. Now both are kept,
+        // so a stretch of BTC_BLOCK rejections can be checked for which
+        // specific bar (whale? bullConf? volume shock? one of the
+        // flexible trend checks?) is the one actually keeping candidates
+        // out, instead of only seeing that they were blocked at all.
+        logAudit('entry_quality_blocked', { pair, blockers: eq.blockers.map(b => ({ code: b.code, reason: b.reason })) });
         continue;
       }
 

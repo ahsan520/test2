@@ -44,6 +44,66 @@ const LB_STALE_LIVE_HRS  = parseFloat(process.env.LB_STALE_LIVE_HRS  || '3');
 // not zeroBalanceStrikes) since the two checks run independently and
 // shouldn't reset each other's progress.
 const STALE_ZERO_BALANCE_STRIKE_LIMIT = parseInt(process.env.LB_STALE_ZERO_BALANCE_STRIKES || '2');
+
+// ── Shared zero-balance strike/self-heal handler ───────────────────────────
+// A live sell (stop hit, Profit Protection, OR Stale-timeout) can find
+// exchange free balance at 0 even though positions.json still tracks the
+// position open — usually because it was already sold outside this exact
+// check (a manual MEXC sell, a different close path that fired first this
+// same cycle, or a prior partial close that didn't fully update tracking).
+// Originally ONLY the Stale-timeout path self-healed this (inline, using
+// STALE_ZERO_BALANCE_STRIKE_LIMIT below) — stop-hit and Profit Protection
+// had no equivalent, so a position stuck at zero balance on either of those
+// paths looped the identical "LIVE SELL SKIPPED" alert every single decide
+// cycle forever, with no escalation (this is what produced 16+ consecutive
+// identical SUI alerts). Generalized here so all three call sites share one
+// counter/threshold and one escalation path: below the strike limit, the
+// repeat alert is rate-limited instead of spammed; at the limit, tracking
+// closes outright (there's nothing left on the exchange to sell).
+// pos.liveOrder.staleZeroBalanceStrikes / STALE_ZERO_BALANCE_STRIKE_LIMIT
+// keep their original (stale-specific) names for backward compatibility
+// with any already-configured LB_STALE_ZERO_BALANCE_STRIKES repo Variable
+// and any position mid-strike-count under the old field — despite the name,
+// both are now shared across all three close reasons, not stale-only.
+// Caller must already be inside `isLiveCrypto && !closeResult.closed`.
+// Returns { changed } — caller ORs this into its own `changed` flag. Does
+// NOT `continue` the caller's loop — that stays the caller's responsibility,
+// same as before this helper existed.
+async function handleZeroBalanceStrike(pos, closeResult, closeLabel, telegramAlerts, now, utc) {
+  if (closeResult.reason !== 'zero_balance') return { changed: false };
+
+  pos.liveOrder.staleZeroBalanceStrikes = (pos.liveOrder.staleZeroBalanceStrikes || 0) + 1;
+  const strikes = pos.liveOrder.staleZeroBalanceStrikes;
+
+  if (strikes >= STALE_ZERO_BALANCE_STRIKE_LIMIT) {
+    // Confirmed gone across multiple cycles — close tracking without a
+    // further sell attempt (nothing left to sell). Same closing shape
+    // reconcileTrackedLiveBalances uses for manual_sell_detected_zero_balance.
+    pos.status = 'stopped';
+    pos.liveOrder.closedAt      = now;
+    pos.liveOrder.exitFillPrice = pos.liveOrder.fillPrice; // real exit price unknown — not a bot-tracked sell
+    recordTradeClose(pos, `${closeLabel.toLowerCase().replace(/\s+/g, '_')}_manual_sell_detected_zero_balance`, { qty: pos.liveOrder.qty, fillPrice: pos.liveOrder.exitFillPrice });
+    await pushTradeLogToGitHub(loadTradeLog());
+    logAudit('zero_balance_strike_closed', { base: pos.base, closeLabel, strikes });
+    clearAlertCooldown(`zero_balance_${pos.base}`);
+    telegramAlerts.push(
+      `🔍 *POSITION CLOSED — ZERO BALANCE* — ${pos.base}\n` +
+      `  ${closeLabel} sell attempt found exchange balance at 0 across ${strikes} consecutive checks — closing tracking, no sell needed.\n` +
+      `  _Real exit price unknown — P&L recorded using last known fill price. If this wasn't sold manually, check reconcileTrackedLiveBalances / MEXC API health._  ${utc}`
+    );
+    return { changed: true };
+  }
+
+  // Not yet confirmed — rate-limit the repeat alert instead of sending the
+  // identical "LIVE SELL SKIPPED" every cycle. It still goes out on the
+  // FIRST strike (already queued by closeLiveOrder before this runs);
+  // suppress duplicates after that until it resolves or the cooldown lapses.
+  if (strikes > 1 && !shouldAlertOnce(`zero_balance_${pos.base}`)) {
+    telegramAlerts.pop(); // drop the just-pushed duplicate from closeLiveOrder
+  }
+  return { changed: false };
+}
+
 // ── Sell Intelligence age gate (dev-team "Buy Priority / Rotation / Sell
 // Intelligence" doc): "Normal Sell Intelligence can act after 5 minutes;
 // hard stop is never blocked by age." SELL_MIN_POSITION_AGE_MIN is the
@@ -651,54 +711,8 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
         const closeResult = await closeLiveOrder(pos, `Stale — ${ageHrs}h with no stop/target hit`, telegramAlerts);
         if (!closeResult.closed) {
           delete pos.exitPrice;
-
-          // ── Self-heal a stale position stuck at zero exchange balance ──
-          // closeLiveOrder's zero_balance branch already pushed a
-          // "LIVE SELL SKIPPED" alert into telegramAlerts above — without
-          // this, that same alert repeats verbatim every single cycle
-          // forever (this is exactly the gap reconcileTrackedLiveBalances
-          // was built to close for the OTHER manual-sell-detection path;
-          // this stale-close path never got the same treatment). A
-          // genuinely zero real balance here almost always means the
-          // position was already sold outside this exact code path (e.g.
-          // reconcileTrackedLiveBalances' own balance-fetch failing
-          // silently that cycle, a manual MEXC sell, or a prior partial
-          // close that didn't fully update tracking) — not something more
-          // retries will fix.
-          if (closeResult.reason === 'zero_balance') {
-            pos.liveOrder.staleZeroBalanceStrikes = (pos.liveOrder.staleZeroBalanceStrikes || 0) + 1;
-            const strikes = pos.liveOrder.staleZeroBalanceStrikes;
-
-            if (strikes >= STALE_ZERO_BALANCE_STRIKE_LIMIT) {
-              // Confirmed gone across multiple cycles — close tracking
-              // without a further sell attempt (nothing left to sell).
-              // Same closing shape reconcileTrackedLiveBalances uses for
-              // its own manual_sell_detected_zero_balance case.
-              pos.status = 'stopped';
-              pos.liveOrder.closedAt      = now;
-              pos.liveOrder.exitFillPrice = pos.liveOrder.fillPrice; // real exit price unknown — not a bot-tracked sell
-              recordTradeClose(pos, 'stale_manual_sell_detected_zero_balance', { qty: pos.liveOrder.qty, fillPrice: pos.liveOrder.exitFillPrice });
-              await pushTradeLogToGitHub(loadTradeLog());
-              changed = true;
-              logAudit('stale_position_zero_balance_closed', { sym, base: pos.base, strikes });
-              clearAlertCooldown(`stale_zero_balance_${pos.base}`);
-              telegramAlerts.push(
-                `🔍 *STALE POSITION CLOSED — ZERO BALANCE* — ${pos.base}\n` +
-                `  Stale (${ageHrs}h) sell attempt found exchange balance at 0 across ${strikes} consecutive checks — closing tracking, no sell needed.\n` +
-                `  _Real exit price unknown — P&L recorded using last known fill price. If this wasn't sold manually, check reconcileTrackedLiveBalances / MEXC API health._  ${utc}`
-              );
-              continue;
-            }
-
-            // Not yet confirmed — rate-limit the repeat alert instead of
-            // sending the identical "LIVE SELL SKIPPED" every cycle. The
-            // one closeLiveOrder already queued above still goes out on
-            // the FIRST strike; suppress the duplicates after that until
-            // either it resolves (closes above) or the cooldown lapses.
-            if (strikes > 1 && !shouldAlertOnce(`stale_zero_balance_${pos.base}`)) {
-              telegramAlerts.pop(); // drop the just-pushed duplicate from closeLiveOrder
-            }
-          }
+          const strike = await handleZeroBalanceStrike(pos, closeResult, `Stale (${ageHrs}h)`, telegramAlerts, now, utc);
+          if (strike.changed) changed = true;
 
           continue; // sell didn't complete — retry next cycle, don't evict an unresolved live position
         }
@@ -784,8 +798,11 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
         // position gets evicted while possibly still open on the exchange;
         // leave it tracked so this same stop check fires again next cycle.
         delete pos.exitPrice;
+        const strike = await handleZeroBalanceStrike(pos, closeResult, 'Stop hit', telegramAlerts, now, utc);
+        if (strike.changed) changed = true;
         continue;
       }
+      if (pos.liveOrder) pos.liveOrder.staleZeroBalanceStrikes = 0; // sold successfully (or never live-tracked) — clear any prior strikes
       pos.status          = 'stopped';
       pos.statusChangedAt = now;
       changed = true;
@@ -1073,8 +1090,11 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
         const isLiveCrypto = isCrypto && pos.liveOrder?.mode === 'live';
         if (isLiveCrypto && !closeResult.closed) {
           delete pos.exitPrice;
+          const strike = await handleZeroBalanceStrike(pos, closeResult, 'Profit Protection', telegramAlerts, now, utc);
+          if (strike.changed) changed = true;
           continue; // sell didn't complete — retry next cycle, don't evict
         }
+        if (pos.liveOrder) pos.liveOrder.staleZeroBalanceStrikes = 0; // sold successfully (or never live-tracked) — clear any prior strikes
         pos.status          = 'exiting';
         pos.statusChangedAt = now;
         pos.exitAlertedAt   = now;
