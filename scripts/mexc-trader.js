@@ -719,6 +719,16 @@ export async function executeSTPriorityRotation({
     console.log(`  🧺  ST15 basket: ${fresh.length} fresh candidate(s) this cycle (${fresh.map(c => c.pair).join(', ')})${ST_EQUAL_ALLOCATE ? ` — equal allocation ÷${basketSize}` : ''}`);
   }
 
+  // Sized ONCE here, from a single balance snapshot — see the matching ST5
+  // comment for why (in-loop re-querying compounded into using only
+  // ~74-75% of available balance across multiple same-cycle candidates,
+  // even though every one of them successfully executed).
+  const { totalUsd: st15TotalUsd } = await computeSTPriorityUsdSize({
+    effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
+    fallbackUsdSize: ST15_PRIORITY_USD_SIZE, label: 'ST15 priority',
+  });
+  const st15UsdSize = parseFloat((st15TotalUsd / basketSize).toFixed(2));
+
   for (const { pair, entry, event } of fresh) {
     const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
     const sym  = buildSymKey(pair);
@@ -1088,11 +1098,7 @@ export async function executeSTPriorityRotation({
     const shock = entry?.d?.shock ?? 1;
     const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
-    const { totalUsd: st15TotalUsd } = await computeSTPriorityUsdSize({
-      effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
-      fallbackUsdSize: ST15_PRIORITY_USD_SIZE, label: 'ST15 priority',
-    });
-    const st15UsdSize = parseFloat((st15TotalUsd / basketSize).toFixed(2));
+    // st15UsdSize computed once, above the loop — see that comment.
     if (st15UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st15_blocked_zero_balance', { pair, id: event.id });
@@ -1265,6 +1271,25 @@ export async function executeST5PriorityRotation({
   if (fresh.length > 1) {
     console.log(`  🧺  ST5 basket: ${fresh.length} fresh candidate(s) this cycle (${fresh.map(c => c.pair).join(', ')})${ST_EQUAL_ALLOCATE ? ` — equal allocation ÷${basketSize}` : ''}`);
   }
+
+  // Sized ONCE here, from a single balance snapshot — NOT inside the loop
+  // below (that was the actual bug behind "still not full available balance
+  // used", 2026-09-10: LINK $258.73 then SOL $207.48 instead of two roughly
+  // equal shares summing to ~full balance). Querying live balance fresh
+  // per-candidate meant each candidate divided by the fixed basketSize
+  // AGAIN, off whatever was left AFTER the previous candidate already
+  // spent its share — for 2 candidates that compounds to using only
+  // ~74-75% of the original balance, not 100%, even though every candidate
+  // successfully executed. A single upfront total, divided once and reused
+  // for every candidate that reaches the buy step, fixes that while still
+  // preserving the "a skipped candidate's share is simply left unused, not
+  // redistributed" rule from the dev-team note — every candidate gets the
+  // SAME fixed target regardless of what a sibling did or didn't do.
+  const { totalUsd: st5TotalUsd } = await computeSTPriorityUsdSize({
+    effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
+    fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'ST5 priority',
+  });
+  const st5UsdSize = parseFloat((st5TotalUsd / basketSize).toFixed(2));
 
   for (const { pair, entry, event } of fresh) {
     const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
@@ -1582,11 +1607,7 @@ export async function executeST5PriorityRotation({
     const shock = entry?.d?.shock ?? 1;
     const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
-    const { totalUsd: st5TotalUsd } = await computeSTPriorityUsdSize({
-      effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
-      fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'ST5 priority',
-    });
-    const st5UsdSize = parseFloat((st5TotalUsd / basketSize).toFixed(2));
+    // st5UsdSize computed once, above the loop — see that comment.
     if (st5UsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
