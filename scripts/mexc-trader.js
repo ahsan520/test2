@@ -591,6 +591,23 @@ const ST_EVENT_TTL_MIN               = parseFloat(process.env.ST_EVENT_TTL_MIN |
 const ST_MAX_DISTANCE_PCT            = parseFloat(process.env.ST_MAX_DISTANCE_PCT || '3');
 const ST_ROTATION_COOLDOWN_MIN       = parseFloat(process.env.ST_ROTATION_COOLDOWN_MIN || '10');
 const ST_EQUAL_ALLOCATE              = (process.env.ST_EQUAL_ALLOCATE ?? 'true') === 'true';
+// ST5/ST15 priority sizing — deliberately INDEPENDENT of the regular buy
+// path's TRADE_SIZE_MODE/TRADE_SIZE_PCT (effectiveSizeMode/effectiveSizePct
+// below, passed in from leaderboard-decider.js). Root cause of a ~$1400
+// SUI→$195 LINK rotation (2026-09-09): TRADE_SIZE_MODE defaults to 'usd'
+// (fixed dollar) unless explicitly set to 'percent' as a repo Variable —
+// TRADE_SIZE_PCT=100 was configured but silently had NO effect, anywhere,
+// because that mode switch was never flipped. Rather than fixing that at
+// the shared setting (which would also change the regular Top-N buy path's
+// sizing — a bigger, unrequested blast radius), ST5/ST15 get their own
+// dedicated knob, defaulting to percent/100 so "use 100% of available
+// balance" works for priority rotations out of the box without touching
+// regular-buy behavior at all. computeSTPriorityUsdSize's basketSize
+// division (below) already correctly splits this equally across multiple
+// same-cycle candidates — that part was never broken, just fed a wrong
+// (tiny, fixed) total.
+const ST_PRIORITY_SIZE_MODE          = process.env.ST_PRIORITY_SIZE_MODE || 'percent';
+const ST_PRIORITY_SIZE_PCT           = parseFloat(process.env.ST_PRIORITY_SIZE_PCT || '100');
 const ST_FAILED_SELL_QUARANTINE_MIN  = parseFloat(process.env.ST_FAILED_SELL_QUARANTINE_MIN || '60');
 
 // P0/P1 bypass checkMarketIntelligence entirely by design (breadth,
@@ -1072,7 +1089,7 @@ export async function executeSTPriorityRotation({
     const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
     const { totalUsd: st15TotalUsd } = await computeSTPriorityUsdSize({
-      effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
+      effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
       fallbackUsdSize: ST15_PRIORITY_USD_SIZE, label: 'ST15 priority',
     });
     const st15UsdSize = parseFloat((st15TotalUsd / basketSize).toFixed(2));
@@ -1113,7 +1130,7 @@ export async function executeSTPriorityRotation({
       logAudit('st15_paper_buy', { sym, id: event.id, usdSize: st15UsdSize, fillPrice });
       recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: st15UsdSize });
       await pushTradeLogToGitHub(loadTradeLog());
-      if (effectiveSizeMode === 'percent') adjustPaperBalance(-st15UsdSize);
+      if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-st15UsdSize);
       changed = true;
       event.status = 'EXECUTED';
       await sendTelegram(
@@ -1566,7 +1583,7 @@ export async function executeST5PriorityRotation({
     const signalPrice = parseFloat(entry?.d?.p || event.close || 0); // see checkBuySlippage/recalcLevelsFromFill
 
     const { totalUsd: st5TotalUsd } = await computeSTPriorityUsdSize({
-      effectiveTradeMode, effectiveSizeMode, effectiveSizePct,
+      effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
       fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'ST5 priority',
     });
     const st5UsdSize = parseFloat((st5TotalUsd / basketSize).toFixed(2));
@@ -1604,7 +1621,7 @@ export async function executeST5PriorityRotation({
       logAudit('st5_paper_buy', { sym, id: event.id, usdSize: st5UsdSize, fillPrice });
       recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: st5UsdSize });
       await pushTradeLogToGitHub(loadTradeLog());
-      if (effectiveSizeMode === 'percent') adjustPaperBalance(-st5UsdSize);
+      if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-st5UsdSize);
       changed = true;
       event.status = 'EXECUTED';
       await sendTelegram(
