@@ -116,7 +116,7 @@
       "drawdownFromPeak": 1.81,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1789006250199
+      "evaluatedAt": 1789006551272
     }
   },
   "TSX:AGCC.TO": {
@@ -182,7 +182,7 @@
       "drawdownFromPeak": 0.89,
       "tier": "B",
       "giveBack": 0.3,
-      "evaluatedAt": 1789006250199
+      "evaluatedAt": 1789006551272
     }
   },
   "BINANCE:SUIUSDT": {
@@ -201,9 +201,9 @@
     "t2": 0.8115,
     "score": -11,
     "spikeScore": 0.015108691277184434,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1789006551272,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -215,33 +215,39 @@
       "fillPrice": 0.765601476371,
       "buyOrderId": "MANUAL_ADOPTED_1789002062363",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__726555442292879360036",
+      "exitFillPrice": 0.7630603392226147,
+      "closedAt": 1789006552724,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 24 below 75 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 40,
-      "exitProbability": 40,
-      "dynamicPositionRisk": 24,
+      "reason": "no entry snapshot — falling-knife-only score 52 below 75 threshold",
+      "fallingKnifeScore": 52,
+      "exitProbability": 52,
+      "dynamicPositionRisk": 52,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1789006250199
+      "evaluatedAt": 1789006551272
     },
     "highestPnLSeen": 0.46,
-    "lastR15": 34.5,
-    "prevPnLPct": -0.44,
+    "lastR15": 36.2,
+    "prevPnLPct": -0.31,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.90% ≥ 0.20% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.46% (tier C) → now +-0.31%, gave back 0.77% ≥ 0.20% with weakening momentum [CVD fading · OI fading]",
       "highestPnLSeen": 0.46,
-      "drawdownFromPeak": 0.9,
+      "drawdownFromPeak": 0.77,
       "tier": "C",
       "giveBack": 0.2,
-      "evaluatedAt": 1789006250199
-    }
+      "evaluatedAt": 1789006551272
+    },
+    "exitPrice": 0.7632,
+    "statusChangedAt": 1789006551272
   }
 }
