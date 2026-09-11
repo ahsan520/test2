@@ -15,9 +15,9 @@
     "t2": 0.1755,
     "score": -6,
     "spikeScore": 0.6298062293297947,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1789115794293,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-FET-20260911T071500Z",
@@ -28,7 +28,11 @@
       "qty": 1862.43,
       "fillPrice": 0.1656,
       "buyOrderId": "C02__726999775311736833036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__727013640648957953036",
+      "exitFillPrice": 0.1648,
+      "closedAt": 1789115795712,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1789112489968,
@@ -61,31 +65,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 13 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -22,
+      "reason": "dynamicPositionRisk 33 below 50 threshold",
+      "fallingKnifeScore": 45,
+      "thesisDrop": 0,
       "confidenceDecay": 25,
-      "exitProbability": 13,
-      "dynamicPositionRisk": 13,
+      "exitProbability": 33,
+      "dynamicPositionRisk": 33,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 7
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1789115575304
+      "evaluatedAt": 1789115794293
     },
     "highestPnLSeen": 0.42,
-    "lastR15": 53.2,
+    "lastR15": 42.8,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.00% below tier C give-back 0.20%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.42% (tier C) → now +-0.48%, gave back 0.90% ≥ 0.20% with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.42,
-      "drawdownFromPeak": 0,
+      "drawdownFromPeak": 0.8999999999999999,
       "tier": "C",
       "giveBack": 0.2,
-      "evaluatedAt": 1789115575304
+      "evaluatedAt": 1789115794293
     },
-    "prevPnLPct": 0.42
+    "prevPnLPct": -0.48,
+    "exitPrice": 0.1648,
+    "statusChangedAt": 1789115794293
   }
 }
