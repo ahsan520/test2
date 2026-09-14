@@ -342,6 +342,12 @@ jobs:
           # Off by default — see mexc-trader.js's ST_PRIORITY_BLOCK_RISK_OFF
           # comment for what this does once enabled.
           ST_PRIORITY_BLOCK_RISK_OFF:   ${{ vars.ST_PRIORITY_BLOCK_RISK_OFF || 'false' }}
+          # Overextended-buy override (2026-09-14, mexc-trader.js) — off by
+          # default, same zero-behavior-change pattern as the rest of this
+          # block. See the comment above ST_ALLOW_OVEREXTENDED_BUY in
+          # mexc-trader.js for the full rationale.
+          ST_ALLOW_OVEREXTENDED_BUY:      ${{ vars.ST_ALLOW_OVEREXTENDED_BUY || 'false' }}
+          ST_OVEREXTENDED_STOP_LOSS_PCT:  ${{ vars.ST_OVEREXTENDED_STOP_LOSS_PCT || '1.25' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
