@@ -194,6 +194,10 @@ export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize })
     setup:       pos.setup,
     mode,
     status:      'open',
+    // Tags trades opened via the ST5/ST15 overextended-buy override
+    // (ST_ALLOW_OVEREXTENDED_BUY, mexc-trader.js) so they can be pulled out
+    // of the trade log and evaluated separately from normal-gate buys.
+    overextendedEntry: pos.overextendedEntry || false,
     buyAt:       Date.now(),
     buyOrderId:  orderId,
     buyQty:      qty,

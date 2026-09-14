@@ -64,12 +64,16 @@ import {
 // today's fill-anchored stop exactly as before, since there's nothing to
 // correct in that direction. entryPrice/P&L reporting are untouched —
 // still the real fill price, only the STOP distance is protected here.
-function recalcLevelsFromFill(fillPrice, shock = 1, signalPrice = null) {
+function recalcLevelsFromFill(fillPrice, shock = 1, signalPrice = null, stopPctOverride = null) {
   const p = parseFloat(fillPrice) || 0;
   if (!p) return null;
   const atr = p * 0.015 * Math.max(1, shock * 0.5);
   const dp  = p < 10 ? 4 : 2;
-  const STOP_LOSS_PCT = parseFloat(process.env.STOP_LOSS_PCT || '0.1');
+  // stopPctOverride (added for the ST5/ST15 overextended-buy override, see
+  // ST_ALLOW_OVEREXTENDED_BUY below) lets a caller widen the stop for a
+  // specific buy without touching the global STOP_LOSS_PCT everyone else
+  // still uses.
+  const STOP_LOSS_PCT = stopPctOverride ?? parseFloat(process.env.STOP_LOSS_PCT || '0.1');
   const stopFromFill = p * (1 - STOP_LOSS_PCT / 100);
   const sig = parseFloat(signalPrice) || 0;
   const stop = sig > 0 ? Math.min(stopFromFill, sig * (1 - STOP_LOSS_PCT / 100)) : stopFromFill;
@@ -610,6 +614,23 @@ const ST_PRIORITY_SIZE_MODE          = process.env.ST_PRIORITY_SIZE_MODE || 'per
 const ST_PRIORITY_SIZE_PCT           = parseFloat(process.env.ST_PRIORITY_SIZE_PCT || '100');
 const ST_FAILED_SELL_QUARANTINE_MIN  = parseFloat(process.env.ST_FAILED_SELL_QUARANTINE_MIN || '60');
 
+// ── Overextended-buy override (2026-09-14) — trade-log review that led to
+// the RSI-overextension gate (calcEntryExtension, see the SKIPPED_OVEREXTENDED
+// blocks below) showed those entries losing more than they won at full
+// size/normal stop. Since then, several SKIPPED_OVEREXTENDED crosses
+// (XLM/ZEC/NEAR/XRP etc.) kept spiking after being skipped — the gate may be
+// filtering out some real moves along with the bad ones. Rather than
+// removing the gate, this makes it an opt-in override: when ON, a
+// SKIPPED_OVEREXTENDED cross still buys, but with a WIDER dedicated stop
+// (ST_OVEREXTENDED_STOP_LOSS_PCT, independent of the normal STOP_LOSS_PCT)
+// to reflect the extra risk of entering already-hot, and the resulting
+// position is tagged overextendedEntry:true so these trades can be pulled
+// out of the trade log separately and evaluated on their own before
+// deciding whether to keep this on. Off by default — no behavior change
+// unless explicitly enabled.
+const ST_ALLOW_OVEREXTENDED_BUY      = (process.env.ST_ALLOW_OVEREXTENDED_BUY || 'false') === 'true';
+const ST_OVEREXTENDED_STOP_LOSS_PCT  = parseFloat(process.env.ST_OVEREXTENDED_STOP_LOSS_PCT || '2');
+
 // P0/P1 bypass checkMarketIntelligence entirely by design (breadth,
 // relative-strength-vs-regime, BTC-bear block — see the big comment above
 // executeSTPriorityRotation) — the ONLY place marketRegime touches either
@@ -794,11 +815,17 @@ export async function executeSTPriorityRotation({
     // this cycle's market-fetcher already computed for this symbol —
     // no extra API calls, no added latency to the priority path.
     const st15Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
+    let st15OverextendedOverride = false;
     if (st15Ext.penalty > 0) {
-      event.status = 'SKIPPED_OVEREXTENDED';
-      logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason });
-      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — skipped, already overextended (${st15Ext.reason}). Event marked handled, no positions touched.`);
-      continue;
+      if (!ST_ALLOW_OVEREXTENDED_BUY) {
+        event.status = 'SKIPPED_OVEREXTENDED';
+        logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason });
+        await sendTelegram(`🚫 *ST15 CROSS — ${base}* — skipped, already overextended (${st15Ext.reason}). Event marked handled, no positions touched.`);
+        continue;
+      }
+      st15OverextendedOverride = true;
+      logAudit('st15_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
+      await sendTelegram(`⚠️ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
     }
 
     // ── Falling-knife / ATR-exhaustion gate ──
@@ -1122,13 +1149,14 @@ export async function executeSTPriorityRotation({
       source: 'st15_priority_v1',
       scoreSource: 'st15_cross',
       st15EventId: event.id,
+      overextendedEntry: st15OverextendedOverride,
     };
 
     if (effectiveTradeMode === 'paper') {
       const fillPrice = signalPrice;
       const qty        = fillPrice > 0 ? st15UsdSize / fillPrice : 0;
       positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st15UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST15_${now}` };
-      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice);
+      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice, st15OverextendedOverride ? ST_OVEREXTENDED_STOP_LOSS_PCT : null);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1165,7 +1193,7 @@ export async function executeSTPriorityRotation({
           mode: 'live', buyAt: now, usdSize: st15UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
-        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice);
+        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice, st15OverextendedOverride ? ST_OVEREXTENDED_STOP_LOSS_PCT : null);
         if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1337,11 +1365,17 @@ export async function executeST5PriorityRotation({
     // ── RSI-overextension gate — see the matching ST15 comment above for
     // the full trade-log rationale (46 closed trades review). ──
     const st5Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
+    let st5OverextendedOverride = false;
     if (st5Ext.penalty > 0) {
-      event.status = 'SKIPPED_OVEREXTENDED';
-      logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason });
-      await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
-      continue;
+      if (!ST_ALLOW_OVEREXTENDED_BUY) {
+        event.status = 'SKIPPED_OVEREXTENDED';
+        logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason });
+        await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
+        continue;
+      }
+      st5OverextendedOverride = true;
+      logAudit('st5_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
+      await sendTelegram(`⚠️ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
     }
 
     // ── Falling-knife / ATR-exhaustion gate — see the matching ST15 comment
@@ -1628,13 +1662,14 @@ export async function executeST5PriorityRotation({
       source: 'st5_priority_v1',
       scoreSource: 'st5_cross',
       st5EventId: event.id,
+      overextendedEntry: st5OverextendedOverride,
     };
 
     if (effectiveTradeMode === 'paper') {
       const fillPrice = signalPrice;
       const qty        = fillPrice > 0 ? st5UsdSize / fillPrice : 0;
       positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize: st5UsdSize, qty, fillPrice, buyOrderId: `PAPER_ST5_${now}` };
-      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice);
+      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice, st5OverextendedOverride ? ST_OVEREXTENDED_STOP_LOSS_PCT : null);
       if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
       positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
@@ -1671,7 +1706,7 @@ export async function executeST5PriorityRotation({
           mode: 'live', buyAt: now, usdSize: st5UsdSize,
           qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
         };
-        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice);
+        const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice, st5OverextendedOverride ? ST_OVEREXTENDED_STOP_LOSS_PCT : null);
         if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
         positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
