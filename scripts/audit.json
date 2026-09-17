@@ -1,197 +1,5 @@
 [
   {
-    "timestamp": "2026-09-17T08:25:46.853Z",
-    "job": "leaderboard-decider",
-    "action": "positions_pushed",
-    "count": 3
-  },
-  {
-    "timestamp": "2026-09-17T08:25:46.858Z",
-    "job": "leaderboard-decider",
-    "action": "monitor_complete",
-    "openBefore": 3,
-    "openAfter": 3,
-    "alerts": 0
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.138Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:RENDERUSDT",
-    "base": "RENDER",
-    "free": 0.3,
-    "estNotional": 0.41579999999999995
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.141Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:SOLUSDT",
-    "base": "SOL",
-    "free": 0.004,
-    "estNotional": 0.40056
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.142Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:DOGEUSDT",
-    "base": "DOGE",
-    "free": 0.05,
-    "estNotional": 0.0040695
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.143Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XRPUSDT",
-    "base": "XRP",
-    "free": 0.015717,
-    "estNotional": 0.020435243399999997
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.144Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:TAOUSDT",
-    "base": "TAO",
-    "free": 0.007,
-    "estNotional": 1.5932
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.145Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XLMUSDT",
-    "base": "XLM",
-    "free": 0.04,
-    "estNotional": 0.007308
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.146Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:ZECUSDT",
-    "base": "ZEC",
-    "free": 0.000693,
-    "estNotional": 0.9588348
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.321Z",
-    "job": "leaderboard-decider",
-    "action": "st5_overextended_override",
-    "pair": "ZECUSDT",
-    "id": "ST5-ZEC-20260917T081500Z",
-    "r15": 64.9,
-    "r1h": 72.3,
-    "reason": "confirming-timeframe RSI 72 ≥ 68",
-    "stopPct": 0.4
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.474Z",
-    "job": "leaderboard-decider",
-    "action": "st5_wait_retest",
-    "pair": "ZECUSDT",
-    "id": "ST5-ZEC-20260917T081500Z",
-    "reason": "ST5 distance 3.037 ATR — EXHAUSTED zone, waiting for retest/cooldown"
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.478Z",
-    "job": "leaderboard-decider",
-    "action": "market_guard",
-    "canBuy": false,
-    "closeAll": false,
-    "sizeMult": 1,
-    "reasons": [
-      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
-    ]
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.481Z",
-    "job": "leaderboard-decider",
-    "action": "alpha_exception_passed",
-    "pair": "UNIUSDT",
-    "passedChecks": [
-      "Volume shock ≥1x",
-      "Whale ≥65",
-      "Score ≥6",
-      "BullConf ≥6",
-      "Buy-intel penalty ≤3",
-      "4H persistence ≥2 cycles",
-      "4H bull bias",
-      "EMA above",
-      "OI confirm",
-      "Positive CVD"
-    ],
-    "rs": 8.88
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.483Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "UNIUSDT",
-    "blockers": [
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 540 min ago (max 25) and trend structure no longer intact — signal may already be over"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.484Z",
-    "job": "leaderboard-decider",
-    "action": "alpha_exception_passed",
-    "pair": "ZECUSDT",
-    "passedChecks": [
-      "Volume shock ≥1x",
-      "Whale ≥65",
-      "Score ≥6",
-      "BullConf ≥6",
-      "Buy-intel penalty ≤3",
-      "4H persistence ≥2 cycles",
-      "4H bull bias",
-      "EMA above",
-      "OI confirm",
-      "Positive CVD"
-    ],
-    "rs": 16.13
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.486Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "ZECUSDT",
-    "blockers": [
-      {
-        "code": "ENTRY_EXTENDED",
-        "reason": "already extended past the breakout — buying the exhaustion, not the move"
-      },
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 1125 min ago — exceeds absolute 720min sanity ceiling regardless of trend structure"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.488Z",
-    "job": "leaderboard-decider",
-    "action": "buy_cycle_complete",
-    "signalsFound": 0,
-    "momWatchAlerts": 0
-  },
-  {
-    "timestamp": "2026-09-17T08:25:47.490Z",
-    "job": "leaderboard-decider",
-    "action": "job_complete"
-  },
-  {
-    "timestamp": "2026-09-17T08:25:49.011Z",
-    "job": "alert-runner",
-    "action": "positions_check",
-    "total": 3,
-    "monitored": 2
-  },
-  {
     "timestamp": "2026-09-17T08:30:39.583Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
@@ -9261,6 +9069,560 @@
   },
   {
     "timestamp": "2026-09-17T09:25:45.858Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 2,
+    "monitored": 2
+  },
+  {
+    "timestamp": "2026-09-17T09:27:31.318Z",
+    "job": "market-fetcher",
+    "action": "fetch_complete",
+    "totalPairs": 43,
+    "successCount": 36,
+    "cryptoCount": 20,
+    "stockScored": 17,
+    "stockFrozen": 6,
+    "results": [
+      {
+        "pair": "AAVEUSDT",
+        "status": "ok",
+        "conv": -1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "APTUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "AVAXUSDT",
+        "status": "ok",
+        "conv": 7,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "BTCUSDT",
+        "status": "ok",
+        "conv": 2,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "DOGEUSDT",
+        "status": "ok",
+        "conv": 1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "ETHUSDT",
+        "status": "ok",
+        "conv": 4,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "FETUSDT",
+        "status": "ok",
+        "conv": 7,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "GALAUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "IMXUSDT",
+        "status": "ok",
+        "conv": -1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "LINKUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "NEARUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "RENDERUSDT",
+        "status": "ok",
+        "conv": 6,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "SOLUSDT",
+        "status": "ok",
+        "conv": 0,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "SUIUSDT",
+        "status": "ok",
+        "conv": 4,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "TAOUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "UNIUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XLMUSDT",
+        "status": "ok",
+        "conv": 7,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XMRUSDT",
+        "status": "ok",
+        "conv": -9,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XRPUSDT",
+        "status": "ok",
+        "conv": -1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "ZECUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "AGCC.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "ETHY.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "GLCC.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "HTAE.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "TXF.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "XDIV.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "AMEX:EWY",
+        "status": "ok",
+        "conv": -5,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "CBOE:SPCH",
+        "status": "ok",
+        "conv": 6,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:AAPL",
+        "status": "ok",
+        "conv": 5,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:AMD",
+        "status": "ok",
+        "conv": 7,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:CRWD",
+        "status": "ok",
+        "conv": 6,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:GOOG",
+        "status": "ok",
+        "conv": 5,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:META",
+        "status": "ok",
+        "conv": -1,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MRVL",
+        "status": "ok",
+        "conv": 6,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MSFT",
+        "status": "ok",
+        "conv": 1,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MU",
+        "status": "ok",
+        "conv": -2,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:NVDA",
+        "status": "ok",
+        "conv": -3,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:PANW",
+        "status": "ok",
+        "conv": 5,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:ZS",
+        "status": "ok",
+        "conv": 6,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:BE",
+        "status": "ok",
+        "conv": 7,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:GE",
+        "status": "ok",
+        "conv": 2,
+        "session": "pre_market",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:GEV",
+        "status": "ok",
+        "conv": 6,
+        "session": "pre_market",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "TSX:MRV",
+        "status": "failed",
+        "session": "closed",
+        "assetType": "stock"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:31.389Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.053Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 2
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.057Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 2,
+    "openAfter": 2,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.455Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:RENDERUSDT",
+    "base": "RENDER",
+    "free": 0.3,
+    "estNotional": 0.41939999999999994
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.458Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.004,
+    "estNotional": 0.40324000000000004
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.461Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:DOGEUSDT",
+    "base": "DOGE",
+    "free": 0.05,
+    "estNotional": 0.004073
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.464Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.015717,
+    "estNotional": 0.0205609794
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.466Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.007,
+    "estNotional": 1.5967
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.469Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XLMUSDT",
+    "base": "XLM",
+    "free": 0.04,
+    "estNotional": 0.0073160000000000005
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.471Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.000693,
+    "estNotional": 0.94922289
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.482Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "AVAXUSDT",
+    "blockers": [
+      {
+        "code": "ENTRY_EXTENDED",
+        "reason": "already extended past the breakout — buying the exhaustion, not the move"
+      },
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 467 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      },
+      {
+        "code": "VOLUME_THIN",
+        "reason": "5m volume did not expand — breakout lacks follow-through"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.485Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "ETHUSDT",
+    "blockers": [
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 140 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      },
+      {
+        "code": "BPP_FADING",
+        "reason": "order-book pressure reads -17.2 (≤ -15) — book has turned against the breakout"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.488Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "FETUSDT",
+    "blockers": [
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 30 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      },
+      {
+        "code": "VOLUME_THIN",
+        "reason": "5m volume did not expand — breakout lacks follow-through"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.491Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "GALAUSDT",
+    "blockers": [
+      {
+        "code": "ENTRY_EXTENDED",
+        "reason": "already extended past the breakout — buying the exhaustion, not the move"
+      },
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 362 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      },
+      {
+        "code": "VOLUME_THIN",
+        "reason": "5m volume did not expand — breakout lacks follow-through"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.494Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "LINKUSDT",
+    "blockers": [
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 262 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      },
+      {
+        "code": "BPP_FADING",
+        "reason": "order-book pressure reads -25.6 (≤ -15) — book has turned against the breakout"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.497Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "NEARUSDT",
+    "blockers": [
+      {
+        "code": "ENTRY_EXTENDED",
+        "reason": "already extended past the breakout — buying the exhaustion, not the move"
+      },
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 922 min ago — exceeds absolute 720min sanity ceiling regardless of trend structure"
+      },
+      {
+        "code": "VOLUME_THIN",
+        "reason": "5m volume did not expand — breakout lacks follow-through"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.500Z",
+    "job": "leaderboard-decider",
+    "action": "entry_quality_blocked",
+    "pair": "XLMUSDT",
+    "blockers": [
+      {
+        "code": "TRIGGER_STALE",
+        "reason": "breakout first confirmed 162 min ago (max 25) and trend structure no longer intact — signal may already be over"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.506Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0,
+    "momWatchAlerts": 0
+  },
+  {
+    "timestamp": "2026-09-17T09:27:36.509Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-09-17T09:27:38.170Z",
     "job": "alert-runner",
     "action": "positions_check",
     "total": 2,
