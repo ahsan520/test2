@@ -98,7 +98,7 @@
     "spikeScore": 0.8542426326562348,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-RENDER-20260918T082000Z",
@@ -110,7 +110,11 @@
       "qty": 380.01,
       "fillPrice": 1.518,
       "buyOrderId": "C02__729550149730074624036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__729562707795021824036",
+      "exitFillPrice": 1.5099999999999998,
+      "closedAt": 1789723541125,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1789720546540,
@@ -167,7 +171,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1789723244393
-    }
+    },
+    "exitPrice": 1.51,
+    "statusChangedAt": 1789723538991
   },
   "BINANCE:SUIUSDT": {
     "sym": "BINANCE:SUIUSDT",
@@ -232,22 +238,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold (recovery detected, risk softened)",
+      "reason": "dynamicPositionRisk 4 below 50 threshold",
       "fallingKnifeScore": 3,
-      "thesisDrop": 12,
+      "thesisDrop": 15,
       "confidenceDecay": 17,
-      "exitProbability": 3,
-      "dynamicPositionRisk": 2,
+      "exitProbability": 4,
+      "dynamicPositionRisk": 4,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1789723244393
+      "evaluatedAt": 1789723538991
     },
     "highestPnLSeen": 0.18,
-    "lastR15": 69.3,
+    "lastR15": 68.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.18% below 0.35% floor — not evaluated yet",
@@ -255,7 +261,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1789723244393
+      "evaluatedAt": 1789723538991
     }
   }
 }
