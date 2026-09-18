@@ -143,32 +143,32 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 39 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 34,
-      "thesisDrop": 22,
+      "reason": "dynamicPositionRisk 44 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 35,
       "confidenceDecay": 20,
-      "exitProbability": 39,
-      "dynamicPositionRisk": 39,
+      "exitProbability": 44,
+      "dynamicPositionRisk": 44,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1789770337020
+      "evaluatedAt": 1789770640167
     },
     "highestPnLSeen": 0.79,
-    "lastR15": 46.5,
+    "lastR15": 46.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.76% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "reason": "drawdown 1.79% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.79,
-      "drawdownFromPeak": 1.76,
+      "drawdownFromPeak": 1.79,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1789770337020
+      "evaluatedAt": 1789770640167
     },
-    "prevPnLPct": -0.97
+    "prevPnLPct": -1
   },
   "BINANCE:XMRUSDT": {
     "sym": "BINANCE:XMRUSDT",
@@ -186,9 +186,9 @@
     "t2": 603.98,
     "score": 5,
     "spikeScore": 0.9343882699620196,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1789770640167,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XMR-20260918T205500Z",
@@ -200,7 +200,10 @@
       "qty": 0.019,
       "fillPrice": 569.7900000000001,
       "buyOrderId": "C02__729738925802762240036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__729760261686079488036",
+      "exitFillPrice": 570.4,
+      "closedAt": 1789770641141
     },
     "entrySnapshot": {
       "at": 1789765554328,
@@ -232,20 +235,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 19 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 49,
-      "confidenceDecay": 33,
-      "exitProbability": 19,
-      "dynamicPositionRisk": 19,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 65 → current 0 (drop 65 > 60)",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 65,
+      "confidenceDecay": 50,
+      "exitProbability": 42,
+      "dynamicPositionRisk": 42,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 5
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1789770337020
+      "evaluatedAt": 1789770640167
     },
     "highestPnLSeen": 1.7,
     "lastR15": 58.4,
@@ -258,6 +261,8 @@
       "tier": "A+",
       "giveBack": 1.5,
       "evaluatedAt": 1789770337020
-    }
+    },
+    "exitPrice": 570.35,
+    "statusChangedAt": 1789770640167
   }
 }
