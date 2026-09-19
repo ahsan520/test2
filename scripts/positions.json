@@ -106,8 +106,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1789776345487,
-      "usdSize": 379.1,
-      "qty": 1.504,
+      "usdSize": 286.01,
+      "qty": 1.135,
       "fillPrice": 251.98999999999998,
       "buyOrderId": "C02__729784192044281857036",
       "qtyEstimated": false
@@ -142,32 +142,33 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 5 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 20,
-      "confidenceDecay": 14,
-      "exitProbability": 5,
-      "dynamicPositionRisk": 5,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 50 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 34,
+      "thesisDrop": 41,
+      "confidenceDecay": 43,
+      "exitProbability": 50,
+      "dynamicPositionRisk": 50,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1789780527618
+      "evaluatedAt": 1789780832936
     },
     "highestPnLSeen": 1.04,
-    "lastR15": 53.8,
-    "prevPnLPct": -0.23,
+    "lastR15": 48.8,
+    "prevPnLPct": -0.75,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.27% ≥ 1.00% but confirmed momentum weakness not met (0/2) — holding, letting it run",
+      "reason": "drawdown 1.79% ≥ 1.00% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 1.04,
-      "drawdownFromPeak": 1.27,
+      "drawdownFromPeak": 1.79,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1789780527618
-    }
+      "evaluatedAt": 1789780832936
+    },
+    "piPartialLevel": 1
   }
 }
