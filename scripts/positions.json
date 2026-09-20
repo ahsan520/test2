@@ -17,7 +17,7 @@
     "spikeScore": 1.3123909960384343,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-GALA-20260920T154500Z",
@@ -29,7 +29,10 @@
       "qty": 121902.03,
       "fillPrice": 0.001894225950872188,
       "buyOrderId": "C02__730388109379665920036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__730396968567599104036",
+      "exitFillPrice": 0.0019339320971110982,
+      "closedAt": 1789922443939
     },
     "entrySnapshot": {
       "at": 1789920331753,
@@ -87,7 +90,10 @@
       "tier": "A+",
       "giveBack": 1.5,
       "evaluatedAt": 1789922439473
-    }
+    },
+    "exitPrice": 0.0019339320971110982,
+    "statusChangedAt": 1789922445033,
+    "rotatedOut": true
   },
   "BINANCE:RENDERUSDT": {
     "sym": "BINANCE:RENDERUSDT",
@@ -107,7 +113,7 @@
     "spikeScore": 5.708480396097802,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "p2Trigger": "P2-C-NORMAL",
@@ -123,7 +129,10 @@
       "qty": 559.78,
       "fillPrice": 1.6538944049448,
       "buyOrderId": "C02__730391973050867712036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__730396977849593856036",
+      "exitFillPrice": 1.7127092665474062,
+      "closedAt": 1789922446161
     },
     "entrySnapshot": {
       "at": 1789921252930,
@@ -181,7 +190,10 @@
       "tier": "A+",
       "giveBack": 1.5,
       "evaluatedAt": 1789922439473
-    }
+    },
+    "exitPrice": 1.7127092665474062,
+    "statusChangedAt": 1789922447071,
+    "rotatedOut": true
   },
   "BINANCE:AAVEUSDT": {
     "sym": "BINANCE:AAVEUSDT",
@@ -201,7 +213,7 @@
     "spikeScore": 1.9833167101120095,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "p2Trigger": "P2-C-NORMAL",
@@ -217,7 +229,10 @@
       "qty": 0.064,
       "fillPrice": 136.80999999999997,
       "buyOrderId": "C02__730393224434057216036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__730396986422751232036",
+      "exitFillPrice": 137.71,
+      "closedAt": 1789922448200
     },
     "entrySnapshot": {
       "at": 1789921551268,
@@ -275,6 +290,71 @@
       "breakoutFailed": false,
       "noSnapshotFallback": false,
       "evaluatedAt": 1789922439473
-    }
+    },
+    "exitPrice": 137.71,
+    "statusChangedAt": 1789922449131,
+    "rotatedOut": true
+  },
+  "BINANCE:SOLUSDT": {
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST15 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1789922452663,
+    "holdLockUntil": 1789922452663,
+    "entryPrice": 110.34000000000002,
+    "stop": 108.96,
+    "t1": 113.65,
+    "t2": 116.96,
+    "score": 2,
+    "spikeScore": 1.7097787701412295,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st15_priority_v1",
+    "scoreSource": "st15_cross",
+    "st15EventId": "ST15-SOL-20260920T161500Z",
+    "overextendedEntry": true,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1789922452663,
+      "usdSize": 1189.49,
+      "qty": 10.78,
+      "fillPrice": 110.34000000000002,
+      "buyOrderId": "C02__730397009592168448036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1789922453718,
+      "price": 110.37,
+      "conv": 2,
+      "whaleScore": 90,
+      "bullConfCount": 8,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": true,
+        "fundingHealthy": true,
+        "obiBidHeavy": true,
+        "rsiNotOb": false,
+        "whaleScore60": true
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 65,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "BREAKOUT",
+      "breakoutLevel": 109.5
+    },
+    "entryTriggerStatus": "BREAKOUT",
+    "entryStateAtBuy": "ST15_CROSS_UP"
   }
 }
