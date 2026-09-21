@@ -1,98 +1,4 @@
 {
-  "BINANCE:DOGEUSDT": {
-    "sym": "BINANCE:DOGEUSDT",
-    "base": "DOGE",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "ST5 PRIORITY",
-    "dir": "bull",
-    "alertedAt": 1789996240900,
-    "holdLockUntil": 1789996240900,
-    "entryPrice": 0.09425,
-    "stop": 0.0931,
-    "t1": 0.0971,
-    "t2": 0.0999,
-    "score": 5,
-    "spikeScore": 0.995166614843954,
-    "exitAlertedAt": 1789997738110,
-    "tier1AlertedAt": null,
-    "status": "stopped",
-    "source": "st5_priority_v1",
-    "scoreSource": "st5_cross",
-    "st5EventId": "ST5-DOGE-20260921T130000Z",
-    "overextendedEntry": true,
-    "liveOrder": {
-      "mode": "live",
-      "buyAt": 1789996240900,
-      "usdSize": 5.58,
-      "qty": 59.2,
-      "fillPrice": 0.09425,
-      "buyOrderId": "C02__730706499164069889036",
-      "qtyEstimated": false,
-      "sellOrderId": "C02__730712779123552256036",
-      "exitFillPrice": 0.0933,
-      "closedAt": 1789997738991
-    },
-    "entrySnapshot": {
-      "at": 1789996241801,
-      "price": 0.09422,
-      "conv": 5,
-      "whaleScore": 85,
-      "bullConfCount": 7,
-      "bullChecks": {
-        "dailyBiasBull": true,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": false,
-        "cvdRising": true,
-        "volExpansion": false,
-        "fundingHealthy": true,
-        "obiBidHeavy": true,
-        "rsiNotOb": false,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 73,
-      "btcRiskScore": null,
-      "breadthScore": null,
-      "marketRegime": null,
-      "triggerStatus": "BREAKOUT",
-      "breakoutLevel": 0.09398
-    },
-    "entryTriggerStatus": "BREAKOUT",
-    "entryStateAtBuy": "ST5_CROSS_UP",
-    "lastPI": {
-      "action": "EXIT",
-      "reason": "Thesis invalidated: entry score 73 → current 8 (drop 65 > 60) — price also back below entry breakout level",
-      "fallingKnifeScore": 35,
-      "thesisDrop": 65,
-      "confidenceDecay": 43,
-      "exitProbability": 59,
-      "dynamicPositionRisk": 59,
-      "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
-      },
-      "breakoutFailed": true,
-      "noSnapshotFallback": false,
-      "evaluatedAt": 1789997738110
-    },
-    "highestPnLSeen": -0.6,
-    "lastR15": 64.3,
-    "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "peak -0.60% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.6,
-      "drawdownFromPeak": 0,
-      "tier": null,
-      "giveBack": null,
-      "evaluatedAt": 1789997433861
-    },
-    "exitPrice": 0.0933,
-    "statusChangedAt": 1789998033925
-  },
   "AMEX:EWY": {
     "sym": "AMEX:EWY",
     "base": "AMEX:EWY",
@@ -118,7 +24,19 @@
     "rankScore": 0.383,
     "histWinRate": 0.3333333333333333,
     "histSample": 3,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": 0.52,
+    "lastR15": 61.2,
+    "prevPnLPct": 0.52,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier C give-back 0.40% (regime-widened)",
+      "highestPnLSeen": 0.52,
+      "drawdownFromPeak": 0,
+      "tier": "C",
+      "giveBack": 0.4,
+      "evaluatedAt": 1789998342695
+    }
   },
   "TSX:ETHY.TO": {
     "sym": "TSX:ETHY.TO",
@@ -199,7 +117,18 @@
     "rankScore": 0.348,
     "histWinRate": 0.3333333333333333,
     "histSample": 3,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": -0.39,
+    "lastR15": 67.2,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.39% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.39,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NASDAQ:AMD": {
     "sym": "NASDAQ:AMD",
@@ -226,36 +155,19 @@
     "rankScore": 0.466,
     "histWinRate": 0.5,
     "histSample": 6,
-    "caution": false
-  },
-  "NASDAQ:MRVL": {
-    "sym": "NASDAQ:MRVL",
-    "base": "NASDAQ:MRVL",
-    "assetType": "stock",
-    "exchangePrefix": "NASDAQ",
-    "session": "open",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1789997436768,
-    "holdLockUntil": 1789998636768,
-    "entryPrice": 251.3,
-    "stop": 248.16,
-    "t1": 258.84,
-    "t2": 266.38,
-    "score": 8,
-    "spikeScore": 0.06399985876588545,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "stopped",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.524,
-    "histWinRate": 0.2857142857142857,
-    "histSample": 7,
-    "caution": true,
-    "exitPrice": 247.61,
-    "statusChangedAt": 1789997738110
+    "caution": false,
+    "highestPnLSeen": 2.98,
+    "lastR15": 78.2,
+    "prevPnLPct": 2.98,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
+      "highestPnLSeen": 2.98,
+      "drawdownFromPeak": 0,
+      "tier": "A+",
+      "giveBack": 1.5,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NASDAQ:MU": {
     "sym": "NASDAQ:MU",
@@ -282,7 +194,19 @@
     "rankScore": 0.383,
     "histWinRate": 0.2857142857142857,
     "histSample": 7,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": 1.61,
+    "lastR15": 69.6,
+    "prevPnLPct": 1.61,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
+      "highestPnLSeen": 1.61,
+      "drawdownFromPeak": 0,
+      "tier": "A+",
+      "giveBack": 1.5,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NASDAQ:NVDA": {
     "sym": "NASDAQ:NVDA",
@@ -309,7 +233,19 @@
     "rankScore": 0.541,
     "histWinRate": 0.6,
     "histSample": 5,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": 0.7,
+    "lastR15": 60.7,
+    "prevPnLPct": 0.7,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "highestPnLSeen": 0.7,
+      "drawdownFromPeak": 0,
+      "tier": "B",
+      "giveBack": 0.6,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NASDAQ:PANW": {
     "sym": "NASDAQ:PANW",
@@ -336,7 +272,19 @@
     "rankScore": 0.24,
     "histWinRate": 0,
     "histSample": 2,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": 0.61,
+    "lastR15": 53,
+    "prevPnLPct": 0.61,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "highestPnLSeen": 0.61,
+      "drawdownFromPeak": 0,
+      "tier": "B",
+      "giveBack": 0.6,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NASDAQ:ZS": {
     "sym": "NASDAQ:ZS",
@@ -363,7 +311,19 @@
     "rankScore": 0.412,
     "histWinRate": 0.3333333333333333,
     "histSample": 3,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": 2.87,
+    "lastR15": 62,
+    "prevPnLPct": 2.87,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
+      "highestPnLSeen": 2.87,
+      "drawdownFromPeak": 0,
+      "tier": "A+",
+      "giveBack": 1.5,
+      "evaluatedAt": 1789998342695
+    }
   },
   "NYSE:GEV": {
     "sym": "NYSE:GEV",
@@ -390,7 +350,18 @@
     "rankScore": 0.24,
     "histWinRate": 0,
     "histSample": 3,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": 0.25,
+    "lastR15": 53.6,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak 0.25% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": 0.25,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1789998342695
+    }
   },
   "CBOE:SPCH": {
     "sym": "CBOE:SPCH",
