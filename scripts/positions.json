@@ -114,7 +114,7 @@
     "spikeScore": 1.254042075476312,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-SOL-20260921T080000Z",
@@ -126,7 +126,10 @@
       "qty": 2.112,
       "fillPrice": 113.25,
       "buyOrderId": "C02__730634764431556608036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__730640415039926272036",
+      "exitFillPrice": 115.92,
+      "closedAt": 1789980486071
     },
     "entrySnapshot": {
       "at": 1789979138882,
@@ -184,7 +187,10 @@
       "tier": "A+",
       "giveBack": 1.5,
       "evaluatedAt": 1789980482250
-    }
+    },
+    "exitPrice": 115.92,
+    "statusChangedAt": 1789980487212,
+    "rotatedOut": true
   },
   "BINANCE:LINKUSDT": {
     "sym": "BINANCE:LINKUSDT",
@@ -204,7 +210,7 @@
     "spikeScore": 0.6022369453426633,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "p2Trigger": "P2-C-NORMAL",
@@ -220,7 +226,10 @@
       "qty": 56.51,
       "fillPrice": 12.74356715625553,
       "buyOrderId": "C02__730636816771624960036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__730640423424258048036",
+      "exitFillPrice": 12.837,
+      "closedAt": 1789980488082
     },
     "entrySnapshot": {
       "at": 1789979628151,
@@ -278,6 +287,71 @@
       "giveBack": 0.6,
       "evaluatedAt": 1789980482250
     },
-    "prevPnLPct": 0.74
+    "prevPnLPct": 0.74,
+    "exitPrice": 12.837,
+    "statusChangedAt": 1789980489168,
+    "rotatedOut": true
+  },
+  "BINANCE:GALAUSDT": {
+    "sym": "BINANCE:GALAUSDT",
+    "base": "GALA",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST5 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1789980492102,
+    "holdLockUntil": 1789980492102,
+    "entryPrice": 0.0020021040414496477,
+    "stop": 0.002,
+    "t1": 0.0021,
+    "t2": 0.0021,
+    "score": 5,
+    "spikeScore": 0.42050241686151363,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st5_priority_v1",
+    "scoreSource": "st5_cross",
+    "st5EventId": "ST5-GALA-20260921T084000Z",
+    "overextendedEntry": false,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1789980492102,
+      "usdSize": 595.07,
+      "qty": 297222.31,
+      "fillPrice": 0.0020021040414496477,
+      "buyOrderId": "C02__730640445347893249036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1789980493308,
+      "price": 0.002001,
+      "conv": 5,
+      "whaleScore": 54,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": false
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 60,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "BREAKOUT",
+      "breakoutLevel": 0.001998
+    },
+    "entryTriggerStatus": "BREAKOUT",
+    "entryStateAtBuy": "ST5_CROSS_UP"
   }
 }
