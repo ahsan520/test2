@@ -142,17 +142,17 @@
     "histWinRate": 0.25,
     "histSample": 8,
     "caution": true,
-    "highestPnLSeen": 2.87,
+    "highestPnLSeen": 2.91,
     "lastR15": 61,
-    "prevPnLPct": 2.87,
+    "prevPnLPct": 2.91,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
-      "highestPnLSeen": 2.87,
+      "highestPnLSeen": 2.91,
       "drawdownFromPeak": 0,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "AMEX:EWY": {
@@ -181,17 +181,17 @@
     "histWinRate": 0.3333333333333333,
     "histSample": 3,
     "caution": false,
-    "highestPnLSeen": 2.16,
-    "lastR15": 61.1,
-    "prevPnLPct": 2.16,
+    "highestPnLSeen": 2.25,
+    "lastR15": 61.2,
+    "prevPnLPct": 2.25,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
-      "highestPnLSeen": 2.16,
+      "highestPnLSeen": 2.25,
       "drawdownFromPeak": 0,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "NASDAQ:NVDA": {
@@ -221,15 +221,15 @@
     "histSample": 5,
     "caution": false,
     "highestPnLSeen": 0.37,
-    "lastR15": 61.2,
+    "lastR15": 60.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.37% did not clear a give-back tier",
       "highestPnLSeen": 0.37,
-      "drawdownFromPeak": 0.10999999999999999,
+      "drawdownFromPeak": 0.32,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "CBOE:SPCH": {
@@ -259,16 +259,16 @@
     "histSample": 9,
     "caution": false,
     "highestPnLSeen": 1.58,
-    "lastR15": 62,
-    "prevPnLPct": 0.29,
+    "lastR15": 62.2,
+    "prevPnLPct": 0.53,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.29% below tier A+ give-back 1.50% (regime-widened)",
+      "reason": "drawdown 1.05% below tier A+ give-back 1.50% (regime-widened)",
       "highestPnLSeen": 1.58,
-      "drawdownFromPeak": 1.29,
+      "drawdownFromPeak": 1.05,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "TSX:TXF.TO": {
@@ -352,7 +352,7 @@
     "histSample": 3,
     "caution": false,
     "highestPnLSeen": 0,
-    "lastR15": 57.8,
+    "lastR15": 58.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.00% below 0.35% floor — not evaluated yet",
@@ -360,7 +360,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "BINANCE:APTUSDT": {
@@ -379,9 +379,9 @@
     "t2": 0.8531,
     "score": 6,
     "spikeScore": 2.7872768399936385,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790106334972,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "p2Trigger": "P2-C-NORMAL",
@@ -397,7 +397,10 @@
       "qty": 1276.41,
       "fillPrice": 0.7872963679382017,
       "buyOrderId": "C02__731148157861126146036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__731168271406899200036",
+      "exitFillPrice": 0.7818051018089799,
+      "closedAt": 1790106336875
     },
     "entrySnapshot": {
       "at": 1790101541419,
@@ -429,20 +432,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "HIGH SHOCK",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 7 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 24,
-      "confidenceDecay": 22,
-      "exitProbability": 7,
-      "dynamicPositionRisk": 7,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 100 → current 32 (drop 68 > 60)",
+      "fallingKnifeScore": 47,
+      "thesisDrop": 68,
+      "confidenceDecay": 44,
+      "exitProbability": 48,
+      "dynamicPositionRisk": 48,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     },
     "highestPnLSeen": 0.34,
     "lastR15": 58,
@@ -454,7 +457,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1790106028739
-    }
+    },
+    "exitPrice": 0.783,
+    "statusChangedAt": 1790106334972
   },
   "NASDAQ:ZS": {
     "sym": "NASDAQ:ZS",
@@ -483,7 +488,7 @@
     "histSample": 4,
     "caution": false,
     "highestPnLSeen": -0.11,
-    "lastR15": 68.3,
+    "lastR15": 68.6,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.11% below 0.35% floor — not evaluated yet",
@@ -491,7 +496,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790106028739
+      "evaluatedAt": 1790106334972
     }
   },
   "BINANCE:LINKUSDT": {
@@ -505,7 +510,7 @@
     "alertedAt": 1790106037684,
     "holdLockUntil": 1790106037684,
     "entryPrice": 13,
-    "stop": 12.83,
+    "stop": 12.838,
     "t1": 13.39,
     "t2": 13.78,
     "score": -3,
@@ -567,7 +572,7 @@
     "alertedAt": 1790106043341,
     "holdLockUntil": 1790106043341,
     "entryPrice": 1.829,
-    "stop": 1.8042,
+    "stop": 1.806,
     "t1": 1.8839,
     "t2": 1.9387,
     "score": 3,
