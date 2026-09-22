@@ -35,7 +35,7 @@
       "drawdownFromPeak": 0.69,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790074381582
+      "evaluatedAt": 1790074546256
     }
   },
   "TSX:ETHY.TO": {
@@ -122,14 +122,14 @@
     "lastR15": 72.1,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.18% below tier A give-back 1.00% (regime-widened)",
+      "reason": "drawdown 0.16% below tier A give-back 1.00% (regime-widened)",
       "highestPnLSeen": 1.37,
-      "drawdownFromPeak": 0.18000000000000016,
+      "drawdownFromPeak": 0.16000000000000014,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1790074381582
+      "evaluatedAt": 1790074546256
     },
-    "prevPnLPct": 1.19
+    "prevPnLPct": 1.21
   },
   "NASDAQ:NVDA": {
     "sym": "NASDAQ:NVDA",
@@ -159,15 +159,15 @@
     "caution": false,
     "highestPnLSeen": 2.31,
     "lastR15": 62.3,
-    "prevPnLPct": 2.02,
+    "prevPnLPct": 2.04,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.29% below tier A+ give-back 1.50% (regime-widened)",
+      "reason": "drawdown 0.27% below tier A+ give-back 1.50% (regime-widened)",
       "highestPnLSeen": 2.31,
-      "drawdownFromPeak": 0.29000000000000004,
+      "drawdownFromPeak": 0.27,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790074381582
+      "evaluatedAt": 1790074546256
     }
   },
   "TSX:TXF.TO": {
@@ -233,7 +233,7 @@
       "drawdownFromPeak": 2.05,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790074381582
+      "evaluatedAt": 1790074546256
     }
   },
   "TSX:AGCC.TO": {
@@ -279,9 +279,9 @@
     "t2": 124.76,
     "score": 7,
     "spikeScore": 0.7607259930873329,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790074546256,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-SOL-20260922T084000Z",
@@ -293,7 +293,10 @@
       "qty": 1.268,
       "fillPrice": 117.69999999999999,
       "buyOrderId": "C02__731003468390559746036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__731034936324026368036",
+      "exitFillPrice": 116.89999999999999,
+      "closedAt": 1790074547256
     },
     "entrySnapshot": {
       "at": 1790067044707,
@@ -325,20 +328,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 47 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 84 → current 21 (drop 63 > 60) — price also back below entry breakout level",
       "fallingKnifeScore": 35,
-      "thesisDrop": 41,
-      "confidenceDecay": 25,
-      "exitProbability": 47,
-      "dynamicPositionRisk": 47,
+      "thesisDrop": 63,
+      "confidenceDecay": 38,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 8
+        "sustainedMin": 5
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790074381582
+      "evaluatedAt": 1790074546256
     },
     "highestPnLSeen": -0.22,
     "lastR15": 49,
@@ -350,6 +353,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1790074381582
-    }
+    },
+    "exitPrice": 116.91,
+    "statusChangedAt": 1790074546256
   }
 }
