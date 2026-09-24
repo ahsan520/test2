@@ -71,7 +71,7 @@
     "spikeScore": 0.45589772227547337,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -83,7 +83,11 @@
       "fillPrice": 1.4731010059232852,
       "buyOrderId": "MANUAL_ADOPTED_1790249138205",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "closedAt": 1790260244717,
+      "exitFillPrice": 1.519,
+      "dustIgnored": true,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -110,48 +114,9 @@
       "giveBack": 1.5,
       "evaluatedAt": 1790259928387
     },
-    "prevPnLPct": 2.81
-  },
-  "NASDAQ:PANW": {
-    "sym": "NASDAQ:PANW",
-    "base": "NASDAQ:PANW",
-    "assetType": "stock",
-    "exchangePrefix": "NASDAQ",
-    "session": "open",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1790256930515,
-    "holdLockUntil": 1790258130515,
-    "entryPrice": 392.95,
-    "stop": 388.04,
-    "t1": 404.74,
-    "t2": 416.53,
-    "score": 7,
-    "spikeScore": 0.037101637361321986,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "stopped",
-    "source": "headless_v11.0",
-    "scoreSource": "latest",
-    "recommended": true,
-    "rankScore": 0.514,
-    "histWinRate": 0.4,
-    "histSample": 5,
-    "caution": false,
-    "highestPnLSeen": 0.53,
-    "lastR15": 61.4,
-    "prevPnLPct": -0.93,
-    "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 1.46% ≥ 0.20% but confirmed momentum weakness not met (0/2) — holding, letting it run",
-      "highestPnLSeen": 0.53,
-      "drawdownFromPeak": 1.46,
-      "tier": "C",
-      "giveBack": 0.2,
-      "evaluatedAt": 1790259782535
-    },
-    "exitPrice": 388,
-    "statusChangedAt": 1790259928387
+    "prevPnLPct": 2.81,
+    "exitPrice": 1.519,
+    "statusChangedAt": 1790260244217
   },
   "NASDAQ:ZS": {
     "sym": "NASDAQ:ZS",
@@ -180,15 +145,15 @@
     "histSample": 6,
     "caution": false,
     "highestPnLSeen": 0.38,
-    "lastR15": 68.5,
+    "lastR15": 67.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.38% did not clear a give-back tier",
       "highestPnLSeen": 0.38,
-      "drawdownFromPeak": 0.81,
+      "drawdownFromPeak": 1.12,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790259928387
+      "evaluatedAt": 1790260244217
     }
   },
   "NASDAQ:MRVL": {
@@ -218,7 +183,7 @@
     "histSample": 10,
     "caution": false,
     "highestPnLSeen": -0.68,
-    "lastR15": 54.9,
+    "lastR15": 55,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.68% below 0.35% floor — not evaluated yet",
@@ -226,7 +191,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790259928387
+      "evaluatedAt": 1790260244217
     }
   },
   "NYSE:IONQ": {
@@ -254,6 +219,18 @@
     "rankScore": 0.24,
     "histWinRate": 0,
     "histSample": 2,
-    "caution": false
+    "caution": false,
+    "highestPnLSeen": 0.81,
+    "lastR15": 52.9,
+    "prevPnLPct": 0.81,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "highestPnLSeen": 0.81,
+      "drawdownFromPeak": 0,
+      "tier": "B",
+      "giveBack": 0.6,
+      "evaluatedAt": 1790260244217
+    }
   }
 }
