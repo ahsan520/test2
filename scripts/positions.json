@@ -62,7 +62,7 @@
       "drawdownFromPeak": 0.73,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1790303436045
+      "evaluatedAt": 1790303737348
     }
   },
   "TSX:TXF.TO": {
@@ -127,7 +127,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790303436045
+      "evaluatedAt": 1790303737348
     }
   },
   "TSX:HTAE.TO": {
@@ -269,9 +269,9 @@
     "t2": 0.0021,
     "score": -4,
     "spikeScore": 0.005812548368487968,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790303737348,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-GALA-20260925T011000Z",
@@ -283,7 +283,11 @@
       "qty": 490374.06,
       "fillPrice": 0.002005,
       "buyOrderId": "C02__731979885399998464036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__731996234595663872036",
+      "exitFillPrice": 0.002000151703783026,
+      "closedAt": 1790303738683,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790299840727,
@@ -316,31 +320,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 9 below 50 threshold",
-      "fallingKnifeScore": 33,
-      "thesisDrop": -37,
+      "reason": "dynamicPositionRisk 16 below 50 threshold",
+      "fallingKnifeScore": 48,
+      "thesisDrop": -9,
       "confidenceDecay": 0,
-      "exitProbability": 9,
-      "dynamicPositionRisk": 9,
+      "exitProbability": 16,
+      "dynamicPositionRisk": 16,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790303436045
+      "evaluatedAt": 1790303737348
     },
     "highestPnLSeen": 0.75,
-    "lastR15": 48.9,
+    "lastR15": 47.7,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.75% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.75% (tier B) → now +-0.15%, gave back 0.90% ≥ 0.60% (0.3% × 2 regime-widened) with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.75,
-      "drawdownFromPeak": 0.75,
+      "drawdownFromPeak": 0.9,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1790303436045
+      "evaluatedAt": 1790303737348
     },
-    "prevPnLPct": 0
+    "prevPnLPct": -0.15,
+    "exitPrice": 0.002002,
+    "statusChangedAt": 1790303737348
   }
 }
