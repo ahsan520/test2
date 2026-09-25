@@ -62,7 +62,7 @@
       "drawdownFromPeak": 0,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     }
   },
   "TSX:TXF.TO": {
@@ -122,14 +122,14 @@
     "lastR15": 47.6,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.11% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.13% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.82,
-      "drawdownFromPeak": 0.10999999999999999,
+      "drawdownFromPeak": 0.13,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
-    "prevPnLPct": 0.71
+    "prevPnLPct": 0.69
   },
   "TSX:HTAE.TO": {
     "sym": "TSX:HTAE.TO",
@@ -221,32 +221,32 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": -25,
+      "reason": "dynamicPositionRisk 10 below 50 threshold",
+      "fallingKnifeScore": 20,
+      "thesisDrop": 9,
       "confidenceDecay": 17,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "exitProbability": 10,
+      "dynamicPositionRisk": 10,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
     "highestPnLSeen": 1.02,
-    "lastR15": 69,
+    "lastR15": 61,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.12% below tier A give-back 1.00% (regime-widened)",
+      "reason": "drawdown 0.68% below tier A give-back 1.00% (regime-widened)",
       "highestPnLSeen": 1.02,
-      "drawdownFromPeak": 0.12,
+      "drawdownFromPeak": 0.6799999999999999,
       "tier": "A",
       "giveBack": 1,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
-    "prevPnLPct": 0.9
+    "prevPnLPct": 0.34
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -311,32 +311,32 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 14 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 35,
-      "confidenceDecay": 33,
-      "exitProbability": 14,
-      "dynamicPositionRisk": 14,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 8,
+      "confidenceDecay": 11,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 8
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
     "highestPnLSeen": 0.99,
-    "lastR15": 66.8,
+    "lastR15": 60.8,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.27% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.59% below tier B give-back 0.60% (regime-widened)",
       "highestPnLSeen": 0.99,
-      "drawdownFromPeak": 0.27,
+      "drawdownFromPeak": 0.59,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
-    "prevPnLPct": 0.72
+    "prevPnLPct": 0.4
   },
   "BINANCE:UNIUSDT": {
     "sym": "BINANCE:UNIUSDT",
@@ -354,9 +354,9 @@
     "t2": 9.8824,
     "score": 4,
     "spikeScore": 0.7104054008209518,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790330741234,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-UNI-20260925T084500Z",
@@ -368,7 +368,11 @@
       "qty": 101.28,
       "fillPrice": 9.323,
       "buyOrderId": "C02__732094428671328256036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732109497832542208036",
+      "exitFillPrice": 9.276,
+      "closedAt": 1790330742734,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790327149974,
@@ -401,31 +405,33 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 1 below 50 threshold",
-      "fallingKnifeScore": 15,
-      "thesisDrop": -10,
+      "reason": "dynamicPositionRisk 17 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 12,
+      "thesisDrop": -16,
       "confidenceDecay": 0,
-      "exitProbability": 1,
-      "dynamicPositionRisk": 1,
+      "exitProbability": 17,
+      "dynamicPositionRisk": 17,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
     "highestPnLSeen": 0.59,
-    "lastR15": 63.8,
+    "lastR15": 60.9,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.85% ≥ 0.40% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.59% (tier C) → now +-0.48%, gave back 1.07% ≥ 0.40% (0.2% × 2 regime-widened) with weakening momentum [OI fading · Breadth weakening]",
       "highestPnLSeen": 0.59,
-      "drawdownFromPeak": 0.85,
+      "drawdownFromPeak": 1.0699999999999998,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1790330447253
+      "evaluatedAt": 1790330741234
     },
-    "prevPnLPct": -0.26
+    "prevPnLPct": -0.48,
+    "exitPrice": 9.278,
+    "statusChangedAt": 1790330741234
   }
 }
