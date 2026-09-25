@@ -1,752 +1,5 @@
 [
   {
-    "timestamp": "2026-09-25T20:05:40.584Z",
-    "job": "leaderboard-decider",
-    "action": "positions_pushed",
-    "count": 4
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.586Z",
-    "job": "leaderboard-decider",
-    "action": "monitor_complete",
-    "openBefore": 4,
-    "openAfter": 4,
-    "alerts": 0
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.790Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:SUIUSDT",
-    "base": "SUI",
-    "free": 0.45,
-    "estNotional": 0.5185350000000001
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.792Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:SOLUSDT",
-    "base": "SOL",
-    "free": 0.003,
-    "estNotional": 0.36534
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.795Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:DOGEUSDT",
-    "base": "DOGE",
-    "free": 0.07,
-    "estNotional": 0.006888000000000001
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.797Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XRPUSDT",
-    "base": "XRP",
-    "free": 0.015717,
-    "estNotional": 0.024719697599999996
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.799Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:TAOUSDT",
-    "base": "TAO",
-    "free": 0.003,
-    "estNotional": 0.9216
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.801Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XLMUSDT",
-    "base": "XLM",
-    "free": 0.01,
-    "estNotional": 0.0022040000000000002
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.803Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:ZECUSDT",
-    "base": "ZEC",
-    "free": 0.00059,
-    "estNotional": 0.9141224
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.968Z",
-    "job": "leaderboard-decider",
-    "action": "st5_wait_retest",
-    "pair": "DOGEUSDT",
-    "id": "ST5-DOGE-20260925T194500Z",
-    "reason": "ST5 distance 3 ATR — EXHAUSTED zone, waiting for retest/cooldown"
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.976Z",
-    "job": "leaderboard-decider",
-    "action": "market_guard",
-    "canBuy": false,
-    "closeAll": false,
-    "sizeMult": 1,
-    "reasons": [
-      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.981Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "DOGEUSDT",
-    "blockers": [
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 1783 min ago — exceeds absolute 720min sanity ceiling regardless of trend structure"
-      },
-      {
-        "code": "BTC_BLOCK",
-        "reason": "BTC regime block, no Alpha Exception (failed: Volume shock ≥1x)"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.984Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "LINKUSDT",
-    "blockers": [
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 80 min ago (max 25) and trend structure no longer intact — signal may already be over"
-      },
-      {
-        "code": "BTC_BLOCK",
-        "reason": "BTC regime block, no Alpha Exception (failed: Volume shock ≥1x)"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.987Z",
-    "job": "leaderboard-decider",
-    "action": "alpha_exception_passed",
-    "pair": "SUIUSDT",
-    "passedChecks": [
-      "Volume shock ≥1x",
-      "Whale ≥65",
-      "Score ≥6",
-      "BullConf ≥6",
-      "Buy-intel penalty ≤3",
-      "4H persistence ≥2 cycles",
-      "4H bull bias",
-      "EMA above",
-      "Positive CVD"
-    ],
-    "rs": 13.22
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.990Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "SUIUSDT",
-    "blockers": [
-      {
-        "code": "ENTRY_EXTENDED",
-        "reason": "already extended past the breakout — buying the exhaustion, not the move"
-      },
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 80 min ago (max 25) and trend structure no longer intact — signal may already be over"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.992Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "XLMUSDT",
-    "blockers": [
-      {
-        "code": "BTC_BLOCK",
-        "reason": "BTC regime block, no Alpha Exception (failed: Volume shock ≥1x)"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:05:40.998Z",
-    "job": "leaderboard-decider",
-    "action": "buy_cycle_complete",
-    "signalsFound": 0,
-    "momWatchAlerts": 0
-  },
-  {
-    "timestamp": "2026-09-25T20:05:41.000Z",
-    "job": "leaderboard-decider",
-    "action": "job_complete"
-  },
-  {
-    "timestamp": "2026-09-25T20:05:42.713Z",
-    "job": "alert-runner",
-    "action": "positions_check",
-    "total": 4,
-    "monitored": 4
-  },
-  {
-    "timestamp": "2026-09-25T20:10:34.540Z",
-    "job": "market-fetcher",
-    "action": "fetch_complete",
-    "totalPairs": 47,
-    "successCount": 39,
-    "cryptoCount": 20,
-    "stockScored": 20,
-    "stockFrozen": 7,
-    "results": [
-      {
-        "pair": "AAVEUSDT",
-        "status": "ok",
-        "conv": -4,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "APTUSDT",
-        "status": "ok",
-        "conv": 5,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "AVAXUSDT",
-        "status": "ok",
-        "conv": -3,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "BTCUSDT",
-        "status": "ok",
-        "conv": -6,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "DOGEUSDT",
-        "status": "ok",
-        "conv": 8,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "ETHUSDT",
-        "status": "ok",
-        "conv": 3,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "FETUSDT",
-        "status": "ok",
-        "conv": 0,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "GALAUSDT",
-        "status": "ok",
-        "conv": 5,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "IMXUSDT",
-        "status": "ok",
-        "conv": 3,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "LINKUSDT",
-        "status": "ok",
-        "conv": 3,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "NEARUSDT",
-        "status": "ok",
-        "conv": 2,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "RENDERUSDT",
-        "status": "ok",
-        "conv": 4,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "SOLUSDT",
-        "status": "ok",
-        "conv": -2,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "SUIUSDT",
-        "status": "ok",
-        "conv": 4,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "TAOUSDT",
-        "status": "ok",
-        "conv": 3,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "UNIUSDT",
-        "status": "ok",
-        "conv": -1,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "XLMUSDT",
-        "status": "ok",
-        "conv": 7,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "XMRUSDT",
-        "status": "ok",
-        "conv": 0,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "XRPUSDT",
-        "status": "ok",
-        "conv": 2,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "ZECUSDT",
-        "status": "ok",
-        "conv": 2,
-        "session": "24/7",
-        "assetType": "crypto"
-      },
-      {
-        "pair": "AGCC.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "ETHY.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "GLCC.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "HOU.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "HTAE.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "TXF.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "XDIV.TO",
-        "status": "frozen",
-        "session": "closed",
-        "assetType": "stock"
-      },
-      {
-        "pair": "AMEX:EWY",
-        "status": "ok",
-        "conv": 2,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "CBOE:SPCH",
-        "status": "ok",
-        "conv": -3,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:AAPL",
-        "status": "ok",
-        "conv": -4,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:AMD",
-        "status": "ok",
-        "conv": 0,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:CRWD",
-        "status": "ok",
-        "conv": 2,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:DOCN",
-        "status": "ok",
-        "conv": 1,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:GOOG",
-        "status": "ok",
-        "conv": 1,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:META",
-        "status": "ok",
-        "conv": 0,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:MRVL",
-        "status": "ok",
-        "conv": 5,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:MSFT",
-        "status": "ok",
-        "conv": 7,
-        "session": "after_hours",
-        "setup": "BREAKOUT",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:MU",
-        "status": "ok",
-        "conv": 4,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:NVDA",
-        "status": "ok",
-        "conv": 3,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:PANW",
-        "status": "ok",
-        "conv": 0,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:SIMO",
-        "status": "ok",
-        "conv": 5,
-        "session": "after_hours",
-        "setup": "BREAKOUT",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NASDAQ:ZS",
-        "status": "ok",
-        "conv": 3,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NYSE:BE",
-        "status": "ok",
-        "conv": 5,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NYSE:GE",
-        "status": "ok",
-        "conv": 6,
-        "session": "after_hours",
-        "setup": "BREAKOUT",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NYSE:GEV",
-        "status": "ok",
-        "conv": 5,
-        "session": "after_hours",
-        "setup": "WATCHING",
-        "assetType": "stock"
-      },
-      {
-        "pair": "NYSE:IONQ",
-        "status": "ok",
-        "conv": 7,
-        "session": "after_hours",
-        "setup": "BREAKOUT",
-        "assetType": "stock"
-      },
-      {
-        "pair": "TSX:MRV",
-        "status": "failed",
-        "session": "closed",
-        "assetType": "stock"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:10:34.636Z",
-    "job": "leaderboard-decider",
-    "action": "job_start",
-    "minScore": 6,
-    "bullConfMin": 5,
-    "cooldownMin": 60,
-    "staleWatchHrs": 24,
-    "exitCvdCycles": 3,
-    "exitScoreMin": 3,
-    "allowAH": false,
-    "allowPre": false,
-    "ghRepo": "ahsan520/test2",
-    "tgEnabled": true,
-    "dryRun": false
-  },
-  {
-    "timestamp": "2026-09-25T20:10:39.509Z",
-    "job": "leaderboard-decider",
-    "action": "positions_pushed",
-    "count": 4
-  },
-  {
-    "timestamp": "2026-09-25T20:10:39.511Z",
-    "job": "leaderboard-decider",
-    "action": "monitor_complete",
-    "openBefore": 4,
-    "openAfter": 4,
-    "alerts": 0
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.191Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:SUIUSDT",
-    "base": "SUI",
-    "free": 0.45,
-    "estNotional": 0.518715
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.193Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:SOLUSDT",
-    "base": "SOL",
-    "free": 0.003,
-    "estNotional": 0.3648
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.196Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:DOGEUSDT",
-    "base": "DOGE",
-    "free": 0.07,
-    "estNotional": 0.006879600000000001
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.198Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XRPUSDT",
-    "base": "XRP",
-    "free": 0.015717,
-    "estNotional": 0.0246426843
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.200Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:TAOUSDT",
-    "base": "TAO",
-    "free": 0.003,
-    "estNotional": 0.9231
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.203Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:XLMUSDT",
-    "base": "XLM",
-    "free": 0.01,
-    "estNotional": 0.0022
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.205Z",
-    "job": "leaderboard-decider",
-    "action": "adoption_skipped_dust",
-    "sym": "BINANCE:ZECUSDT",
-    "base": "ZEC",
-    "free": 0.00059,
-    "estNotional": 0.914854
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.208Z",
-    "job": "leaderboard-decider",
-    "action": "st5_expired",
-    "pair": "DOGEUSDT",
-    "id": "ST5-DOGE-20260925T194500Z",
-    "ageMin": "20.0",
-    "ttlMin": 20
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.216Z",
-    "job": "leaderboard-decider",
-    "action": "market_guard",
-    "canBuy": false,
-    "closeAll": false,
-    "sizeMult": 1,
-    "reasons": [
-      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.220Z",
-    "job": "leaderboard-decider",
-    "action": "alpha_exception_passed",
-    "pair": "DOGEUSDT",
-    "passedChecks": [
-      "Volume shock ≥1x",
-      "Whale ≥65",
-      "Score ≥6",
-      "BullConf ≥6",
-      "Buy-intel penalty ≤3",
-      "4H persistence ≥2 cycles",
-      "4H bull bias",
-      "EMA above",
-      "Positive CVD"
-    ],
-    "rs": 2.69
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.222Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "DOGEUSDT",
-    "blockers": [
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 1788 min ago — exceeds absolute 720min sanity ceiling regardless of trend structure"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.226Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "SUIUSDT",
-    "blockers": [
-      {
-        "code": "ENTRY_EXTENDED",
-        "reason": "already extended past the breakout — buying the exhaustion, not the move"
-      },
-      {
-        "code": "TRIGGER_STALE",
-        "reason": "breakout first confirmed 85 min ago (max 25) and trend structure no longer intact — signal may already be over"
-      },
-      {
-        "code": "BPP_FADING",
-        "reason": "order-book pressure reads -22.6 (≤ -15) — book has turned against the breakout"
-      },
-      {
-        "code": "VOLUME_THIN",
-        "reason": "5m volume did not expand — breakout lacks follow-through"
-      },
-      {
-        "code": "BTC_BLOCK",
-        "reason": "BTC regime block, no Alpha Exception (failed: Whale ≥65)"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.228Z",
-    "job": "leaderboard-decider",
-    "action": "entry_quality_blocked",
-    "pair": "XLMUSDT",
-    "blockers": [
-      {
-        "code": "BTC_BLOCK",
-        "reason": "BTC regime block, no Alpha Exception (failed: Volume shock ≥1x)"
-      }
-    ]
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.233Z",
-    "job": "leaderboard-decider",
-    "action": "buy_cycle_complete",
-    "signalsFound": 0,
-    "momWatchAlerts": 0
-  },
-  {
-    "timestamp": "2026-09-25T20:10:40.236Z",
-    "job": "leaderboard-decider",
-    "action": "job_complete"
-  },
-  {
-    "timestamp": "2026-09-25T20:10:41.730Z",
-    "job": "alert-runner",
-    "action": "positions_check",
-    "total": 4,
-    "monitored": 4
-  },
-  {
     "timestamp": "2026-09-25T20:15:27.215Z",
     "job": "market-fetcher",
     "action": "fetch_complete",
@@ -8221,6 +7474,481 @@
   },
   {
     "timestamp": "2026-09-25T21:05:36.203Z",
+    "job": "alert-runner",
+    "action": "positions_check",
+    "total": 3,
+    "monitored": 3
+  },
+  {
+    "timestamp": "2026-09-25T21:10:36.813Z",
+    "job": "market-fetcher",
+    "action": "fetch_complete",
+    "totalPairs": 47,
+    "successCount": 39,
+    "cryptoCount": 20,
+    "stockScored": 20,
+    "stockFrozen": 7,
+    "results": [
+      {
+        "pair": "AAVEUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "APTUSDT",
+        "status": "ok",
+        "conv": 4,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "AVAXUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "BTCUSDT",
+        "status": "ok",
+        "conv": -3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "DOGEUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "ETHUSDT",
+        "status": "ok",
+        "conv": -3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "FETUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "GALAUSDT",
+        "status": "ok",
+        "conv": 2,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "IMXUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "LINKUSDT",
+        "status": "ok",
+        "conv": -1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "NEARUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "RENDERUSDT",
+        "status": "ok",
+        "conv": 5,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "SOLUSDT",
+        "status": "ok",
+        "conv": 3,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "SUIUSDT",
+        "status": "ok",
+        "conv": 1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "TAOUSDT",
+        "status": "ok",
+        "conv": 2,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "UNIUSDT",
+        "status": "ok",
+        "conv": 0,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XLMUSDT",
+        "status": "ok",
+        "conv": 1,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XMRUSDT",
+        "status": "ok",
+        "conv": -4,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "XRPUSDT",
+        "status": "ok",
+        "conv": 2,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "ZECUSDT",
+        "status": "ok",
+        "conv": -9,
+        "session": "24/7",
+        "assetType": "crypto"
+      },
+      {
+        "pair": "AGCC.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "ETHY.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "GLCC.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "HOU.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "HTAE.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "TXF.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "XDIV.TO",
+        "status": "frozen",
+        "session": "closed",
+        "assetType": "stock"
+      },
+      {
+        "pair": "AMEX:EWY",
+        "status": "ok",
+        "conv": 2,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "CBOE:SPCH",
+        "status": "ok",
+        "conv": -3,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:AAPL",
+        "status": "ok",
+        "conv": 0,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:AMD",
+        "status": "ok",
+        "conv": 1,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:CRWD",
+        "status": "ok",
+        "conv": 2,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:DOCN",
+        "status": "ok",
+        "conv": 1,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:GOOG",
+        "status": "ok",
+        "conv": 1,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:META",
+        "status": "ok",
+        "conv": 0,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MRVL",
+        "status": "ok",
+        "conv": 5,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MSFT",
+        "status": "ok",
+        "conv": 6,
+        "session": "after_hours",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:MU",
+        "status": "ok",
+        "conv": 3,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:NVDA",
+        "status": "ok",
+        "conv": 3,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:PANW",
+        "status": "ok",
+        "conv": 0,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:SIMO",
+        "status": "ok",
+        "conv": 6,
+        "session": "after_hours",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NASDAQ:ZS",
+        "status": "ok",
+        "conv": 3,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:BE",
+        "status": "ok",
+        "conv": 5,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:GE",
+        "status": "ok",
+        "conv": 5,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:GEV",
+        "status": "ok",
+        "conv": 5,
+        "session": "after_hours",
+        "setup": "WATCHING",
+        "assetType": "stock"
+      },
+      {
+        "pair": "NYSE:IONQ",
+        "status": "ok",
+        "conv": 7,
+        "session": "after_hours",
+        "setup": "BREAKOUT",
+        "assetType": "stock"
+      },
+      {
+        "pair": "TSX:MRV",
+        "status": "failed",
+        "session": "closed",
+        "assetType": "stock"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-09-25T21:10:36.887Z",
+    "job": "leaderboard-decider",
+    "action": "job_start",
+    "minScore": 6,
+    "bullConfMin": 5,
+    "cooldownMin": 60,
+    "staleWatchHrs": 24,
+    "exitCvdCycles": 3,
+    "exitScoreMin": 3,
+    "allowAH": false,
+    "allowPre": false,
+    "ghRepo": "ahsan520/test2",
+    "tgEnabled": true,
+    "dryRun": false
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.514Z",
+    "job": "leaderboard-decider",
+    "action": "positions_pushed",
+    "count": 3
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.516Z",
+    "job": "leaderboard-decider",
+    "action": "monitor_complete",
+    "openBefore": 3,
+    "openAfter": 3,
+    "alerts": 0
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.765Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SUIUSDT",
+    "base": "SUI",
+    "free": 0.45,
+    "estNotional": 0.522405
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.769Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:SOLUSDT",
+    "base": "SOL",
+    "free": 0.003,
+    "estNotional": 0.36387
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.771Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:DOGEUSDT",
+    "base": "DOGE",
+    "free": 0.07,
+    "estNotional": 0.006837600000000001
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.774Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XRPUSDT",
+    "base": "XRP",
+    "free": 0.015717,
+    "estNotional": 0.024476084099999997
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.776Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "free": 0.003,
+    "estNotional": 0.9231
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.779Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:XLMUSDT",
+    "base": "XLM",
+    "free": 0.01,
+    "estNotional": 0.002184
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.781Z",
+    "job": "leaderboard-decider",
+    "action": "adoption_skipped_dust",
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "free": 0.00059,
+    "estNotional": 0.9048594000000001
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.790Z",
+    "job": "leaderboard-decider",
+    "action": "market_guard",
+    "canBuy": false,
+    "closeAll": false,
+    "sizeMult": 1,
+    "reasons": [
+      "BTC 4H bias is LEAN BEAR — new buys paused (market-regime gate)"
+    ]
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.799Z",
+    "job": "leaderboard-decider",
+    "action": "buy_cycle_complete",
+    "signalsFound": 0,
+    "momWatchAlerts": 0
+  },
+  {
+    "timestamp": "2026-09-25T21:10:41.801Z",
+    "job": "leaderboard-decider",
+    "action": "job_complete"
+  },
+  {
+    "timestamp": "2026-09-25T21:10:43.415Z",
     "job": "alert-runner",
     "action": "positions_check",
     "total": 3,
