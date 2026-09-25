@@ -176,7 +176,7 @@
     "spikeScore": 2.2396200545628044,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-NEAR-20260925T081000Z",
@@ -188,7 +188,10 @@
       "qty": 25.31,
       "fillPrice": 4.639500000000001,
       "buyOrderId": "C02__732084914622537728036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732094406043054080036",
+      "exitFillPrice": 4.7433000000000005,
+      "closedAt": 1790327144579
     },
     "entrySnapshot": {
       "at": 1790324881661,
@@ -246,7 +249,10 @@
       "giveBack": 1.5,
       "evaluatedAt": 1790327140290
     },
-    "prevPnLPct": 2.38
+    "prevPnLPct": 2.38,
+    "exitPrice": 4.7433000000000005,
+    "statusChangedAt": 1790327146022,
+    "rotatedOut": true
   },
   "BINANCE:AVAXUSDT": {
     "sym": "BINANCE:AVAXUSDT",
@@ -426,5 +432,67 @@
       "giveBack": null,
       "evaluatedAt": 1790327140290
     }
+  },
+  "BINANCE:UNIUSDT": {
+    "sym": "BINANCE:UNIUSDT",
+    "base": "UNI",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST15 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1790327148692,
+    "holdLockUntil": 1790327148692,
+    "entryPrice": 9.323,
+    "stop": 9.1976,
+    "t1": 9.6027,
+    "t2": 9.8824,
+    "score": 4,
+    "spikeScore": 0.7104054008209518,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st15_priority_v1",
+    "scoreSource": "st15_cross",
+    "st15EventId": "ST15-UNI-20260925T084500Z",
+    "overextendedEntry": false,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1790327148692,
+      "usdSize": 944.32,
+      "qty": 101.28,
+      "fillPrice": 9.323,
+      "buyOrderId": "C02__732094428671328256036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1790327149974,
+      "price": 9.314,
+      "conv": 4,
+      "whaleScore": 55,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": false
+      },
+      "bias4h": "LEAN BULL",
+      "cvdTrend": "up",
+      "thesisScore": 57,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "BREAKOUT",
+      "breakoutLevel": 9.286
+    },
+    "entryTriggerStatus": "BREAKOUT",
+    "entryStateAtBuy": "ST15_CROSS_UP"
   }
 }
