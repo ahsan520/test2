@@ -15,9 +15,9 @@
     "t2": 15.13,
     "score": 5,
     "spikeScore": 1.730289516977978,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790479282601,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-LINK-20260927T020000Z",
@@ -29,7 +29,10 @@
       "qty": 17.6,
       "fillPrice": 14.27,
       "buyOrderId": "C02__732718692214714369036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732732526165966848036",
+      "exitFillPrice": 14.111999999999998,
+      "closedAt": 1790479284283
     },
     "entrySnapshot": {
       "at": 1790475986002,
@@ -61,20 +64,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 49 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 68 → current 3 (drop 65 > 60) — price also back below entry breakout level",
       "fallingKnifeScore": 37,
-      "thesisDrop": 37,
+      "thesisDrop": 65,
       "confidenceDecay": 38,
-      "exitProbability": 49,
-      "dynamicPositionRisk": 49,
+      "exitProbability": 59,
+      "dynamicPositionRisk": 59,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790479044034
+      "evaluatedAt": 1790479282601
     },
     "highestPnLSeen": -0.24,
     "lastR15": 49.1,
@@ -87,6 +90,8 @@
       "giveBack": null,
       "evaluatedAt": 1790479044034
     },
-    "piPartialLevel": 1
+    "piPartialLevel": 1,
+    "exitPrice": 14.108,
+    "statusChangedAt": 1790479282601
   }
 }
