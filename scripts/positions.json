@@ -17,7 +17,7 @@
     "spikeScore": 0.35301725107092846,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-ZEC-20260927T182500Z",
@@ -29,7 +29,11 @@
       "qty": 0.238005,
       "fillPrice": 1609.78,
       "buyOrderId": "C02__732965576397258752036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__733011873825251331036",
+      "exitFillPrice": 1597.7300000000002,
+      "closedAt": 1790545885947,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790534847714,
@@ -88,7 +92,9 @@
       "evaluatedAt": 1790545641365
     },
     "piPartialLevel": 1,
-    "piReduceAlertedAt": 1790545641365
+    "piReduceAlertedAt": 1790545641365,
+    "exitPrice": 1598.28,
+    "statusChangedAt": 1790545884816
   },
   "BINANCE:AVAXUSDT": {
     "sym": "BINANCE:AVAXUSDT",
@@ -153,22 +159,22 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 10 below 50 threshold",
-      "fallingKnifeScore": 36,
-      "thesisDrop": -14,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": -33,
       "confidenceDecay": 0,
-      "exitProbability": 10,
-      "dynamicPositionRisk": 10,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 6
+        "sustainedMin": 9
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790545641365
+      "evaluatedAt": 1790545884816
     },
     "highestPnLSeen": 0.18,
-    "lastR15": 45.8,
+    "lastR15": 50.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.18% below 0.35% floor — not evaluated yet",
@@ -176,7 +182,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790545641365
+      "evaluatedAt": 1790545884816
     }
   },
   "BINANCE:SOLUSDT": {
@@ -242,22 +248,22 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 43 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 34,
+      "reason": "dynamicPositionRisk 17 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 0,
+      "thesisDrop": 6,
       "confidenceDecay": 14,
-      "exitProbability": 43,
-      "dynamicPositionRisk": 43,
+      "exitProbability": 17,
+      "dynamicPositionRisk": 17,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 6
+        "sustainedMin": 9
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790545641365
+      "evaluatedAt": 1790545884816
     },
     "highestPnLSeen": 0.14,
-    "lastR15": 49.9,
+    "lastR15": 51.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.35% floor — not evaluated yet",
@@ -265,7 +271,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790545641365
+      "evaluatedAt": 1790545884816
     }
   }
 }
