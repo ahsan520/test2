@@ -17,7 +17,7 @@
     "spikeScore": 1.792946464970745,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-NEAR-20260927T180000Z",
@@ -29,7 +29,10 @@
       "qty": 2.04,
       "fillPrice": 5.33,
       "buyOrderId": "C02__732956566067580929036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732965558118473728036",
+      "exitFillPrice": 5.3919999999999995,
+      "closedAt": 1790534843351
     },
     "entrySnapshot": {
       "at": 1790532699490,
@@ -87,7 +90,10 @@
       "giveBack": 1,
       "evaluatedAt": 1790534839620
     },
-    "prevPnLPct": 1.14
+    "prevPnLPct": 1.14,
+    "exitPrice": 5.3919999999999995,
+    "statusChangedAt": 1790534845311,
+    "rotatedOut": true
   },
   "BINANCE:XRPUSDT": {
     "sym": "BINANCE:XRPUSDT",
@@ -178,5 +184,67 @@
       "evaluatedAt": 1790534839620
     },
     "prevPnLPct": 0.48
+  },
+  "BINANCE:ZECUSDT": {
+    "sym": "BINANCE:ZECUSDT",
+    "base": "ZEC",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST5 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1790534846786,
+    "holdLockUntil": 1790534846786,
+    "entryPrice": 1609.78,
+    "stop": 1587.8,
+    "t1": 1658.07,
+    "t2": 1706.37,
+    "score": 5,
+    "spikeScore": 0.35301725107092846,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st5_priority_v1",
+    "scoreSource": "st5_cross",
+    "st5EventId": "ST5-ZEC-20260927T182500Z",
+    "overextendedEntry": false,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1790534846786,
+      "usdSize": 509.36,
+      "qty": 0.316415,
+      "fillPrice": 1609.78,
+      "buyOrderId": "C02__732965576397258752036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1790534847714,
+      "price": 1607.9,
+      "conv": 5,
+      "whaleScore": 47,
+      "bullConfCount": 6,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": false,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": false
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 58,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "BREAKOUT",
+      "breakoutLevel": 1605
+    },
+    "entryTriggerStatus": "BREAKOUT",
+    "entryStateAtBuy": "ST5_CROSS_UP"
   }
 }
