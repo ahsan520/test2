@@ -17,7 +17,7 @@
     "spikeScore": 1.7037677159192508,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-RENDER-20260926T230000Z",
@@ -29,7 +29,10 @@
       "qty": 577.54,
       "fillPrice": 2,
       "buyOrderId": "C02__732672184798904320036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732714922844065793036",
+      "exitFillPrice": 2.0294442634315426,
+      "closedAt": 1790475087252
     },
     "entrySnapshot": {
       "at": 1790464897769,
@@ -87,7 +90,10 @@
       "giveBack": 1.5,
       "evaluatedAt": 1790475082830
     },
-    "prevPnLPct": 1.5
+    "prevPnLPct": 1.5,
+    "exitPrice": 2.0294442634315426,
+    "statusChangedAt": 1790475088638,
+    "rotatedOut": true
   },
   "BINANCE:XRPUSDT": {
     "sym": "BINANCE:XRPUSDT",
@@ -107,7 +113,7 @@
     "spikeScore": 0.3534293599494142,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -119,7 +125,10 @@
       "fillPrice": 1.5215329153319241,
       "buyOrderId": "MANUAL_ADOPTED_1790469380805",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__732714932021190656036",
+      "exitFillPrice": 1.5277999999999998,
+      "closedAt": 1790475089607
     },
     "lastPI": {
       "action": "HOLD",
@@ -146,6 +155,71 @@
       "giveBack": 0.4,
       "evaluatedAt": 1790475082830
     },
-    "prevPnLPct": 0.43
+    "prevPnLPct": 0.43,
+    "exitPrice": 1.5277999999999998,
+    "statusChangedAt": 1790475091109,
+    "rotatedOut": true
+  },
+  "BINANCE:TAOUSDT": {
+    "sym": "BINANCE:TAOUSDT",
+    "base": "TAO",
+    "assetType": "crypto",
+    "exchangePrefix": "BINANCE",
+    "session": "24/7",
+    "setup": "ST5 PRIORITY",
+    "dir": "bull",
+    "alertedAt": 1790475093288,
+    "holdLockUntil": 1790475093288,
+    "entryPrice": 324.56632295719845,
+    "stop": 319.95,
+    "t1": 334.3,
+    "t2": 344.04,
+    "score": 8,
+    "spikeScore": 1.8804663187601558,
+    "exitAlertedAt": null,
+    "tier1AlertedAt": null,
+    "status": "watching",
+    "source": "st5_priority_v1",
+    "scoreSource": "st5_cross",
+    "st5EventId": "ST5-TAO-20260927T015000Z",
+    "overextendedEntry": false,
+    "liveOrder": {
+      "mode": "live",
+      "buyAt": 1790475093288,
+      "usdSize": 167.11,
+      "qty": 0.514,
+      "fillPrice": 324.56632295719845,
+      "buyOrderId": "C02__732714952111898625036",
+      "qtyEstimated": false
+    },
+    "entrySnapshot": {
+      "at": 1790475094210,
+      "price": 324,
+      "conv": 8,
+      "whaleScore": 80,
+      "bullConfCount": 8,
+      "bullChecks": {
+        "dailyBiasBull": true,
+        "bias4hBull": true,
+        "aboveEma": true,
+        "oiRising": false,
+        "cvdRising": true,
+        "volExpansion": true,
+        "fundingHealthy": true,
+        "obiBidHeavy": false,
+        "rsiNotOb": true,
+        "whaleScore60": true
+      },
+      "bias4h": "BULL 4H",
+      "cvdTrend": "up",
+      "thesisScore": 86,
+      "btcRiskScore": null,
+      "breadthScore": null,
+      "marketRegime": null,
+      "triggerStatus": "BREAKOUT",
+      "breakoutLevel": 323.3
+    },
+    "entryTriggerStatus": "BREAKOUT",
+    "entryStateAtBuy": "ST5_CROSS_UP"
   }
 }
