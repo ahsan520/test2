@@ -15,9 +15,9 @@
     "t2": 0.1781,
     "score": 6,
     "spikeScore": 0.8064612389974606,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790500583242,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-IMX-20260927T073000Z",
@@ -29,7 +29,10 @@
       "qty": 6973.56,
       "fillPrice": 0.16801588181646102,
       "buyOrderId": "C02__732796739139903488036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732821865193484288036",
+      "exitFillPrice": 0.16824490940065046,
+      "closedAt": 1790500584388
     },
     "entrySnapshot": {
       "at": 1790494593858,
@@ -61,20 +64,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 12 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 38,
-      "confidenceDecay": 25,
-      "exitProbability": 12,
-      "dynamicPositionRisk": 12,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 80 → current 15 (drop 65 > 60)",
+      "fallingKnifeScore": 35,
+      "thesisDrop": 65,
+      "confidenceDecay": 38,
+      "exitProbability": 40,
+      "dynamicPositionRisk": 40,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790500351146
+      "evaluatedAt": 1790500583242
     },
     "highestPnLSeen": 0.82,
     "lastR15": 61,
@@ -87,6 +90,8 @@
       "giveBack": 0.6,
       "evaluatedAt": 1790500351146
     },
-    "prevPnLPct": 0.41
+    "prevPnLPct": 0.41,
+    "exitPrice": 0.1686,
+    "statusChangedAt": 1790500583242
   }
 }
