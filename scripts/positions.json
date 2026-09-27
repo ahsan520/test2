@@ -15,9 +15,9 @@
     "t2": 1.6243,
     "score": 2,
     "spikeScore": 1.8735903168399972,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790537246717,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XRP-20260927T181000Z",
@@ -29,7 +29,11 @@
       "qty": 93.82,
       "fillPrice": 1.5324000000000002,
       "buyOrderId": "C02__732960325426454528036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__732975643750248448036",
+      "exitFillPrice": 1.5324459381663114,
+      "closedAt": 1790537248411,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790533595844,
@@ -62,32 +66,34 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 13 below 50 threshold",
-      "fallingKnifeScore": 18,
-      "thesisDrop": 6,
+      "reason": "dynamicPositionRisk 32 below 50 threshold",
+      "fallingKnifeScore": 32,
+      "thesisDrop": 44,
       "confidenceDecay": 43,
-      "exitProbability": 13,
-      "dynamicPositionRisk": 13,
+      "exitProbability": 32,
+      "dynamicPositionRisk": 32,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790537179646
+      "evaluatedAt": 1790537246717
     },
     "highestPnLSeen": 0.48,
-    "lastR15": 57.8,
+    "lastR15": 55.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.35% below tier C give-back 0.40% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.48% (tier C) → now +0.01%, gave back 0.47% ≥ 0.40% (0.2% × 2 regime-widened) with weakening momentum [OI fading · Breadth weakening]",
       "highestPnLSeen": 0.48,
-      "drawdownFromPeak": 0.35,
+      "drawdownFromPeak": 0.47,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1790537179646
+      "evaluatedAt": 1790537246717
     },
-    "prevPnLPct": 0.13
+    "prevPnLPct": 0.01,
+    "exitPrice": 1.5325,
+    "statusChangedAt": 1790537246717
   },
   "BINANCE:ZECUSDT": {
     "sym": "BINANCE:ZECUSDT",
@@ -152,22 +158,22 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 8 below 50 threshold",
-      "fallingKnifeScore": 30,
-      "thesisDrop": 0,
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
+      "fallingKnifeScore": 0,
+      "thesisDrop": -23,
       "confidenceDecay": 0,
-      "exitProbability": 8,
-      "dynamicPositionRisk": 8,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790537179646
+      "evaluatedAt": 1790537246717
     },
     "highestPnLSeen": 0.09,
-    "lastR15": 49.8,
+    "lastR15": 49.2,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.09% below 0.35% floor — not evaluated yet",
@@ -175,7 +181,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790537179646
+      "evaluatedAt": 1790537246717
     }
   }
 }
