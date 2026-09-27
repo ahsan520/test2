@@ -17,7 +17,7 @@
     "spikeScore": 0.05363154852991733,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-AVAX-20260927T200000Z",
@@ -29,7 +29,11 @@
       "qty": 29.89,
       "fillPrice": 10.985999999999999,
       "buyOrderId": "C02__732991765463646210036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__733016911259848705036",
+      "exitFillPrice": 10.841,
+      "closedAt": 1790547086926,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790541091674,
@@ -86,7 +90,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1790546783452
-    }
+    },
+    "exitPrice": 10.843,
+    "statusChangedAt": 1790547085817
   },
   "BINANCE:SOLUSDT": {
     "sym": "BINANCE:SOLUSDT",
@@ -151,22 +157,22 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 36 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 36,
-      "thesisDrop": 13,
+      "reason": "dynamicPositionRisk 25 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 16,
+      "thesisDrop": 8,
       "confidenceDecay": 14,
-      "exitProbability": 36,
-      "dynamicPositionRisk": 36,
+      "exitProbability": 25,
+      "dynamicPositionRisk": 25,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790546783452
+      "evaluatedAt": 1790547085817
     },
     "highestPnLSeen": 0.14,
-    "lastR15": 43.5,
+    "lastR15": 38.8,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.35% floor — not evaluated yet",
@@ -174,7 +180,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790546783452
+      "evaluatedAt": 1790547085817
     },
     "piPartialLevel": 1
   }
