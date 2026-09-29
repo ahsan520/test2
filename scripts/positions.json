@@ -1,45 +1,4 @@
 {
-  "NASDAQ:CRWD": {
-    "sym": "NASDAQ:CRWD",
-    "base": "NASDAQ:CRWD",
-    "assetType": "stock",
-    "exchangePrefix": "NASDAQ",
-    "session": "open",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1790608303350,
-    "holdLockUntil": 1790609503350,
-    "entryPrice": 256.61,
-    "stop": 253.4,
-    "t1": 264.3,
-    "t2": 272,
-    "score": 6,
-    "spikeScore": 0.3507261486875884,
-    "exitAlertedAt": 1790689946453,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": true,
-    "rankScore": 0.496,
-    "histWinRate": 0.5,
-    "histSample": 6,
-    "caution": false,
-    "highestPnLSeen": 1.61,
-    "lastR15": 65.9,
-    "prevPnLPct": 0.28,
-    "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 1.33% below tier A+ give-back 1.50% (regime-widened)",
-      "highestPnLSeen": 1.61,
-      "drawdownFromPeak": 1.33,
-      "tier": "A+",
-      "giveBack": 1.5,
-      "evaluatedAt": 1790689946453
-    },
-    "exitPrice": 257.34,
-    "statusChangedAt": 1790689946453
-  },
   "BINANCE:XRPUSDT": {
     "sym": "BINANCE:XRPUSDT",
     "base": "XRP",
@@ -56,9 +15,9 @@
     "t2": 1.633,
     "score": 8,
     "spikeScore": 2.552951006906098,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790690562430,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "p2Trigger": "P2-C-NORMAL",
@@ -74,7 +33,10 @@
       "qty": 778.14,
       "fillPrice": 1.5168000000000001,
       "buyOrderId": "C02__733585752230694913036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "closedAt": 1790690562837,
+      "exitFillPrice": 1.5461,
+      "dustIgnored": true
     },
     "entrySnapshot": {
       "at": 1790682709153,
@@ -117,22 +79,24 @@
       "evaluatedAt": 1790690180623
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 13 below 50 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 5,
-      "thesisDrop": 49,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 92 → current 23 (drop 69 > 60)",
+      "fallingKnifeScore": 50,
+      "thesisDrop": 69,
       "confidenceDecay": 44,
-      "exitProbability": 22,
-      "dynamicPositionRisk": 13,
+      "exitProbability": 49,
+      "dynamicPositionRisk": 49,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790690180623
+      "evaluatedAt": 1790690562430
     },
-    "prevPnLPct": 2.39
+    "prevPnLPct": 2.39,
+    "exitPrice": 1.5461,
+    "statusChangedAt": 1790690562430
   },
   "TSX:ETHY.TO": {
     "sym": "TSX:ETHY.TO",
@@ -187,16 +151,16 @@
     "histWinRate": 0,
     "histSample": 3,
     "caution": true,
-    "highestPnLSeen": -0.06,
-    "lastR15": 65.1,
+    "highestPnLSeen": 0.06,
+    "lastR15": 65.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -0.06% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.06,
+      "reason": "peak 0.06% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": 0.06,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690180623
+      "evaluatedAt": 1790690562430
     }
   },
   "NASDAQ:MSFT": {
@@ -226,7 +190,7 @@
     "histSample": 5,
     "caution": true,
     "highestPnLSeen": -0.74,
-    "lastR15": 51.4,
+    "lastR15": 51.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.74% below 0.35% floor — not evaluated yet",
@@ -234,7 +198,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690180623
+      "evaluatedAt": 1790690562430
     }
   },
   "NASDAQ:NVDA": {
@@ -264,7 +228,7 @@
     "histSample": 7,
     "caution": false,
     "highestPnLSeen": -0.65,
-    "lastR15": 61.6,
+    "lastR15": 61.2,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.65% below 0.35% floor — not evaluated yet",
@@ -272,49 +236,8 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690180623
+      "evaluatedAt": 1790690562430
     }
-  },
-  "NYSE:BE": {
-    "sym": "NYSE:BE",
-    "base": "NYSE:BE",
-    "assetType": "stock",
-    "exchangePrefix": "NYSE",
-    "session": "open",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1790688721303,
-    "holdLockUntil": 1790689921303,
-    "entryPrice": 282.46,
-    "stop": 278.93,
-    "t1": 290.93,
-    "t2": 299.41,
-    "score": 6,
-    "spikeScore": 1.1450977209811013,
-    "exitAlertedAt": null,
-    "tier1AlertedAt": null,
-    "status": "tp1_hit",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": true,
-    "rankScore": 0.365,
-    "histWinRate": 0.25,
-    "histSample": 8,
-    "caution": true,
-    "highestPnLSeen": 2.77,
-    "lastR15": 64.8,
-    "prevPnLPct": 2.39,
-    "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.38% below tier A+ give-back 1.50% (regime-widened)",
-      "highestPnLSeen": 2.77,
-      "drawdownFromPeak": 0.3799999999999999,
-      "tier": "A+",
-      "giveBack": 1.5,
-      "evaluatedAt": 1790689946453
-    },
-    "exitPrice": 291.38,
-    "statusChangedAt": 1790690180623
   },
   "NYSE:IONQ": {
     "sym": "NYSE:IONQ",
@@ -334,7 +257,7 @@
     "spikeScore": 0.8667370885175374,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -352,7 +275,9 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1790690180623
-    }
+    },
+    "exitPrice": 44.58,
+    "statusChangedAt": 1790690562430
   },
   "NASDAQ:MRVL": {
     "sym": "NASDAQ:MRVL",
@@ -381,16 +306,16 @@
     "histSample": 11,
     "caution": true,
     "highestPnLSeen": 0.97,
-    "lastR15": 68.6,
-    "prevPnLPct": 0.97,
+    "lastR15": 67.5,
+    "prevPnLPct": -0.29,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 1.26% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.97,
-      "drawdownFromPeak": 0,
+      "drawdownFromPeak": 1.26,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1790690180623
+      "evaluatedAt": 1790690562430
     }
   },
   "NYSE:GEV": {
@@ -418,6 +343,17 @@
     "rankScore": 0.24,
     "histWinRate": 0,
     "histSample": 4,
-    "caution": true
+    "caution": true,
+    "highestPnLSeen": -0.38,
+    "lastR15": 59.6,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.38% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.38,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1790690562430
+    }
   }
 }
