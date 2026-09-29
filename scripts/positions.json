@@ -15,9 +15,9 @@
     "t2": 1.633,
     "score": 8,
     "spikeScore": 2.552951006906098,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790690806153,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "p2Trigger": "P2-C-NORMAL",
@@ -33,7 +33,10 @@
       "qty": 778.14,
       "fillPrice": 1.5168000000000001,
       "buyOrderId": "C02__733585752230694913036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "closedAt": 1790690806848,
+      "exitFillPrice": 1.5442,
+      "dustIgnored": true
     },
     "entrySnapshot": {
       "at": 1790682709153,
@@ -76,22 +79,24 @@
       "evaluatedAt": 1790690595596
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 46 below 50 threshold",
-      "fallingKnifeScore": 50,
-      "thesisDrop": 58,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 92 → current 23 (drop 69 > 60)",
+      "fallingKnifeScore": 60,
+      "thesisDrop": 69,
       "confidenceDecay": 44,
-      "exitProbability": 46,
-      "dynamicPositionRisk": 46,
+      "exitProbability": 60,
+      "dynamicPositionRisk": 60,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790690595596
+      "evaluatedAt": 1790690806153
     },
-    "prevPnLPct": 1.98
+    "prevPnLPct": 1.98,
+    "exitPrice": 1.5442,
+    "statusChangedAt": 1790690806153
   },
   "TSX:ETHY.TO": {
     "sym": "TSX:ETHY.TO",
@@ -155,7 +160,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690595596
+      "evaluatedAt": 1790690806153
     }
   },
   "NASDAQ:MSFT": {
@@ -184,16 +189,16 @@
     "histWinRate": 0.2,
     "histSample": 5,
     "caution": true,
-    "highestPnLSeen": -0.74,
-    "lastR15": 51.3,
+    "highestPnLSeen": -0.71,
+    "lastR15": 51.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -0.74% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.74,
+      "reason": "peak -0.71% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.71,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690595596
+      "evaluatedAt": 1790690806153
     }
   },
   "NASDAQ:NVDA": {
@@ -223,7 +228,7 @@
     "histSample": 7,
     "caution": false,
     "highestPnLSeen": -0.65,
-    "lastR15": 61.3,
+    "lastR15": 60.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.65% below 0.35% floor — not evaluated yet",
@@ -231,7 +236,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690595596
+      "evaluatedAt": 1790690806153
     }
   },
   "NYSE:IONQ": {
@@ -301,16 +306,16 @@
     "histSample": 11,
     "caution": true,
     "highestPnLSeen": 0.97,
-    "lastR15": 67.6,
-    "prevPnLPct": -0.18,
+    "lastR15": 67.7,
+    "prevPnLPct": -0.12,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.15% ≥ 0.60% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "reason": "drawdown 1.09% ≥ 0.30% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.97,
-      "drawdownFromPeak": 1.15,
+      "drawdownFromPeak": 1.0899999999999999,
       "tier": "B",
-      "giveBack": 0.6,
-      "evaluatedAt": 1790690595596
+      "giveBack": 0.3,
+      "evaluatedAt": 1790690806153
     }
   },
   "NYSE:GEV": {
@@ -339,16 +344,16 @@
     "histWinRate": 0,
     "histSample": 4,
     "caution": true,
-    "highestPnLSeen": -0.57,
-    "lastR15": 59.3,
+    "highestPnLSeen": -0.37,
+    "lastR15": 59.7,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak -0.57% below 0.35% floor — not evaluated yet",
-      "highestPnLSeen": -0.57,
+      "reason": "peak -0.37% below 0.35% floor — not evaluated yet",
+      "highestPnLSeen": -0.37,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790690595596
+      "evaluatedAt": 1790690806153
     }
   }
 }
