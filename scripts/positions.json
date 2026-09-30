@@ -15,9 +15,9 @@
     "t2": 276.54,
     "score": 6,
     "spikeScore": 0.14076853934974656,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790775693815,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
@@ -26,17 +26,19 @@
     "histSample": 11,
     "caution": true,
     "highestPnLSeen": 1.81,
-    "lastR15": 68.8,
-    "prevPnLPct": -0.23,
+    "lastR15": 67.6,
+    "prevPnLPct": -0.82,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 2.04% ≥ 0.75% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "reason": "drawdown 2.63% ≥ 0.75% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 1.81,
-      "drawdownFromPeak": 2.04,
+      "drawdownFromPeak": 2.63,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1790775394408
-    }
+      "evaluatedAt": 1790775693815
+    },
+    "exitPrice": 258.74,
+    "statusChangedAt": 1790775693815
   },
   "NYSE:GEV": {
     "sym": "NYSE:GEV",
@@ -65,17 +67,17 @@
     "histSample": 4,
     "caution": true,
     "highestPnLSeen": 0.75,
-    "lastR15": 56.7,
+    "lastR15": 55.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 1.07% ≥ 0.30% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "reason": "drawdown 1.59% ≥ 0.30% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.75,
-      "drawdownFromPeak": 1.07,
+      "drawdownFromPeak": 1.5899999999999999,
       "tier": "B",
       "giveBack": 0.3,
-      "evaluatedAt": 1790775394408
+      "evaluatedAt": 1790775693815
     },
-    "prevPnLPct": -0.32
+    "prevPnLPct": -0.84
   },
   "BINANCE:RENDERUSDT": {
     "sym": "BINANCE:RENDERUSDT",
@@ -93,9 +95,9 @@
     "t2": 2.0861,
     "score": 4,
     "spikeScore": 1.9926066979497528,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790775693815,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-RENDER-20260930T123000Z",
@@ -103,11 +105,15 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1790771788834,
-      "usdSize": 302.6,
-      "qty": 153.76,
+      "usdSize": 153.03,
+      "qty": 77.76,
       "fillPrice": 1.968,
       "buyOrderId": "C02__733959383884451841036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__733975776507928576036",
+      "exitFillPrice": 1.9429999999999998,
+      "closedAt": 1790775699018,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790771789980,
@@ -139,33 +145,36 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 16 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 5,
-      "confidenceDecay": 13,
-      "exitProbability": 16,
-      "dynamicPositionRisk": 16,
+      "action": "REDUCE_50",
+      "reason": "Confidence decay 38% > 35% with falling-knife 52 — price also back below entry breakout level",
+      "fallingKnifeScore": 52,
+      "thesisDrop": 42,
+      "confidenceDecay": 38,
+      "exitProbability": 58,
+      "dynamicPositionRisk": 58,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790775394408
+      "evaluatedAt": 1790775693815
     },
     "highestPnLSeen": 1.47,
-    "lastR15": 50,
-    "prevPnLPct": -0.76,
+    "lastR15": 48,
+    "prevPnLPct": -1.12,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 2.23% ≥ 0.50% but confirmed momentum weakness not met (1/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +1.47% (tier A) → now +-1.12%, gave back 2.59% ≥ 0.50% with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 1.47,
-      "drawdownFromPeak": 2.23,
+      "drawdownFromPeak": 2.59,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1790775394408
-    }
+      "evaluatedAt": 1790775693815
+    },
+    "piPartialLevel": 2,
+    "exitPrice": 1.946,
+    "statusChangedAt": 1790775693815
   },
   "BINANCE:ETHUSDT": {
     "sym": "BINANCE:ETHUSDT",
@@ -447,14 +456,16 @@
     "spikeScore": 1.5980489683278247,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
     "rankScore": 0.477,
     "histWinRate": 0.3333333333333333,
     "histSample": 9,
-    "caution": false
+    "caution": false,
+    "exitPrice": 287.88,
+    "statusChangedAt": 1790775693815
   },
   "TSX:TXF.TO": {
     "sym": "TSX:TXF.TO",
