@@ -79,18 +79,18 @@
     "histWinRate": 0.2222222222222222,
     "histSample": 9,
     "caution": true,
-    "highestPnLSeen": 2.11,
+    "highestPnLSeen": 2.13,
     "lastR15": 65,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.03% below tier A+ give-back 1.50% (regime-widened)",
-      "highestPnLSeen": 2.11,
-      "drawdownFromPeak": 0.029999999999999805,
+      "reason": "drawdown 0.00% below tier A+ give-back 1.50% (regime-widened)",
+      "highestPnLSeen": 2.13,
+      "drawdownFromPeak": 0,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
-    "prevPnLPct": 2.08
+    "prevPnLPct": 2.13
   },
   "NASDAQ:DOCN": {
     "sym": "NASDAQ:DOCN",
@@ -127,7 +127,7 @@
       "drawdownFromPeak": 0,
       "tier": "B",
       "giveBack": 0.6,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
     "prevPnLPct": 0.77
   },
@@ -157,8 +157,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1790929236987,
-      "usdSize": 170.7,
-      "qty": 85.73,
+      "usdSize": 130.39,
+      "qty": 65.49,
       "fillPrice": 1.991,
       "buyOrderId": "C02__734619768295743489036",
       "qtyEstimated": false
@@ -193,32 +193,33 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 9,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 54 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 49,
+      "thesisDrop": 39,
+      "confidenceDecay": 29,
+      "exitProbability": 54,
+      "dynamicPositionRisk": 54,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
     "highestPnLSeen": 0.35,
-    "lastR15": 60,
+    "lastR15": 57.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.35% did not clear a give-back tier",
       "highestPnLSeen": 0.35,
-      "drawdownFromPeak": 0.75,
+      "drawdownFromPeak": 0.95,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790934061502
-    }
+      "evaluatedAt": 1790934341859
+    },
+    "piPartialLevel": 1
   },
   "BINANCE:TAOUSDT": {
     "sym": "BINANCE:TAOUSDT",
@@ -236,9 +237,9 @@
     "t2": 331.35,
     "score": 4,
     "spikeScore": 0.9761068889491166,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790934341859,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-TAO-20261002T081500Z",
@@ -250,7 +251,11 @@
       "qty": 0.546,
       "fillPrice": 312.5901098901099,
       "buyOrderId": "C02__734619784951308288036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__734641193832382465036",
+      "exitFillPrice": 311.03485185185184,
+      "closedAt": 1790934346135,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790929241768,
@@ -283,32 +288,34 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -11,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "reason": "dynamicPositionRisk 49 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 49,
+      "thesisDrop": 33,
+      "confidenceDecay": 17,
+      "exitProbability": 49,
+      "dynamicPositionRisk": 49,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
     "highestPnLSeen": 0.48,
-    "lastR15": 57.6,
+    "lastR15": 54.4,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.73% ≥ 0.40% but confirmed momentum weakness not met (0/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +0.48% (tier C) → now +-0.51%, gave back 0.99% ≥ 0.40% (0.2% × 2 regime-widened) with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 0.48,
-      "drawdownFromPeak": 0.73,
+      "drawdownFromPeak": 0.99,
       "tier": "C",
       "giveBack": 0.4,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
-    "prevPnLPct": -0.25
+    "prevPnLPct": -0.51,
+    "exitPrice": 311,
+    "statusChangedAt": 1790934341859
   },
   "BINANCE:DOGEUSDT": {
     "sym": "BINANCE:DOGEUSDT",
@@ -377,30 +384,30 @@
     "entryStateAtBuy": "HIGH SHOCK",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 10 below 50 threshold",
-      "fallingKnifeScore": 4,
-      "thesisDrop": 24,
-      "confidenceDecay": 29,
-      "exitProbability": 10,
-      "dynamicPositionRisk": 10,
+      "reason": "dynamicPositionRisk 36 below 50 threshold",
+      "fallingKnifeScore": 49,
+      "thesisDrop": 32,
+      "confidenceDecay": 43,
+      "exitProbability": 36,
+      "dynamicPositionRisk": 36,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     },
     "highestPnLSeen": 0.36,
-    "lastR15": 60.3,
+    "lastR15": 59.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.36% did not clear a give-back tier",
       "highestPnLSeen": 0.36,
-      "drawdownFromPeak": 0.9,
+      "drawdownFromPeak": 0.97,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1790934061502
+      "evaluatedAt": 1790934341859
     }
   }
 }
