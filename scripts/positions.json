@@ -83,12 +83,12 @@
     "lastR15": 65,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.50% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.50% ≥ 0.30% but confirmed momentum weakness not met (1/2) — holding, letting it run",
       "highestPnLSeen": 0.93,
       "drawdownFromPeak": 0.5,
       "tier": "B",
-      "giveBack": 0.6,
-      "evaluatedAt": 1790911531890
+      "giveBack": 0.3,
+      "evaluatedAt": 1790911645429
     },
     "prevPnLPct": 0.43
   },
@@ -122,12 +122,12 @@
     "lastR15": 66.4,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.00% below tier B give-back 0.60% (regime-widened)",
+      "reason": "drawdown 0.00% below tier B give-back 0.30%",
       "highestPnLSeen": 0.77,
       "drawdownFromPeak": 0,
       "tier": "B",
-      "giveBack": 0.6,
-      "evaluatedAt": 1790911531890
+      "giveBack": 0.3,
+      "evaluatedAt": 1790911645429
     },
     "prevPnLPct": 0.77
   },
@@ -147,9 +147,9 @@
     "t2": 1408.08,
     "score": -6,
     "spikeScore": 0.3111456847528983,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1790911645429,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-ZEC-20261002T020000Z",
@@ -161,7 +161,11 @@
       "qty": 0.181236,
       "fillPrice": 1328.373055684301,
       "buyOrderId": "C02__734530412977557505036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__734545985388105728036",
+      "exitFillPrice": 1330.0700000000002,
+      "closedAt": 1790911646671,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1790907933925,
@@ -194,31 +198,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 22 below 50 threshold",
+      "reason": "dynamicPositionRisk 16 below 50 threshold",
       "fallingKnifeScore": 48,
       "thesisDrop": 0,
-      "confidenceDecay": 33,
-      "exitProbability": 22,
-      "dynamicPositionRisk": 22,
+      "confidenceDecay": 0,
+      "exitProbability": 16,
+      "dynamicPositionRisk": 16,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1790911531890
+      "evaluatedAt": 1790911645429
     },
     "highestPnLSeen": 1.13,
-    "lastR15": 46.6,
+    "lastR15": 45.9,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.84% below tier A give-back 1.00% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: peak +1.13% (tier A) → now +0.21%, gave back 0.92% ≥ 0.50% with weakening momentum [CVD fading · Breadth weakening]",
       "highestPnLSeen": 1.13,
-      "drawdownFromPeak": 0.8399999999999999,
+      "drawdownFromPeak": 0.9199999999999999,
       "tier": "A",
-      "giveBack": 1,
-      "evaluatedAt": 1790911531890
+      "giveBack": 0.5,
+      "evaluatedAt": 1790911645429
     },
-    "prevPnLPct": 0.29
+    "prevPnLPct": 0.21,
+    "exitPrice": 1331.14,
+    "statusChangedAt": 1790911645429
   }
 }
