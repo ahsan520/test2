@@ -287,6 +287,10 @@ export function recordTradeClose(pos, reason, sell = {}) {
   entry.sellQty     = sell.qty ?? entry.buyQty;
   entry.sellPrice   = sell.fillPrice ?? null;
   entry.reason      = reason;
+  // Peak unrealized P&L seen while open (tracked by profit-intelligence.js).
+  // Lets future reviews measure how much each exit type gives back.
+  entry.peakPct     = (pos.highestPnLSeen != null && isFinite(pos.highestPnLSeen))
+    ? parseFloat(Number(pos.highestPnLSeen).toFixed(2)) : null;
   entry.pnlPct      = (entry.buyPrice && entry.sellPrice)
     ? parseFloat(((entry.sellPrice - entry.buyPrice) / entry.buyPrice * 100).toFixed(2))
     : null;

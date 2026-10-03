@@ -45,11 +45,20 @@ const ENABLED           = (process.env.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true'
 // trade has to clear a real move (not noise) before Profit Intelligence
 // starts watching it — the PDF's own default of 8% would leave most
 // T1/T2-sized winners completely unprotected.
-const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '0.4');
+const PROFIT_MIN_PCT    = parseFloat(process.env.SELL_PROFIT_MIN_PCT    || '0.8');
 const RSI_ROLLOVER_DROP = parseFloat(process.env.SELL_PROFIT_RSI_ROLLOVER_DROP || '5'); // 15m RSI points dropped from an extended reading to count as "rolling over"
 const RSI_EXTENDED      = parseFloat(process.env.SELL_PROFIT_RSI_EXTENDED      || '70');
 const MIN_WEAK_SIGNALS  = parseInt(process.env.SELL_PROFIT_MIN_WEAK_SIGNALS || '2', 10);
 const RUNNER_MIN_PCT     = parseFloat(process.env.SELL_PROFIT_RUNNER_MIN_PCT || '0.6');
+// Breakeven lock (added after the 2026-09-18..10-02 review: 16 Profit
+// Protection exits averaged -0.30%, 9 of them closed NEGATIVE, i.e. the
+// "protection" never protected). Once the peak has reached LOCK_PEAK, an
+// exit fires as soon as pnl falls to LOCK_FLOOR or below, WITHOUT waiting
+// for the momentum-weakness confirmation (which tends to arrive only after
+// the price has already fallen through breakeven). LOCK_FLOOR should clear
+// the round-trip fee + slippage.
+const LOCK_PEAK  = parseFloat(process.env.SELL_PROFIT_LOCK_PEAK  || '1.0');
+const LOCK_FLOOR = parseFloat(process.env.SELL_PROFIT_LOCK_FLOOR || '0.2');
 
 // ── Adaptive give-back thresholds, keyed by how high the peak ran ──
 // { minPeak: highestPnLSeen must be >= this to use this tier, giveBack: how
@@ -64,8 +73,8 @@ const RUNNER_MIN_PCT     = parseFloat(process.env.SELL_PROFIT_RUNNER_MIN_PCT || 
 const TIERS = [
   { label: 'A+', minPeak: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_PEAK || '1.5'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75') },
   { label: 'A',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_A_PEAK     || '1.0'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_A_GIVEBACK     || '0.5') },
-  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '0.6'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '0.3') },
-  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.2') },
+  { label: 'B',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_B_PEAK     || '0.8'), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_B_GIVEBACK     || '0.3') },
+  { label: 'C',  minPeak: parseFloat(process.env.SELL_PROFIT_TIER_C_PEAK     || PROFIT_MIN_PCT.toString()), giveBack: parseFloat(process.env.SELL_PROFIT_TIER_C_GIVEBACK || '0.3') },
 ];
 
 // ── Regime-aware widening (2026-09-03) ──────────────────────────────────
@@ -93,6 +102,11 @@ function regimeGivebackMultiplier(marketState) {
 }
 
 export function profitIntelligenceEnabled() { return ENABLED; }
+
+// pickTier returns the FIRST match, so tiers must be ordered highest peak
+// first. Sorting here keeps that true even if env overrides reorder them
+// (e.g. raising the C floor above B's would otherwise leave C unreachable).
+TIERS.sort((a, b) => b.minPeak - a.minPeak);
 
 function pickTier(highestPnLSeen) {
   for (const t of TIERS) {
@@ -160,6 +174,19 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
     return {
       action: 'HOLD', reason: `peak ${highestPnLSeen.toFixed(2)}% below ${PROFIT_MIN_PCT}% floor — not evaluated yet`,
       highestPnLSeen, drawdownFromPeak: 0, skipped: true,
+    };
+  }
+
+  // ── Step 2b: breakeven lock — a trade that has proven itself (peak >=
+  // LOCK_PEAK) must not be allowed to fall back to a loss. Exits without
+  // requiring momentum confirmation. ──
+  if (highestPnLSeen >= LOCK_PEAK && pnlPct <= LOCK_FLOOR) {
+    pos.prevPnLPct = pnlPct;
+    return {
+      action: 'EXIT',
+      reason: `Profit Protection Triggered: breakeven lock — peak +${highestPnLSeen.toFixed(2)}% fell back to +${pnlPct.toFixed(2)}% (≤ ${LOCK_FLOOR}% floor)`,
+      highestPnLSeen, drawdownFromPeak: highestPnLSeen - pnlPct, tier: 'LOCK', giveBack: highestPnLSeen - LOCK_FLOOR,
+      regimeMult: 1, momentum: null, strongContinuation: false,
     };
   }
 
