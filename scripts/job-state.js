@@ -184,7 +184,7 @@ export const loadTradeLog = () => loadJSON(TRADE_LOG_PATH, []);
 export const saveTradeLog = t  => saveJSON(TRADE_LOG_PATH, t);
 
 // Called the moment a buy (paper or live) is placed.
-export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize }) {
+export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize, timing = null }) {
   const log = loadTradeLog();
   log.push({
     id:          `${pos.sym}_${orderId}`,
@@ -203,6 +203,9 @@ export function recordTradeOpen(pos, { mode, orderId, qty, fillPrice, usdSize })
     buyQty:      qty,
     buyPrice:    fillPrice,
     usdSize,
+    // ST5/ST15 entry-quality snapshot (delay since detection, ATR zone, fill vs cross
+    // close, retest flag) — null for non-ST buys. See st-entry-gate.js.
+    entryTiming: timing,
     sellAt:      null,
     sellOrderId: null,
     sellQty:     null,

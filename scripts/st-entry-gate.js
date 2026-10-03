@@ -59,3 +59,39 @@ export function checkPriorityEntryGate({ entry, event, retestBuy = false, livePr
     snapshot: { conv: conv ?? null, signal, cvd, retestBuy, livePrice: lp || null, crossClose: ref || null },
   };
 }
+
+// ── Retest lateness cap + entry-timing record (added 2026-10-03 review) ──
+// 2026-10-03: of ~8 ST5 crosses detected in a day, every one was already
+// EXHAUSTED (2-3.2 ATR above the Supertrend line) at detection. The one fill
+// (RENDER) came ~20 min after detection on a "retest" and closed -0.89%.
+// ST5 trades flagged overextended averaged -0.09% vs +0.50% for the rest.
+// A retest that only confirms long after the cross is no longer the same
+// trade, so it is dropped. 0 disables the cap.
+export const ST_RETEST_MAX_AGE_MIN = num('ST_RETEST_MAX_AGE_MIN', '15');
+// An EXHAUSTED-zone retest buy is a lower-quality entry than a first-touch
+// cross: size it down. 1 disables.
+export const ST_RETEST_SIZE_MULT   = num('ST_RETEST_SIZE_MULT', '0.5');
+
+// Minutes since the cross was detected (null if unknown).
+export function eventAgeMin(event, nowMs = Date.now()) {
+  const t = Date.parse(event?.detectedAt);
+  return Number.isFinite(t) ? (nowMs - t) / 60000 : null;
+}
+
+// Snapshot written onto the trade-log entry at buy time so entry timing can be
+// measured in the next review (the log previously had no entry-quality data).
+export function buildEntryTiming({ event, retestBuy = false, fillPrice = null, nowMs = Date.now() }) {
+  const atCross = event?.type === 'ST15_CROSS_UP' ? event?.st15AtCross : event?.st5AtCross;
+  const age = eventAgeMin(event, nowMs);
+  const ref = parseFloat(event?.close);
+  const fp  = parseFloat(fillPrice);
+  return {
+    eventId:        event?.id ?? null,
+    entryDelayMin:  age == null ? null : parseFloat(age.toFixed(1)),
+    crossClose:     ref > 0 ? ref : null,
+    fillVsCrossPct: (ref > 0 && fp > 0) ? parseFloat(((fp - ref) / ref * 100).toFixed(2)) : null,
+    zone:           atCross?.extensionZone ?? null,
+    distanceATR:    atCross?.distanceATR ?? null,
+    retestBuy:      !!retestBuy,
+  };
+}

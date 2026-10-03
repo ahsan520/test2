@@ -25,7 +25,7 @@ import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { calcEntryExtension } from './buy-intelligence.js';
 import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
-import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE } from './st-entry-gate.js';
+import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming } from './st-entry-gate.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -906,6 +906,13 @@ export async function executeSTPriorityRotation({
           continue;
         }
         logAudit('st15_retest_confirmed', { pair, id: event.id, reason: st15LiveCheck.reason });
+        const st15RetestAge = eventAgeMin(event);
+        if (ST_RETEST_MAX_AGE_MIN > 0 && st15RetestAge != null && st15RetestAge > ST_RETEST_MAX_AGE_MIN) {
+          event.status = 'SKIPPED_LATE_RETEST';
+          logAudit('st15_skipped_late_retest', { pair, id: event.id, ageMin: parseFloat(st15RetestAge.toFixed(1)), maxMin: ST_RETEST_MAX_AGE_MIN });
+          await sendTelegram(`⏱ *ST15 CROSS — ${base}* — retest confirmed ${st15RetestAge.toFixed(0)} min after the cross (max ${ST_RETEST_MAX_AGE_MIN}) — skipped, too late. Event marked handled, no positions touched.`);
+          continue;
+        }
         st15RetestBuy = true;
       }
       if (st15Exhausted.overrideUsed) {
@@ -1179,6 +1186,11 @@ export async function executeSTPriorityRotation({
         logAudit('st15_usdsize_refreshed_post_sell', { pair, id: event.id, before: st15UsdSize, after: effectiveUsdSize });
       }
     }
+    if (st15RetestBuy && ST_RETEST_SIZE_MULT > 0 && ST_RETEST_SIZE_MULT < 1) {
+      const before = effectiveUsdSize;
+      effectiveUsdSize = parseFloat((effectiveUsdSize * ST_RETEST_SIZE_MULT).toFixed(2));
+      logAudit('st15_retest_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_RETEST_SIZE_MULT });
+    }
     if (effectiveUsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st15_blocked_zero_balance', { pair, id: event.id });
@@ -1215,7 +1227,7 @@ export async function executeSTPriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
       logAudit('st15_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: fillPrice }) });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1252,7 +1264,7 @@ export async function executeSTPriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
         logAudit('st15_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: buy.fillPrice }) });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
@@ -1490,6 +1502,13 @@ export async function executeST5PriorityRotation({
           continue;
         }
         logAudit('st5_retest_confirmed', { pair, id: event.id, reason: st5LiveCheck.reason });
+        const st5RetestAge = eventAgeMin(event);
+        if (ST_RETEST_MAX_AGE_MIN > 0 && st5RetestAge != null && st5RetestAge > ST_RETEST_MAX_AGE_MIN) {
+          event.status = 'SKIPPED_LATE_RETEST';
+          logAudit('st5_skipped_late_retest', { pair, id: event.id, ageMin: parseFloat(st5RetestAge.toFixed(1)), maxMin: ST_RETEST_MAX_AGE_MIN });
+          await sendTelegram(`⏱ *ST5 CROSS — ${base}* — retest confirmed ${st5RetestAge.toFixed(0)} min after the cross (max ${ST_RETEST_MAX_AGE_MIN}) — skipped, too late. Event marked handled, no positions touched.`);
+          continue;
+        }
         st5RetestBuy = true;
       }
       if (st5Exhausted.overrideUsed) {
@@ -1747,6 +1766,11 @@ export async function executeST5PriorityRotation({
         logAudit('st5_usdsize_refreshed_post_sell', { pair, id: event.id, before: st5UsdSize, after: effectiveUsdSize });
       }
     }
+    if (st5RetestBuy && ST_RETEST_SIZE_MULT > 0 && ST_RETEST_SIZE_MULT < 1) {
+      const before = effectiveUsdSize;
+      effectiveUsdSize = parseFloat((effectiveUsdSize * ST_RETEST_SIZE_MULT).toFixed(2));
+      logAudit('st5_retest_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_RETEST_SIZE_MULT });
+    }
     if (effectiveUsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
@@ -1780,7 +1804,7 @@ export async function executeST5PriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
       logAudit('st5_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: fillPrice }) });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1817,7 +1841,7 @@ export async function executeST5PriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
         logAudit('st5_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: buy.fillPrice }) });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
