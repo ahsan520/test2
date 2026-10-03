@@ -25,6 +25,7 @@ import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { calcEntryExtension } from './buy-intelligence.js';
 import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
+import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE } from './st-entry-gate.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -722,6 +723,17 @@ export async function executeSTPriorityRotation({
       logAudit('st15_rejected_too_far', { pair, id: event.id, distancePct: event.distancePct, maxPct: ST_MAX_DISTANCE_PCT });
       continue;
     }
+    // Entry-gate pre-filter (conviction/signal only — needs no live data), applied
+    // BEFORE the basket size is computed so a blocked weak coin doesn't shrink
+    // the allocation of the candidates that do qualify.
+    if (ST_GATE_ENABLED && ST_GATE_MODE !== 'log') {
+      const pre = checkPriorityEntryGate({ entry: cand.entry, event, retestBuy: false, livePrice: null });
+      if (!pre.ok) {
+        event.status = 'SKIPPED_GATE';
+        logAudit('st15_gate_prefilter', { pair, id: event.id, reasons: pre.reasons, ...pre.snapshot });
+        continue;
+      }
+    }
     fresh.push(cand);
   }
   if (!fresh.length) return { changed };
@@ -828,6 +840,7 @@ export async function executeSTPriorityRotation({
       await sendTelegram(`⚠️ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
     }
 
+    let st15RetestBuy = false; // set true when this buy waited for / confirmed a pullback
     // ── Falling-knife / ATR-exhaustion gate ──
     // RSI overextension above catches a slow grind into overbought on
     // 15m/1h — it says nothing about the cross itself already being a
@@ -893,10 +906,25 @@ export async function executeSTPriorityRotation({
           continue;
         }
         logAudit('st15_retest_confirmed', { pair, id: event.id, reason: st15LiveCheck.reason });
+        st15RetestBuy = true;
       }
       if (st15Exhausted.overrideUsed) {
         logAudit('st15_exhausted_override', { pair, id: event.id, reason: st15Exhausted.reason });
         await sendTelegram(`⚡ *ST15 CROSS — ${base}* — EXHAUSTED-zone hard block bypassed (${st15Exhausted.reason}).`);
+      }
+    }
+
+    // ── Execution-time confirmation gate (st-entry-gate.js) — conviction /
+    // signal / CVD / failed-breakout checks the priority path used to skip.
+    if (ST_GATE_ENABLED) {
+      let st15GateLive = null;
+      try { st15GateLive = await mexcGetLivePrice(pair); } catch (e) { /* fail open — gate rules that need price are skipped */ }
+      const st15Gate = checkPriorityEntryGate({ entry, event, retestBuy: st15RetestBuy, livePrice: st15GateLive });
+      logAudit('st15_gate_eval', { pair, id: event.id, ok: st15Gate.ok, mode: ST_GATE_MODE, reasons: st15Gate.reasons, ...st15Gate.snapshot });
+      if (!st15Gate.ok && ST_GATE_MODE !== 'log') {
+        event.status = 'SKIPPED_GATE';
+        await sendTelegram(`🛑 *ST15 CROSS — ${base}* — skipped by entry gate (${st15Gate.reasons.join(' · ')}). Event marked handled, no positions touched.`);
+        continue;
       }
     }
 
@@ -1314,6 +1342,17 @@ export async function executeST5PriorityRotation({
       logAudit('st5_rejected_too_far', { pair, id: event.id, distancePct: event.distancePct, maxPct: ST_MAX_DISTANCE_PCT });
       continue;
     }
+    // Entry-gate pre-filter (conviction/signal only — needs no live data), applied
+    // BEFORE the basket size is computed so a blocked weak coin doesn't shrink
+    // the allocation of the candidates that do qualify.
+    if (ST_GATE_ENABLED && ST_GATE_MODE !== 'log') {
+      const pre = checkPriorityEntryGate({ entry: cand.entry, event, retestBuy: false, livePrice: null });
+      if (!pre.ok) {
+        event.status = 'SKIPPED_GATE';
+        logAudit('st5_gate_prefilter', { pair, id: event.id, reasons: pre.reasons, ...pre.snapshot });
+        continue;
+      }
+    }
     fresh.push(cand);
   }
   if (!fresh.length) return { changed };
@@ -1403,6 +1442,7 @@ export async function executeST5PriorityRotation({
       await sendTelegram(`⚠️ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
     }
 
+    let st5RetestBuy = false; // set true when this buy waited for / confirmed a pullback
     // ── Falling-knife / ATR-exhaustion gate — see the matching ST15 comment
     // above for the full rationale. Same hard-conditions-only scope: this
     // is the exact pattern from the RENDER/SUI/TAO trap (all three P0 buys
@@ -1450,10 +1490,25 @@ export async function executeST5PriorityRotation({
           continue;
         }
         logAudit('st5_retest_confirmed', { pair, id: event.id, reason: st5LiveCheck.reason });
+        st5RetestBuy = true;
       }
       if (st5Exhausted.overrideUsed) {
         logAudit('st5_exhausted_override', { pair, id: event.id, reason: st5Exhausted.reason });
         await sendTelegram(`⚡ *ST5 CROSS — ${base}* — EXHAUSTED-zone hard block bypassed (${st5Exhausted.reason}).`);
+      }
+    }
+
+    // ── Execution-time confirmation gate (st-entry-gate.js) — conviction /
+    // signal / CVD / failed-breakout checks the priority path used to skip.
+    if (ST_GATE_ENABLED) {
+      let st5GateLive = null;
+      try { st5GateLive = await mexcGetLivePrice(pair); } catch (e) { /* fail open — gate rules that need price are skipped */ }
+      const st5Gate = checkPriorityEntryGate({ entry, event, retestBuy: st5RetestBuy, livePrice: st5GateLive });
+      logAudit('st5_gate_eval', { pair, id: event.id, ok: st5Gate.ok, mode: ST_GATE_MODE, reasons: st5Gate.reasons, ...st5Gate.snapshot });
+      if (!st5Gate.ok && ST_GATE_MODE !== 'log') {
+        event.status = 'SKIPPED_GATE';
+        await sendTelegram(`🛑 *ST5 CROSS — ${base}* — skipped by entry gate (${st5Gate.reasons.join(' · ')}). Event marked handled, no positions touched.`);
+        continue;
       }
     }
 
