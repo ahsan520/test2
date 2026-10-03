@@ -348,6 +348,11 @@ jobs:
           # mexc-trader.js for the full rationale.
           ST_ALLOW_OVEREXTENDED_BUY:      ${{ vars.ST_ALLOW_OVEREXTENDED_BUY || 'false' }}
           ST_OVEREXTENDED_STOP_LOSS_PCT:  ${{ vars.ST_OVEREXTENDED_STOP_LOSS_PCT || '1.25' }}
+          # ST5/ST15 execution-time entry gate (st-entry-gate.js). MODE=log audits only.
+          ST_GATE_ENABLE:                 ${{ vars.ST_GATE_ENABLE || 'true' }}
+          ST_GATE_MODE:                   ${{ vars.ST_GATE_MODE || 'block' }}
+          ST_GATE_MIN_CONV:               ${{ vars.ST_GATE_MIN_CONV || '0' }}
+          ST_GATE_MAX_DRIFT_DOWN_PCT:     ${{ vars.ST_GATE_MAX_DRIFT_DOWN_PCT || '0.5' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
