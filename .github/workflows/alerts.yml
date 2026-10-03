@@ -466,6 +466,11 @@ jobs:
           SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75' }}
           SELL_PROFIT_LOCK_PEAK:            ${{ vars.SELL_PROFIT_LOCK_PEAK || '1.0' }}
           SELL_PROFIT_LOCK_FLOOR:           ${{ vars.SELL_PROFIT_LOCK_FLOOR || '0.2' }}
+          # Stale live-position timeout. LB_STALE_LIVE_HRS was not previously passed
+          # through the workflow, so a repo variable of that name had no effect.
+          LB_STALE_LIVE_HRS:                ${{ vars.LB_STALE_LIVE_HRS || '3' }}
+          LB_STALE_WINNER_HRS:              ${{ vars.LB_STALE_WINNER_HRS || '6' }}
+          LB_STALE_WINNER_MIN_PCT:          ${{ vars.LB_STALE_WINNER_MIN_PCT || '0.5' }}
           # Regime-aware widening (2026-09-03) — mirrors the buy-side
           # EXHAUSTED broad-rally exception above. Only widens the give-back
           # distance on a genuinely broad RISK_ON day; a choppy/NEUTRAL day
