@@ -446,19 +446,21 @@ jobs:
           # this system's T1≈+3% / T2≈+6% ATR-based targets rather than the
           # design doc's generic 8/15/20 numbers.
           SELL_ENABLE_PROFIT_INTELLIGENCE: ${{ vars.SELL_ENABLE_PROFIT_INTELLIGENCE || 'true' }}
-          SELL_PROFIT_MIN_PCT:             ${{ vars.SELL_PROFIT_MIN_PCT || '0.4' }}
+          SELL_PROFIT_MIN_PCT:             ${{ vars.SELL_PROFIT_MIN_PCT || '0.8' }}
           SELL_PROFIT_RSI_EXTENDED:        ${{ vars.SELL_PROFIT_RSI_EXTENDED || '70' }}
           SELL_PROFIT_RSI_ROLLOVER_DROP:   ${{ vars.SELL_PROFIT_RSI_ROLLOVER_DROP || '5' }}
           SELL_PROFIT_MIN_WEAK_SIGNALS:     ${{ vars.SELL_PROFIT_MIN_WEAK_SIGNALS || '2' }}
           SELL_PROFIT_RUNNER_MIN_PCT:       ${{ vars.SELL_PROFIT_RUNNER_MIN_PCT || '0.6' }}
-          SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '0.4' }}
-          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.2' }}
-          SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '0.6' }}
-          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '0.3' }}
+          SELL_PROFIT_TIER_C_PEAK:         ${{ vars.SELL_PROFIT_TIER_C_PEAK || '0.8' }}
+          SELL_PROFIT_TIER_C_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_C_GIVEBACK || '0.3' }}
+          SELL_PROFIT_TIER_B_PEAK:         ${{ vars.SELL_PROFIT_TIER_B_PEAK || '0.8' }}
+          SELL_PROFIT_TIER_B_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_B_GIVEBACK || '0.35' }}
           SELL_PROFIT_TIER_A_PEAK:         ${{ vars.SELL_PROFIT_TIER_A_PEAK || '1.0' }}
           SELL_PROFIT_TIER_A_GIVEBACK:     ${{ vars.SELL_PROFIT_TIER_A_GIVEBACK || '0.5' }}
           SELL_PROFIT_TIER_APLUS_PEAK:     ${{ vars.SELL_PROFIT_TIER_APLUS_PEAK || '1.5' }}
           SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75' }}
+          SELL_PROFIT_LOCK_PEAK:            ${{ vars.SELL_PROFIT_LOCK_PEAK || '1.0' }}
+          SELL_PROFIT_LOCK_FLOOR:           ${{ vars.SELL_PROFIT_LOCK_FLOOR || '0.2' }}
           # Regime-aware widening (2026-09-03) — mirrors the buy-side
           # EXHAUSTED broad-rally exception above. Only widens the give-back
           # distance on a genuinely broad RISK_ON day; a choppy/NEUTRAL day
