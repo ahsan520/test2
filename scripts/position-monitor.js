@@ -37,6 +37,15 @@ const LB_STALE_WATCH_HRS = parseFloat(process.env.LB_STALE_WATCH_HRS || '24');
 // the position, just deleted the tracking record, silently abandoning a
 // real open MEXC position with no further stop-loss protection at all.
 const LB_STALE_LIVE_HRS  = parseFloat(process.env.LB_STALE_LIVE_HRS  || '3');
+// Winners get longer. 2026-09-18..10-02 review: 6 of 17 stale exits were
+// already +1.8%..+3.1% when the 3h timeout cut them (short of T1), while the
+// flat/losing ones sit within ~0.5% of the stop anyway. A position at or above
+// LB_STALE_WINNER_MIN_PCT may run until LB_STALE_WINNER_HRS; everything else
+// keeps the LB_STALE_LIVE_HRS timeout. Profit Protection + the breakeven lock
+// remain the safety net while it runs. Set LB_STALE_WINNER_HRS <= LB_STALE_LIVE_HRS
+// to disable the extension.
+const LB_STALE_WINNER_HRS     = parseFloat(process.env.LB_STALE_WINNER_HRS     || '6');
+const LB_STALE_WINNER_MIN_PCT = parseFloat(process.env.LB_STALE_WINNER_MIN_PCT || '0.5');
 // Consecutive stale-close cycles a position must read zero exchange balance
 // before this path force-closes tracking itself, instead of retrying (and
 // re-alerting) forever. Mirrors reconcileTrackedLiveBalances' own
@@ -702,10 +711,14 @@ export async function monitorPositions(positions, marketSymbols, cfg = {}, marke
     // winning nor losing, just tying up a live slot doing nothing.
     if (isLiveHeld) {
       const openedAt = pos.alertedAt || 0;
-      const liveStaleMs = LB_STALE_LIVE_HRS * 3600000;
+      const pnlPct = ((price - pos.entryPrice) / pos.entryPrice) * 100;
+      const isStaleWinner = pnlPct >= LB_STALE_WINNER_MIN_PCT && LB_STALE_WINNER_HRS > LB_STALE_LIVE_HRS;
+      const liveStaleMs = (isStaleWinner ? LB_STALE_WINNER_HRS : LB_STALE_LIVE_HRS) * 3600000;
+      if (isStaleWinner && now - openedAt >= LB_STALE_LIVE_HRS * 3600000 && now - openedAt < liveStaleMs) {
+        console.log(`  ⏳  ${pos.base} — past ${LB_STALE_LIVE_HRS}h but +${pnlPct.toFixed(2)}% (≥ ${LB_STALE_WINNER_MIN_PCT}%) — stale timeout extended to ${LB_STALE_WINNER_HRS}h`);
+      }
       if (now - openedAt >= liveStaleMs) {
         const ageHrs = ((now - openedAt) / 3600000).toFixed(1);
-        const pnlPct = ((price - pos.entryPrice) / pos.entryPrice) * 100;
         console.log(`  🗑💰  ${pos.base} — live position stale ${ageHrs}h (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%), closing for real`);
         pos.exitPrice = price;
         const closeResult = await closeLiveOrder(pos, `Stale — ${ageHrs}h with no stop/target hit`, telegramAlerts);
