@@ -353,6 +353,9 @@ jobs:
           ST_GATE_MODE:                   ${{ vars.ST_GATE_MODE || 'block' }}
           ST_GATE_MIN_CONV:               ${{ vars.ST_GATE_MIN_CONV || '0' }}
           ST_GATE_MAX_DRIFT_DOWN_PCT:     ${{ vars.ST_GATE_MAX_DRIFT_DOWN_PCT || '0.5' }}
+          # Late-retest cap and retest sizing (0 / 1 disable) — see st-entry-gate.js
+          ST_RETEST_MAX_AGE_MIN:          ${{ vars.ST_RETEST_MAX_AGE_MIN || '15' }}
+          ST_RETEST_SIZE_MULT:            ${{ vars.ST_RETEST_SIZE_MULT || '0.5' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
