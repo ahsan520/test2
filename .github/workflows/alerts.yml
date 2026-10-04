@@ -363,6 +363,8 @@ jobs:
           ST_BO_SIZE_MULT:                ${{ vars.ST_BO_SIZE_MULT || '0.5' }}
           ST_BO_MAX_ATR:                  ${{ vars.ST_BO_MAX_ATR || '4.5' }}
           ST_BO_MAX_RSI15:                ${{ vars.ST_BO_MAX_RSI15 || '84' }}
+          # Skip ST5/ST15 priority buys sized below this many USDT (dust positions). 0 disables.
+          ST_MIN_BUY_USD:                 ${{ vars.ST_MIN_BUY_USD || '100' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
