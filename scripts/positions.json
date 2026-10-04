@@ -28,20 +28,20 @@
     "caution": false,
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 30 below 75 threshold",
-      "fallingKnifeScore": 30,
-      "exitProbability": 30,
-      "dynamicPositionRisk": 30,
+      "reason": "no entry snapshot — falling-knife-only score 2 below 75 threshold",
+      "fallingKnifeScore": 2,
+      "exitProbability": 2,
+      "dynamicPositionRisk": 2,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 5
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1791145645361
+      "evaluatedAt": 1791145862005
     },
     "highestPnLSeen": 0.43,
-    "lastR15": 61.6,
+    "lastR15": 63,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.43% below 0.8% floor — not evaluated yet",
@@ -49,7 +49,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791145645361
+      "evaluatedAt": 1791145862005
     }
   },
   "BINANCE:GALAUSDT": {
@@ -68,9 +68,9 @@
     "t2": 0.0027,
     "score": 8,
     "spikeScore": 0.8597791365870636,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791145862005,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-GALA-20261004T181000Z",
@@ -82,7 +82,10 @@
       "qty": 2096.83,
       "fillPrice": 0.002561,
       "buyOrderId": "C02__735495565772558336036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__735528361773703170036",
+      "exitFillPrice": 0.002552,
+      "closedAt": 1791145863442
     },
     "entrySnapshot": {
       "at": 1791138044255,
@@ -114,20 +117,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 58 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
-      "fallingKnifeScore": 49,
-      "thesisDrop": 49,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 91 → current 26 (drop 65 > 60)",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 65,
       "confidenceDecay": 33,
-      "exitProbability": 58,
-      "dynamicPositionRisk": 58,
+      "exitProbability": 38,
+      "dynamicPositionRisk": 38,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 5
       },
-      "breakoutFailed": true,
+      "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791145645361
+      "evaluatedAt": 1791145862005
     },
     "highestPnLSeen": 0.43,
     "lastR15": 48.8,
@@ -139,6 +142,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1791145645361
-    }
+    },
+    "exitPrice": 0.002553,
+    "statusChangedAt": 1791145862005
   }
 }
