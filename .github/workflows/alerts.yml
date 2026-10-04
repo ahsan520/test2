@@ -356,6 +356,13 @@ jobs:
           # Late-retest cap and retest sizing (0 / 1 disable) — see st-entry-gate.js
           ST_RETEST_MAX_AGE_MIN:          ${{ vars.ST_RETEST_MAX_AGE_MIN || '15' }}
           ST_RETEST_SIZE_MULT:            ${{ vars.ST_RETEST_SIZE_MULT || '0.5' }}
+          # Spike-breakout exception (OFF by default). When true, a cross with a confirmed
+          # range breakout + volume expansion + rising CVD may pass the RSI-overextension
+          # skip and the EXHAUSTED wait-for-retest, at reduced size. See st-entry-gate.js.
+          ST_BO_ENABLE:                   ${{ vars.ST_BO_ENABLE || 'false' }}
+          ST_BO_SIZE_MULT:                ${{ vars.ST_BO_SIZE_MULT || '0.5' }}
+          ST_BO_MAX_ATR:                  ${{ vars.ST_BO_MAX_ATR || '4.5' }}
+          ST_BO_MAX_RSI15:                ${{ vars.ST_BO_MAX_RSI15 || '84' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
