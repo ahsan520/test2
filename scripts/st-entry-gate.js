@@ -119,3 +119,58 @@ export function buildEntryContext({ entry, market, marketState }) {
     btcBias4h:  market?.global?.btcBias4h ?? null,
   };
 }
+
+// ── Spike-breakout exception (OFF by default) ───────────────────────────
+// Problem (2026-10-04 SUI): a coin breaks out of a flat range on expanding
+// volume; the impulse candle itself pushes RSI past the overextension cutoff
+// (RSI >= 70 / 1h >= 68) and the cross is already EXHAUSTED, so the bot
+// skips it or waits for a retest that never comes. The existing broad-rally
+// override needs breadth >= 85, which a single-coin spike never produces.
+// This lets a cross through BOTH barriers only when the coin's own tape
+// confirms a real breakout (not a late trend candle):
+//   confirmed breakout (trigger BREAKOUT / range break) AND volume expansion
+//   AND CVD rising AND RSI not absurd AND distance from the line capped
+//   AND conviction/signal not weak.
+// Such buys are sized down (ST_BO_SIZE_MULT) and use the wider overextended
+// stop. Unproven on live data: keep disabled until the entry-context log
+// (or missed_signal_check.py) shows these entries pay.
+export const ST_BO_ENABLE    = (process.env.ST_BO_ENABLE ?? 'false') === 'true';
+export const ST_BO_SIZE_MULT = num('ST_BO_SIZE_MULT', '0.5');
+const BO_MAX_ATR   = num('ST_BO_MAX_ATR', '4.5');
+const BO_MAX_RSI15 = num('ST_BO_MAX_RSI15', '84');
+
+export function checkSpikeBreakout({ entry, event, tf = '5' }) {
+  if (!ST_BO_ENABLE) return { ok: false, disabled: true, failed: [], snapshot: null };
+  const st = tf === '15'
+    ? (event?.st15AtCross || entry?.supertrend15m)
+    : (event?.st5AtCross  || entry?.supertrend5m);
+  const failed = [];
+
+  const breakout = entry?.triggerStatus === 'BREAKOUT'
+    || entry?.breakoutConfirmed === true
+    || st?.consolidation?.breakout === true;
+  if (!breakout) failed.push('no confirmed breakout from a range');
+  if (entry?.bullChecks?.volExpansion !== true) failed.push('no volume expansion');
+  if (entry?.d?.cvdTrend !== 'up') failed.push('CVD not rising');
+
+  const r15 = entry?.d?.r15;
+  if (r15 != null && r15 > BO_MAX_RSI15) failed.push(`RSI ${r15} > ${BO_MAX_RSI15}`);
+  const dist = st?.distanceATR;
+  if (dist != null && dist > BO_MAX_ATR) failed.push(`${dist} ATR from the line > ${BO_MAX_ATR}`);
+
+  if (entry?.conv != null && entry.conv < MIN_CONV) failed.push(`conviction ${entry.conv} < ${MIN_CONV}`);
+  if (entry?.signal && BAD_SIGNALS.has(entry.signal)) failed.push(`signal ${entry.signal}`);
+
+  return {
+    ok: failed.length === 0, failed,
+    snapshot: { breakout, vol: entry?.bullChecks?.volExpansion ?? null, cvd: entry?.d?.cvdTrend ?? null, r15: r15 ?? null, distanceATR: dist ?? null },
+  };
+}
+
+// ── Minimum priority-buy size ─────────────────────────────────────────────
+// 2026-10-04: with the wallet already deployed in two flat positions, an ST5
+// cross sized itself from the ~$5 left over and opened a $5.37 GALA position.
+// It earned nothing, could not be partially sold (below MEXC's $5 minimum),
+// and held one of the three concurrent slots for two hours. Below this size a
+// priority buy is skipped instead. 0 disables.
+export const ST_MIN_BUY_USD = num('ST_MIN_BUY_USD', '100');

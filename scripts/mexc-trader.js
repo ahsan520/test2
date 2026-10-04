@@ -25,7 +25,7 @@ import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { calcEntryExtension } from './buy-intelligence.js';
 import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
-import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming, buildEntryContext } from './st-entry-gate.js';
+import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming, buildEntryContext, ST_BO_ENABLE, ST_BO_SIZE_MULT, checkSpikeBreakout, ST_MIN_BUY_USD } from './st-entry-gate.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -829,16 +829,25 @@ export async function executeSTPriorityRotation({
     // no extra API calls, no added latency to the priority path.
     const st15Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
     let st15OverextendedOverride = false;
+    // Spike-breakout exception (st-entry-gate.js, ST_BO_ENABLE, default off).
+    const st15Spike = checkSpikeBreakout({ entry, event, tf: '15' });
+    let st15SpikeUsed = false; // true only when the exception actually relaxed a gate
     if (st15Ext.penalty > 0) {
-      if (!ST_ALLOW_OVEREXTENDED_BUY) {
+      if (!ST_ALLOW_OVEREXTENDED_BUY && st15Spike.ok) {
+        st15SpikeUsed = true;
+        logAudit('st15_spike_breakout_override', { pair, id: event.id, gate: 'overextended', reason: st15Ext.reason, ...st15Spike.snapshot });
+        await sendTelegram(`⚡ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but a confirmed spike breakout (volume + CVD up, ${st15Spike.snapshot.distanceATR ?? '?'} ATR) — buying at ${ST_BO_SIZE_MULT * 100}% size with the wider stop.`);
+      } else if (!ST_ALLOW_OVEREXTENDED_BUY) {
         event.status = 'SKIPPED_OVEREXTENDED';
-        logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason });
+        logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st15Spike.disabled ? null : st15Spike.failed });
         await sendTelegram(`🚫 *ST15 CROSS — ${base}* — skipped, already overextended (${st15Ext.reason}). Event marked handled, no positions touched.`);
         continue;
       }
       st15OverextendedOverride = true;
-      logAudit('st15_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
-      await sendTelegram(`⚠️ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
+      if (ST_ALLOW_OVEREXTENDED_BUY) {
+        logAudit('st15_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
+        await sendTelegram(`⚠️ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
+      }
     }
 
     let st15RetestBuy = false; // set true when this buy waited for / confirmed a pullback
@@ -895,7 +904,12 @@ export async function executeSTPriorityRotation({
       // waiting on it would never resolve) and requeue rather than buy or
       // discard — picked back up next cycle, naturally expired by
       // ST_EVENT_TTL_MIN if no retest/cooldown arrives in time.
-      if (st15Exhausted.waitRetest) {
+      if (st15Exhausted.waitRetest && st15Spike.ok) {
+        st15SpikeUsed = true;
+        logAudit('st15_spike_breakout_override', { pair, id: event.id, gate: 'exhausted', reason: st15Exhausted.reason, ...st15Spike.snapshot });
+        await sendTelegram(`⚡ *ST15 CROSS — ${base}* — EXHAUSTED zone but a confirmed spike breakout (volume + CVD up) — not waiting for a retest, buying at ${ST_BO_SIZE_MULT * 100}% size.`);
+      }
+      if (st15Exhausted.waitRetest && !st15Spike.ok) {
         const st15LiveCheck = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m, {
           triggerStatus: entry?.triggerStatus ?? null,
           regime: marketState?.marketRegime ?? null,
@@ -1192,6 +1206,20 @@ export async function executeSTPriorityRotation({
       effectiveUsdSize = parseFloat((effectiveUsdSize * ST_RETEST_SIZE_MULT).toFixed(2));
       logAudit('st15_retest_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_RETEST_SIZE_MULT });
     }
+    if (st15SpikeUsed && ST_BO_SIZE_MULT > 0 && ST_BO_SIZE_MULT < 1) {
+      const before = effectiveUsdSize;
+      effectiveUsdSize = parseFloat((effectiveUsdSize * ST_BO_SIZE_MULT).toFixed(2));
+      logAudit('st15_spike_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_BO_SIZE_MULT });
+    }
+    if (ST_MIN_BUY_USD > 0 && effectiveUsdSize > 0 && effectiveUsdSize < ST_MIN_BUY_USD) {
+      // Dust-size guard (st-entry-gate.js): don't open a position too small to matter
+      // or to partially exit, and don't let it occupy a concurrent slot.
+      event.status = 'BLOCKED_BELOW_MIN_SIZE';
+      logAudit('st15_blocked_below_min_size', { pair, id: event.id, usdSize: effectiveUsdSize, minUsd: ST_MIN_BUY_USD });
+      markSTRotationExecuted(tradeState); // same re-check cooldown as the zero-balance block below
+      await sendTelegram(`🚫 *ST15 CROSS — ${base}* — only $${effectiveUsdSize} free (min $${ST_MIN_BUY_USD}) — skipped instead of opening a dust position. Event marked handled.`);
+      continue;
+    }
     if (effectiveUsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st15_blocked_zero_balance', { pair, id: event.id });
@@ -1228,7 +1256,7 @@ export async function executeSTPriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
       logAudit('st15_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: fillPrice }) , ctx: { ...buildEntryContext({ entry, market, marketState }), spikeBreakout: st15SpikeUsed } } });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1265,7 +1293,7 @@ export async function executeSTPriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
         logAudit('st15_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: buy.fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: buy.fillPrice }) , ctx: { ...buildEntryContext({ entry, market, marketState }), spikeBreakout: st15SpikeUsed } } });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
@@ -1444,16 +1472,25 @@ export async function executeST5PriorityRotation({
     // the full trade-log rationale (46 closed trades review). ──
     const st5Ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
     let st5OverextendedOverride = false;
+    // Spike-breakout exception (st-entry-gate.js, ST_BO_ENABLE, default off).
+    const st5Spike = checkSpikeBreakout({ entry, event, tf: '5' });
+    let st5SpikeUsed = false; // true only when the exception actually relaxed a gate
     if (st5Ext.penalty > 0) {
-      if (!ST_ALLOW_OVEREXTENDED_BUY) {
+      if (!ST_ALLOW_OVEREXTENDED_BUY && st5Spike.ok) {
+        st5SpikeUsed = true;
+        logAudit('st5_spike_breakout_override', { pair, id: event.id, gate: 'overextended', reason: st5Ext.reason, ...st5Spike.snapshot });
+        await sendTelegram(`⚡ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but a confirmed spike breakout (volume + CVD up, ${st5Spike.snapshot.distanceATR ?? '?'} ATR) — buying at ${ST_BO_SIZE_MULT * 100}% size with the wider stop.`);
+      } else if (!ST_ALLOW_OVEREXTENDED_BUY) {
         event.status = 'SKIPPED_OVEREXTENDED';
-        logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason });
+        logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st5Spike.disabled ? null : st5Spike.failed });
         await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
         continue;
       }
       st5OverextendedOverride = true;
-      logAudit('st5_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
-      await sendTelegram(`⚠️ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
+      if (ST_ALLOW_OVEREXTENDED_BUY) {
+        logAudit('st5_overextended_override', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, stopPct: ST_OVEREXTENDED_STOP_LOSS_PCT });
+        await sendTelegram(`⚠️ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but ST_ALLOW_OVEREXTENDED_BUY is on — buying with a ${ST_OVEREXTENDED_STOP_LOSS_PCT}% stop instead of the normal stop.`);
+      }
     }
 
     let st5RetestBuy = false; // set true when this buy waited for / confirmed a pullback
@@ -1492,7 +1529,12 @@ export async function executeST5PriorityRotation({
       // waitRetest (incl. EXHAUSTED as of the 29 Aug 2026 ATR-balance
       // tuning) must be requeued, not bypassed, or P0 buys immediately
       // into the same over-extended entry the gate exists to stop.
-      if (st5Exhausted.waitRetest) {
+      if (st5Exhausted.waitRetest && st5Spike.ok) {
+        st5SpikeUsed = true;
+        logAudit('st5_spike_breakout_override', { pair, id: event.id, gate: 'exhausted', reason: st5Exhausted.reason, ...st5Spike.snapshot });
+        await sendTelegram(`⚡ *ST5 CROSS — ${base}* — EXHAUSTED zone but a confirmed spike breakout (volume + CVD up) — not waiting for a retest, buying at ${ST_BO_SIZE_MULT * 100}% size.`);
+      }
+      if (st5Exhausted.waitRetest && !st5Spike.ok) {
         const st5LiveCheck = checkExhaustedEntry(entry.supertrend5m, entry.supertrend15m, {
           triggerStatus: entry?.triggerStatus ?? null,
           regime: marketState?.marketRegime ?? null,
@@ -1773,6 +1815,20 @@ export async function executeST5PriorityRotation({
       effectiveUsdSize = parseFloat((effectiveUsdSize * ST_RETEST_SIZE_MULT).toFixed(2));
       logAudit('st5_retest_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_RETEST_SIZE_MULT });
     }
+    if (st5SpikeUsed && ST_BO_SIZE_MULT > 0 && ST_BO_SIZE_MULT < 1) {
+      const before = effectiveUsdSize;
+      effectiveUsdSize = parseFloat((effectiveUsdSize * ST_BO_SIZE_MULT).toFixed(2));
+      logAudit('st5_spike_size_reduced', { pair, id: event.id, before, after: effectiveUsdSize, mult: ST_BO_SIZE_MULT });
+    }
+    if (ST_MIN_BUY_USD > 0 && effectiveUsdSize > 0 && effectiveUsdSize < ST_MIN_BUY_USD) {
+      // Dust-size guard (st-entry-gate.js): don't open a position too small to matter
+      // or to partially exit, and don't let it occupy a concurrent slot.
+      event.status = 'BLOCKED_BELOW_MIN_SIZE';
+      logAudit('st5_blocked_below_min_size', { pair, id: event.id, usdSize: effectiveUsdSize, minUsd: ST_MIN_BUY_USD });
+      markSTRotationExecuted(tradeState); // same re-check cooldown as the zero-balance block below
+      await sendTelegram(`🚫 *ST5 CROSS — ${base}* — only $${effectiveUsdSize} free (min $${ST_MIN_BUY_USD}) — skipped instead of opening a dust position. Event marked handled.`);
+      continue;
+    }
     if (effectiveUsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
@@ -1806,7 +1862,7 @@ export async function executeST5PriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
       logAudit('st5_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: fillPrice }) , ctx: { ...buildEntryContext({ entry, market, marketState }), spikeBreakout: st5SpikeUsed } } });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1843,7 +1899,7 @@ export async function executeST5PriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
         logAudit('st5_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: buy.fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: buy.fillPrice }) , ctx: { ...buildEntryContext({ entry, market, marketState }), spikeBreakout: st5SpikeUsed } } });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
