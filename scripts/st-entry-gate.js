@@ -95,3 +95,27 @@ export function buildEntryTiming({ event, retestBuy = false, fillPrice = null, n
     retestBuy:      !!retestBuy,
   };
 }
+
+// Market/coin context at the moment of the buy, stored with the trade so the
+// RSI, breadth, conviction and gate cutoffs can be tuned against real results
+// (the trade log previously had none of this). Pure — never throws.
+export function buildEntryContext({ entry, market, marketState }) {
+  const r = (v, n = 1) => (v == null || isNaN(v)) ? null : parseFloat(Number(v).toFixed(n));
+  const d = entry?.d || {};
+  return {
+    conv:       entry?.conv ?? null,
+    rawConv:    entry?.rawConv ?? null,
+    signal:     entry?.signal ?? null,
+    entryState: entry?.entryState ?? null,
+    bullConf:   entry?.bullConf ?? null,
+    grade:      entry?.grade ?? null,
+    whale:      entry?.whale?.score ?? null,
+    r15:        r(d.r15),
+    r1h:        r(d.r1h),
+    cvd:        d.cvdTrend ?? null,
+    breadth:    marketState?.breadth?.score ?? null,
+    regime:     typeof marketState?.marketRegime === 'string' ? marketState.marketRegime : null,
+    btcRisk:    marketState?.btcRiskScore ?? null,
+    btcBias4h:  market?.global?.btcBias4h ?? null,
+  };
+}

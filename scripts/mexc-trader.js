@@ -25,7 +25,7 @@ import { isMomentumWeak } from './profit-intelligence.js';
 import { buildEntrySnapshot } from './position-intelligence.js';
 import { calcEntryExtension } from './buy-intelligence.js';
 import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
-import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming } from './st-entry-gate.js';
+import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming, buildEntryContext } from './st-entry-gate.js';
 import { buildSymKey } from './exchange-registry.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
@@ -731,6 +731,7 @@ export async function executeSTPriorityRotation({
       if (!pre.ok) {
         event.status = 'SKIPPED_GATE';
         logAudit('st15_gate_prefilter', { pair, id: event.id, reasons: pre.reasons, ...pre.snapshot });
+        await sendTelegram(`🛑 *ST15 CROSS — ${pair.replace(/USDT$/, '')}* — skipped by entry gate (${pre.reasons.join(' · ')}). Event marked handled, no positions touched.`);
         continue;
       }
     }
@@ -1227,7 +1228,7 @@ export async function executeSTPriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
       logAudit('st15_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: fillPrice }) });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1264,7 +1265,7 @@ export async function executeSTPriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST15_CROSS_UP';
         logAudit('st15_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: buy.fillPrice }) });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st15RetestBuy, fillPrice: buy.fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
@@ -1362,6 +1363,7 @@ export async function executeST5PriorityRotation({
       if (!pre.ok) {
         event.status = 'SKIPPED_GATE';
         logAudit('st5_gate_prefilter', { pair, id: event.id, reasons: pre.reasons, ...pre.snapshot });
+        await sendTelegram(`🛑 *ST5 CROSS — ${pair.replace(/USDT$/, '')}* — skipped by entry gate (${pre.reasons.join(' · ')}). Event marked handled, no positions touched.`);
         continue;
       }
     }
@@ -1804,7 +1806,7 @@ export async function executeST5PriorityRotation({
       positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
       positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
       logAudit('st5_paper_buy', { sym, id: event.id, usdSize: effectiveUsdSize, fillPrice });
-      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: fillPrice }) });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-effectiveUsdSize);
       changed = true;
@@ -1841,7 +1843,7 @@ export async function executeST5PriorityRotation({
         positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
         positions[sym].entryStateAtBuy    = 'ST5_CROSS_UP';
         logAudit('st5_live_buy', { sym, id: event.id, usdSize: effectiveUsdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId });
-        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: buy.fillPrice }) });
+        recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize: effectiveUsdSize, timing: { ...buildEntryTiming({ event, retestBuy: st5RetestBuy, fillPrice: buy.fillPrice }) , ctx: buildEntryContext({ entry, market, marketState }) } });
         await pushTradeLogToGitHub(loadTradeLog());
         changed = true;
         event.status = 'EXECUTED';
