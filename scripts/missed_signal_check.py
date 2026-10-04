@@ -44,7 +44,10 @@ def parse_ts(s):
 
 
 def load_events(paths):
-    seen, out = set(), []
+    """One row per cross. wait_retest -> expired/skipped for the same event id is ONE
+    cross, not two: it is scored from the FIRST moment the bot declined to buy and
+    labelled with the LAST thing that happened to it."""
+    by_key = {}
     for p in paths:
         with open(p) as fh:
             rows = json.load(fh)
@@ -59,13 +62,20 @@ def load_events(paths):
             sym = sym.split(":")[-1].upper()            # "BINANCE:RENDERUSDT" -> "RENDERUSDT"
             if not sym.endswith("USDT"):
                 sym += "USDT"
-            # first occurrence per (action, event id) — wait_retest repeats every cycle
-            key = (a, r.get("id") or (sym, r["timestamp"][:13]))
-            if key in seen:
-                continue
-            seen.add(key)
-            out.append({"action": a, "symbol": sym, "ts": parse_ts(r["timestamp"]), "id": r.get("id")})
-    return out
+            kind = "taken" if a in TAKEN_ACTIONS else "skipped"
+            key = (kind, r.get("id") or (sym, a, r["timestamp"][:13]))
+            ts = parse_ts(r["timestamp"])
+            cur = by_key.get(key)
+            if cur is None:
+                by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts}
+            else:
+                cur["ts"] = min(cur["ts"], ts)                       # decision moment = earliest
+                if ts >= cur["_last"]:
+                    cur["action"], cur["_last"] = a, ts              # label = terminal state
+    out = list(by_key.values())
+    for e in out:
+        e.pop("_last", None)
+    return sorted(out, key=lambda e: e["ts"])
 
 
 SSL_CTX = None   # set from --ca-bundle / --insecure in main()
