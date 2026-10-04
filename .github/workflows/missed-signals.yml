@@ -1,0 +1,76 @@
+name: Missed Signal Check
+
+# Manual only. Replays skipped ST5/ST15 crosses from scripts/audit.json against
+# real Binance candles and prints the result in the run summary. Runs on a
+# GitHub-hosted runner, so it needs no certificates or access from your own
+# machine/network. Read-only: it never touches positions, trades or state files.
+on:
+  workflow_dispatch:
+    inputs:
+      partial:
+        description: 'Also score events whose 3h window is still open (provisional)'
+        required: false
+        default: true
+        type: boolean
+      stop_pct:
+        description: 'Stop loss % to simulate'
+        required: false
+        default: '1.25'
+      t1_pct:
+        description: 'T1 target % to simulate'
+        required: false
+        default: '3'
+      fee_pct:
+        description: 'Round-trip fee % (check your MEXC tier)'
+        required: false
+        default: '0.1'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run missed-signal check
+        env:
+          PARTIAL: ${{ inputs.partial }}
+          STOP_PCT: ${{ inputs.stop_pct }}
+          T1_PCT: ${{ inputs.t1_pct }}
+          FEE_PCT: ${{ inputs.fee_pct }}
+        run: |
+          set -o pipefail
+          AUDIT=scripts/audit.json
+          [ -f "$AUDIT" ] || { echo "scripts/audit.json not found in the repo"; exit 1; }
+          cp "$AUDIT" audit-snapshot.json
+          ARGS=(--audit "$AUDIT" --stop "$STOP_PCT" --t1 "$T1_PCT" --fee "$FEE_PCT")
+          [ "$PARTIAL" = "true" ] && ARGS+=(--partial)
+          python3 scripts/missed_signal_check.py "${ARGS[@]}" 2>&1 | tee result.txt
+          {
+            echo '### Missed signal check'
+            echo '```'
+            cat result.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # audit.json is capped, so keep a dated snapshot of each run's input;
+      # several snapshots can later be passed together with repeated --audit.
+      - name: Save audit snapshot and result
+        uses: actions/upload-artifact@v4
+        with:
+          name: missed-signal-check-${{ github.run_id }}
+          path: |
+            audit-snapshot.json
+            result.txt
+          retention-days: 90
