@@ -61,7 +61,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791282334185
+      "evaluatedAt": 1791282670928
     }
   },
   "TSX:HOU.TO": {
@@ -90,102 +90,6 @@
     "histWinRate": null,
     "histSample": 0,
     "caution": false
-  },
-  "BINANCE:RENDERUSDT": {
-    "sym": "BINANCE:RENDERUSDT",
-    "base": "RENDER",
-    "assetType": "crypto",
-    "exchangePrefix": "BINANCE",
-    "session": "24/7",
-    "setup": "ST5 PRIORITY",
-    "dir": "bull",
-    "alertedAt": 1791274252529,
-    "holdLockUntil": 1791274252529,
-    "entryPrice": 2.108,
-    "stop": 2.082,
-    "t1": 2.1712,
-    "t2": 2.2345,
-    "score": 8,
-    "spikeScore": 1.6897054645410248,
-    "exitAlertedAt": 1791282048165,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "st5_priority_v1",
-    "scoreSource": "st5_cross",
-    "st5EventId": "ST5-RENDER-20261006T075500Z",
-    "overextendedEntry": false,
-    "liveOrder": {
-      "mode": "live",
-      "buyAt": 1791274252529,
-      "usdSize": 186.91,
-      "qty": 88.66,
-      "fillPrice": 2.108,
-      "buyOrderId": "C02__736066868103577600036",
-      "qtyEstimated": false,
-      "sellOrderId": "C02__736099567346356224036",
-      "exitFillPrice": 2.123,
-      "closedAt": 1791282049447,
-      "staleZeroBalanceStrikes": 0
-    },
-    "entrySnapshot": {
-      "at": 1791274253347,
-      "price": 2.108,
-      "conv": 8,
-      "whaleScore": 75,
-      "bullConfCount": 8,
-      "bullChecks": {
-        "dailyBiasBull": true,
-        "bias4hBull": true,
-        "aboveEma": true,
-        "oiRising": false,
-        "cvdRising": true,
-        "volExpansion": true,
-        "fundingHealthy": true,
-        "obiBidHeavy": false,
-        "rsiNotOb": true,
-        "whaleScore60": true
-      },
-      "bias4h": "BULL 4H",
-      "cvdTrend": "up",
-      "thesisScore": 85,
-      "btcRiskScore": null,
-      "breadthScore": null,
-      "marketRegime": null,
-      "triggerStatus": "BREAKOUT",
-      "breakoutLevel": 2.095
-    },
-    "entryTriggerStatus": "BREAKOUT",
-    "entryStateAtBuy": "ST5_CROSS_UP",
-    "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 1 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 10,
-      "confidenceDecay": 13,
-      "exitProbability": 1,
-      "dynamicPositionRisk": 1,
-      "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
-      },
-      "breakoutFailed": false,
-      "noSnapshotFallback": false,
-      "evaluatedAt": 1791282048165
-    },
-    "highestPnLSeen": 1.33,
-    "lastR15": 63.2,
-    "lastProfitIntel": {
-      "action": "EXIT",
-      "reason": "Profit Protection Triggered: trailing stop — peak +1.33% fell 0.57% to +0.76% (≥ 0.50% trail)",
-      "highestPnLSeen": 1.33,
-      "drawdownFromPeak": 0.5700000000000001,
-      "tier": "TRAIL",
-      "giveBack": 0.5,
-      "evaluatedAt": 1791282048165
-    },
-    "prevPnLPct": 0.76,
-    "exitPrice": 2.124,
-    "statusChangedAt": 1791282048165
   },
   "BINANCE:APTUSDT": {
     "sym": "BINANCE:APTUSDT",
@@ -252,9 +156,9 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 1 below 50 threshold (recovery detected, risk softened)",
       "fallingKnifeScore": 3,
-      "thesisDrop": 14,
+      "thesisDrop": 10,
       "confidenceDecay": 11,
-      "exitProbability": 2,
+      "exitProbability": 1,
       "dynamicPositionRisk": 1,
       "recovery": {
         "recovering": true,
@@ -262,18 +166,19 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791282334185
+      "evaluatedAt": 1791282670928
     },
-    "highestPnLSeen": 0.75,
-    "lastR15": 58.9,
+    "highestPnLSeen": 1,
+    "lastR15": 61,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak 0.75% below 0.8% floor — not evaluated yet",
-      "highestPnLSeen": 0.75,
+      "reason": "drawdown 0.00% below tier A give-back 1.00% (regime-widened)",
+      "highestPnLSeen": 1,
       "drawdownFromPeak": 0,
-      "tier": null,
-      "giveBack": null,
-      "evaluatedAt": 1791282334185
-    }
+      "tier": "A",
+      "giveBack": 1,
+      "evaluatedAt": 1791282670928
+    },
+    "prevPnLPct": 1
   }
 }
