@@ -61,7 +61,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791281846396
+      "evaluatedAt": 1791282048165
     }
   },
   "TSX:HOU.TO": {
@@ -107,9 +107,9 @@
     "t2": 2.2345,
     "score": 8,
     "spikeScore": 1.6897054645410248,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791282048165,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-RENDER-20261006T075500Z",
@@ -121,7 +121,11 @@
       "qty": 88.66,
       "fillPrice": 2.108,
       "buyOrderId": "C02__736066868103577600036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736099567346356224036",
+      "exitFillPrice": 2.123,
+      "closedAt": 1791282049447,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1791274253347,
@@ -154,32 +158,34 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 2 below 50 threshold",
-      "fallingKnifeScore": 5,
-      "thesisDrop": 8,
+      "reason": "dynamicPositionRisk 1 below 50 threshold",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 10,
       "confidenceDecay": 13,
-      "exitProbability": 2,
-      "dynamicPositionRisk": 2,
+      "exitProbability": 1,
+      "dynamicPositionRisk": 1,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791281846396
+      "evaluatedAt": 1791282048165
     },
     "highestPnLSeen": 1.33,
-    "lastR15": 64.9,
+    "lastR15": 63.2,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.38% below tier A give-back 1.00% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.33% fell 0.57% to +0.76% (≥ 0.50% trail)",
       "highestPnLSeen": 1.33,
-      "drawdownFromPeak": 0.3800000000000001,
-      "tier": "A",
-      "giveBack": 1,
-      "evaluatedAt": 1791281846396
+      "drawdownFromPeak": 0.5700000000000001,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1791282048165
     },
-    "prevPnLPct": 0.95
+    "prevPnLPct": 0.76,
+    "exitPrice": 2.124,
+    "statusChangedAt": 1791282048165
   },
   "BINANCE:APTUSDT": {
     "sym": "BINANCE:APTUSDT",
@@ -244,22 +250,22 @@
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 6 below 50 threshold",
-      "fallingKnifeScore": 18,
-      "thesisDrop": 4,
+      "reason": "dynamicPositionRisk 2 below 50 threshold",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 14,
       "confidenceDecay": 11,
-      "exitProbability": 6,
-      "dynamicPositionRisk": 6,
+      "exitProbability": 2,
+      "dynamicPositionRisk": 2,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 7
+        "sustainedMin": 8
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791281846396
+      "evaluatedAt": 1791282048165
     },
     "highestPnLSeen": 0.74,
-    "lastR15": 58.8,
+    "lastR15": 56.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.74% below 0.8% floor — not evaluated yet",
@@ -267,7 +273,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791281846396
+      "evaluatedAt": 1791282048165
     }
   }
 }
