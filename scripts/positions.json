@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791269132570
+      "evaluatedAt": 1791269450113
     }
   },
   "TSX:ETHY.TO": {
@@ -99,7 +99,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791269132570
+      "evaluatedAt": 1791269450113
     }
   },
   "NASDAQ:GOOG": {
@@ -137,7 +137,7 @@
       "drawdownFromPeak": 0.3599999999999999,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1791269132570
+      "evaluatedAt": 1791269450113
     },
     "prevPnLPct": 1.03
   },
@@ -184,9 +184,9 @@
     "t2": 11.97,
     "score": 2,
     "spikeScore": 2.0213939262241643,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791269450113,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-AVAX-20261006T041500Z",
@@ -198,7 +198,11 @@
       "qty": 16.69,
       "fillPrice": 11.286999999999999,
       "buyOrderId": "C02__736010335772688384036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736046728389537792036",
+      "exitFillPrice": 11.333,
+      "closedAt": 1791269451736,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1791260774972,
@@ -231,32 +235,34 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 7 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 4,
+      "reason": "dynamicPositionRisk 12 below 50 threshold",
+      "fallingKnifeScore": 2,
+      "thesisDrop": 14,
       "confidenceDecay": 29,
-      "exitProbability": 7,
-      "dynamicPositionRisk": 7,
+      "exitProbability": 12,
+      "dynamicPositionRisk": 12,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 5
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791269132570
+      "evaluatedAt": 1791269450113
     },
     "highestPnLSeen": 0.96,
-    "lastR15": 66.3,
+    "lastR15": 59.9,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.00% below tier B give-back 0.35%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +0.96% fell 0.53% to +0.43% (≥ 0.50% trail)",
       "highestPnLSeen": 0.96,
-      "drawdownFromPeak": 0,
-      "tier": "B",
-      "giveBack": 0.35,
-      "evaluatedAt": 1791269132570
+      "drawdownFromPeak": 0.53,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1791269450113
     },
-    "prevPnLPct": 0.96
+    "prevPnLPct": 0.43,
+    "exitPrice": 11.336,
+    "statusChangedAt": 1791269450113
   },
   "BINANCE:IMXUSDT": {
     "sym": "BINANCE:IMXUSDT",
@@ -318,6 +324,33 @@
       "breakoutLevel": 0.184
     },
     "entryTriggerStatus": "TRIGGERING",
-    "entryStateAtBuy": "ST15_CROSS_UP"
+    "entryStateAtBuy": "ST15_CROSS_UP",
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 14 below 50 threshold",
+      "fallingKnifeScore": 15,
+      "thesisDrop": 13,
+      "confidenceDecay": 13,
+      "exitProbability": 14,
+      "dynamicPositionRisk": 14,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 5
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1791269450113
+    },
+    "highestPnLSeen": -0.11,
+    "lastR15": 67.2,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.11% below 0.8% floor — not evaluated yet",
+      "highestPnLSeen": -0.11,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1791269450113
+    }
   }
 }
