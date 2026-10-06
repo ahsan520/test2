@@ -61,7 +61,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791291759709
+      "evaluatedAt": 1791291943396
     }
   },
   "TSX:HOU.TO": {
@@ -107,9 +107,9 @@
     "t2": 0.1959,
     "score": 5,
     "spikeScore": 1.7302613072582032,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791291943396,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-IMX-20261006T112500Z",
@@ -121,7 +121,10 @@
       "qty": 3041.39,
       "fillPrice": 0.18476699604457172,
       "buyOrderId": "C02__736119789054808065036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736141071305641985036",
+      "exitFillPrice": 0.18318454877539547,
+      "closedAt": 1791291944777
     },
     "entrySnapshot": {
       "at": 1791286870675,
@@ -153,20 +156,20 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 54 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
-      "fallingKnifeScore": 51,
-      "thesisDrop": 36,
-      "confidenceDecay": 33,
-      "exitProbability": 54,
-      "dynamicPositionRisk": 54,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 75 → current 1 (drop 74 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 37,
+      "thesisDrop": 74,
+      "confidenceDecay": 56,
+      "exitProbability": 66,
+      "dynamicPositionRisk": 66,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791291759709
+      "evaluatedAt": 1791291943396
     },
     "highestPnLSeen": -0.14,
     "lastR15": 49.5,
@@ -178,6 +181,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1791291759709
-    }
+    },
+    "exitPrice": 0.1832,
+    "statusChangedAt": 1791291943396
   }
 }
