@@ -26,7 +26,7 @@
     "histSample": 4,
     "caution": true,
     "highestPnLSeen": -0.04,
-    "lastR15": 68.6,
+    "lastR15": 68.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak -0.04% below 0.8% floor — not evaluated yet",
@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791301837503
+      "evaluatedAt": 1791302134975
     }
   },
   "BINANCE:DOGEUSDT": {
@@ -99,7 +99,7 @@
     "entryTriggerStatus": "BREAKOUT",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "highestPnLSeen": 0.25,
-    "lastR15": 54.3,
+    "lastR15": 48.8,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.25% below 0.8% floor — not evaluated yet",
@@ -107,23 +107,23 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791301837503
+      "evaluatedAt": 1791302134975
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 24 below 50 threshold (stale+flat nudge applied, +15)",
-      "fallingKnifeScore": 6,
-      "thesisDrop": 22,
-      "confidenceDecay": 25,
-      "exitProbability": 24,
-      "dynamicPositionRisk": 24,
+      "reason": "dynamicPositionRisk 43 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 30,
+      "thesisDrop": 28,
+      "confidenceDecay": 38,
+      "exitProbability": 43,
+      "dynamicPositionRisk": 43,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791301837503
+      "evaluatedAt": 1791302134975
     }
   },
   "BINANCE:SOLUSDT": {
@@ -152,8 +152,8 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1791294947243,
-      "usdSize": 282.22,
-      "qty": 2.33,
+      "usdSize": 212.37,
+      "qty": 1.754,
       "fillPrice": 121.0778111587983,
       "buyOrderId": "C02__736153667798802432036",
       "qtyEstimated": false
@@ -188,23 +188,23 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 15 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -7,
-      "confidenceDecay": 13,
-      "exitProbability": 15,
-      "dynamicPositionRisk": 15,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 57 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 51,
+      "thesisDrop": 48,
+      "confidenceDecay": 25,
+      "exitProbability": 57,
+      "dynamicPositionRisk": 57,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791301837503
+      "evaluatedAt": 1791302134975
     },
     "highestPnLSeen": 0.65,
-    "lastR15": 54,
+    "lastR15": 49.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.65% below 0.8% floor — not evaluated yet",
@@ -212,8 +212,9 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791301837503
-    }
+      "evaluatedAt": 1791302134975
+    },
+    "piPartialLevel": 1
   },
   "TSX:ETHY.TO": {
     "sym": "TSX:ETHY.TO",
@@ -260,7 +261,7 @@
     "spikeScore": 3.570293119571576,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-APT-20261006T144000Z",
@@ -272,7 +273,11 @@
       "qty": 169.01,
       "fillPrice": 0.8431112478551566,
       "buyOrderId": "C02__736168764252332032036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736183827168186368036",
+      "exitFillPrice": 0.8296000000000001,
+      "closedAt": 1791302138489,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1791298547206,
@@ -329,6 +334,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1791301837503
-    }
+    },
+    "exitPrice": 0.83,
+    "statusChangedAt": 1791302134975
   }
 }
