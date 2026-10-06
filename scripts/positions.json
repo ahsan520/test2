@@ -34,7 +34,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791270959612
+      "evaluatedAt": 1791271239108
     }
   },
   "TSX:ETHY.TO": {
@@ -99,7 +99,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1791270959612
+      "evaluatedAt": 1791271239108
     }
   },
   "NASDAQ:GOOG": {
@@ -137,7 +137,7 @@
       "drawdownFromPeak": 0.3599999999999999,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1791270959612
+      "evaluatedAt": 1791271239108
     },
     "prevPnLPct": 1.03
   },
@@ -184,9 +184,9 @@
     "t2": 0.2069,
     "score": 5,
     "spikeScore": 3.7968505644559145,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791271239108,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st15_priority_v1",
     "scoreSource": "st15_cross",
     "st15EventId": "ST15-IMX-20261006T061500Z",
@@ -198,7 +198,10 @@
       "qty": 2531.09,
       "fillPrice": 0.18571000000000001,
       "buyOrderId": "C02__736044184758079488036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736054230766288897036",
+      "exitFillPrice": 0.18369,
+      "closedAt": 1791271240403
     },
     "entrySnapshot": {
       "at": 1791268845178,
@@ -230,20 +233,20 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "ST15_CROSS_UP",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 20 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 44,
-      "confidenceDecay": 25,
-      "exitProbability": 20,
-      "dynamicPositionRisk": 20,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 76 → current 12 (drop 64 > 60)",
+      "fallingKnifeScore": 46,
+      "thesisDrop": 64,
+      "confidenceDecay": 38,
+      "exitProbability": 51,
+      "dynamicPositionRisk": 31,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 5
+        "sustainedMin": 10
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791270959612
+      "evaluatedAt": 1791271239108
     },
     "highestPnLSeen": -0.11,
     "lastR15": 57,
@@ -255,6 +258,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1791270959612
-    }
+    },
+    "exitPrice": 0.184,
+    "statusChangedAt": 1791271239108
   }
 }
