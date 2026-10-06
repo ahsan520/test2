@@ -356,10 +356,10 @@ jobs:
           # Late-retest cap and retest sizing (0 / 1 disable) — see st-entry-gate.js
           ST_RETEST_MAX_AGE_MIN:          ${{ vars.ST_RETEST_MAX_AGE_MIN || '15' }}
           ST_RETEST_SIZE_MULT:            ${{ vars.ST_RETEST_SIZE_MULT || '0.5' }}
-          # Spike-breakout exception (OFF by default). When true, a cross with a confirmed
+          # Spike-breakout exception (ON by default since 2026-10-05; set ST_BO_ENABLE=false to disable). When true, a cross with a confirmed
           # range breakout + volume expansion + rising CVD may pass the RSI-overextension
           # skip and the EXHAUSTED wait-for-retest, at reduced size. See st-entry-gate.js.
-          ST_BO_ENABLE:                   ${{ vars.ST_BO_ENABLE || 'false' }}
+          ST_BO_ENABLE:                   ${{ vars.ST_BO_ENABLE || 'true' }}
           ST_BO_SIZE_MULT:                ${{ vars.ST_BO_SIZE_MULT || '0.5' }}
           ST_BO_MAX_ATR:                  ${{ vars.ST_BO_MAX_ATR || '4.5' }}
           ST_BO_MAX_RSI15:                ${{ vars.ST_BO_MAX_RSI15 || '84' }}
@@ -478,6 +478,11 @@ jobs:
           SELL_PROFIT_TIER_APLUS_GIVEBACK: ${{ vars.SELL_PROFIT_TIER_APLUS_GIVEBACK || '0.75' }}
           SELL_PROFIT_LOCK_PEAK:            ${{ vars.SELL_PROFIT_LOCK_PEAK || '1.0' }}
           SELL_PROFIT_LOCK_FLOOR:           ${{ vars.SELL_PROFIT_LOCK_FLOOR || '0.2' }}
+          # Unconditional trailing stop (profit-intelligence.js): exit when price falls
+          # max(MIN_PCT, FRAC x peak) below the peak, no momentum/regime conditions.
+          SELL_PROFIT_TRAIL_ENABLE:         ${{ vars.SELL_PROFIT_TRAIL_ENABLE || 'true' }}
+          SELL_PROFIT_TRAIL_MIN_PCT:        ${{ vars.SELL_PROFIT_TRAIL_MIN_PCT || '0.5' }}
+          SELL_PROFIT_TRAIL_FRAC:           ${{ vars.SELL_PROFIT_TRAIL_FRAC || '0.35' }}
           # Stale live-position timeout. LB_STALE_LIVE_HRS was not previously passed
           # through the workflow, so a repo variable of that name had no effect.
           LB_STALE_LIVE_HRS:                ${{ vars.LB_STALE_LIVE_HRS || '3' }}
