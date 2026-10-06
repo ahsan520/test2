@@ -141,14 +141,17 @@ const BO_MAX_RSI15 = num('ST_BO_MAX_RSI15', '84');
 
 export function checkSpikeBreakout({ entry, event, tf = '5' }) {
   if (!ST_BO_ENABLE) return { ok: false, disabled: true, failed: [], snapshot: null };
-  const st = tf === '15'
-    ? (event?.st15AtCross || entry?.supertrend15m)
-    : (event?.st5AtCross  || entry?.supertrend5m);
+  // The event's *AtCross snapshot only carries distanceATR/extensionZone (no
+  // consolidation data), so range-breakout state comes from the live per-timeframe
+  // supertrend block, and the distance from the snapshot when present.
+  const live    = tf === '15' ? entry?.supertrend15m : entry?.supertrend5m;
+  const atCross = tf === '15' ? event?.st15AtCross   : event?.st5AtCross;
+  const st = { distanceATR: atCross?.distanceATR ?? live?.distanceATR, consolidation: live?.consolidation };
   const failed = [];
 
   const breakout = entry?.triggerStatus === 'BREAKOUT'
     || entry?.breakoutConfirmed === true
-    || st?.consolidation?.breakout === true;
+    || st.consolidation?.breakout === true;
   if (!breakout) failed.push('no confirmed breakout from a range');
   if (entry?.bullChecks?.volExpansion !== true) failed.push('no volume expansion');
   if (entry?.d?.cvdTrend !== 'up') failed.push('CVD not rising');

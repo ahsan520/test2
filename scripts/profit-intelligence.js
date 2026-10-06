@@ -57,6 +57,18 @@ const RUNNER_MIN_PCT     = parseFloat(process.env.SELL_PROFIT_RUNNER_MIN_PCT || 
 // for the momentum-weakness confirmation (which tends to arrive only after
 // the price has already fallen through breakeven). LOCK_FLOOR should clear
 // the round-trip fee + slippage.
+// Trailing stop (added after the 2026-10-05 review). The give-back rule below needs
+// BOTH a drawdown and confirmed weak momentum, and in RISK_ON / broad-breadth tape
+// it also doubles the tolerated drawdown (SELL_PROFIT_REGIME_GIVEBACK_MULT=2.0), so
+// winners gave back close to or over 1% before exiting: XRP peak +1.41% -> +0.49%,
+// DOGE +1.08% -> +0.12%, SUI +0.96% -> -0.44%. This trail has no momentum condition
+// and no regime widening: once the peak has cleared the profit floor, exit when price
+// falls max(TRAIL_MIN_PCT, TRAIL_FRAC x peak) below the peak. The fraction gives big
+// runners more room (peak +3% tolerates about 1.05%). It cannot beat the check cadence:
+// a dip that starts and finishes between two runs is only seen at the next run.
+const TRAIL_ENABLED  = (process.env.SELL_PROFIT_TRAIL_ENABLE ?? 'true') !== 'false';
+const TRAIL_MIN_PCT  = parseFloat(process.env.SELL_PROFIT_TRAIL_MIN_PCT || '0.5');
+const TRAIL_FRAC     = parseFloat(process.env.SELL_PROFIT_TRAIL_FRAC    || '0.35');
 const LOCK_PEAK  = parseFloat(process.env.SELL_PROFIT_LOCK_PEAK  || '1.0');
 const LOCK_FLOOR = parseFloat(process.env.SELL_PROFIT_LOCK_FLOOR || '0.2');
 
@@ -188,6 +200,21 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
       highestPnLSeen, drawdownFromPeak: highestPnLSeen - pnlPct, tier: 'LOCK', giveBack: highestPnLSeen - LOCK_FLOOR,
       regimeMult: 1, momentum: null, strongContinuation: false,
     };
+  }
+
+  // ── Step 2c: trailing stop — unconditional once the peak has cleared the floor. ──
+  if (TRAIL_ENABLED) {
+    const trailDist = Math.max(TRAIL_MIN_PCT, TRAIL_FRAC * highestPnLSeen);
+    const dd = highestPnLSeen - pnlPct;
+    if (dd + 1e-9 >= trailDist) {   // epsilon: 0.96 - 0.46 must count as 0.50, not 0.4999999
+      pos.prevPnLPct = pnlPct;
+      return {
+        action: 'EXIT',
+        reason: `Profit Protection Triggered: trailing stop — peak +${highestPnLSeen.toFixed(2)}% fell ${dd.toFixed(2)}% to +${pnlPct.toFixed(2)}% (≥ ${trailDist.toFixed(2)}% trail)`,
+        highestPnLSeen, drawdownFromPeak: dd, tier: 'TRAIL', giveBack: trailDist,
+        regimeMult: 1, momentum: null, strongContinuation: false,
+      };
+    }
   }
 
   // ── Step 3: drawdown from peak ──
