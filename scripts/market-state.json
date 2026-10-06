@@ -1,24 +1,24 @@
 {
-  "fetchedAt": 1791307526355,
+  "fetchedAt": 1791307869077,
   "btcRiskScore": 8,
   "btcRiskBand": "LOW RISK",
   "btcRiskAction": "buy",
-  "marketRegime": "NEUTRAL",
+  "marketRegime": "RISK_OFF",
   "breadth": {
-    "score": 45,
-    "bullCount": 9,
+    "score": 30,
+    "bullCount": 6,
     "total": 20
   },
   "breadthMomentum": {
-    "delta": 10,
-    "trend": "ACCELERATING"
+    "delta": -15,
+    "trend": "FADING"
   },
   "buyStatus": {
-    "status": "OPEN",
-    "canBuyNormally": true,
-    "reason": null,
+    "status": "CONDITIONAL",
+    "canBuyNormally": false,
+    "reason": "Breadth 30% < required 45%",
     "btcRiskGate": "PASS",
-    "breadthGate": "PASS"
+    "breadthGate": "FAIL"
   },
   "config": {
     "BUY_MIN_BREADTH": "45",
@@ -32,14 +32,6 @@
   "symbols": {
     "AAVEUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 180.05,
-          "whale": 37,
-          "fr": 0.00362458669269,
-          "cvd": "down",
-          "conv": -7
-        },
         {
           "t": 1791306956929,
           "price": 179.83,
@@ -63,36 +55,36 @@
           "fr": 0.0034637968537799997,
           "cvd": "down",
           "conv": -8
+        },
+        {
+          "t": 1791307869077,
+          "price": 179.84,
+          "whale": 22,
+          "fr": 0.00359534639844,
+          "cvd": "down",
+          "conv": -8
         }
       ],
-      "momentumSlope": 0.06,
-      "momentumTrend": "ACCELERATING",
+      "momentumSlope": 0.005,
+      "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00006,
-        "trend": "FLAT",
+        "momentum": 0.00011,
+        "trend": "ACCELERATING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -30,
-        "trend": "FADING"
+        "delta": 15,
+        "trend": "ACCELERATING"
       },
-      "setupPersistence": 1,
-      "updatedAt": 1791307526355
+      "setupPersistence": 0,
+      "updatedAt": 1791307869077
     },
     "APTUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.8234,
-          "whale": 15,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -3
-        },
         {
           "t": 1791306956929,
           "price": 0.8228,
@@ -116,9 +108,17 @@
           "fr": 0.01,
           "cvd": "down",
           "conv": 1
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.8242,
+          "whale": 7,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -2
         }
       ],
-      "momentumSlope": 0.1468,
+      "momentumSlope": 0.0813,
       "momentumTrend": "ACCELERATING",
       "cvdMomentum": {
         "streak": 4,
@@ -130,22 +130,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 22,
+        "delta": 0,
         "trend": "ACCELERATING"
       },
-      "setupPersistence": 302,
-      "updatedAt": 1791307526355
+      "setupPersistence": 303,
+      "updatedAt": 1791307869077
     },
     "AVAXUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 11.502,
-          "whale": 37,
-          "fr": 0.0065148290915200005,
-          "cvd": "down",
-          "conv": 2
-        },
         {
           "t": 1791306956929,
           "price": 11.465,
@@ -169,36 +161,36 @@
           "fr": 0.0064151379664400005,
           "cvd": "down",
           "conv": 3
+        },
+        {
+          "t": 1791307869077,
+          "price": 11.461,
+          "whale": 37,
+          "fr": 0.00641028110156,
+          "cvd": "down",
+          "conv": 3
         }
       ],
-      "momentumSlope": -0.0174,
+      "momentumSlope": 0.0044,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00005,
-        "trend": "FLAT",
+        "momentum": -0.00011,
+        "trend": "FADING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 0,
+        "delta": 15,
         "trend": "ACCELERATING"
       },
-      "setupPersistence": 268,
-      "updatedAt": 1791307526355
+      "setupPersistence": 269,
+      "updatedAt": 1791307869077
     },
     "BTCUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 85618.48,
-          "whale": 7,
-          "fr": 0.00316487052694,
-          "cvd": "down",
-          "conv": -4
-        },
         {
           "t": 1791306956929,
           "price": 85535.74,
@@ -222,16 +214,24 @@
           "fr": 0.00328211533105,
           "cvd": "down",
           "conv": -1
+        },
+        {
+          "t": 1791307869077,
+          "price": 85560.11,
+          "whale": 37,
+          "fr": 0.00332024622878,
+          "cvd": "down",
+          "conv": 0
         }
       ],
-      "momentumSlope": -0.0253,
+      "momentumSlope": 0.0157,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": 0.00004,
+        "momentum": 0.00005,
         "trend": "FLAT",
         "proxy": true
       },
@@ -239,19 +239,11 @@
         "delta": 30,
         "trend": "ACCELERATING"
       },
-      "setupPersistence": 1,
-      "updatedAt": 1791307526355
+      "setupPersistence": 2,
+      "updatedAt": 1791307869077
     },
     "DOGEUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.09499,
-          "whale": 14,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -2
-        },
         {
           "t": 1791306956929,
           "price": 0.0949,
@@ -275,10 +267,18 @@
           "fr": 0.01,
           "cvd": "down",
           "conv": -2
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.09459,
+          "whale": 30,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -9
         }
       ],
-      "momentumSlope": -0.0042,
-      "momentumTrend": "FLAT",
+      "momentumSlope": -0.0928,
+      "momentumTrend": "FADING",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
@@ -289,22 +289,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 16,
-        "trend": "ACCELERATING"
+        "delta": 0,
+        "trend": "FADING"
       },
-      "setupPersistence": 105,
-      "updatedAt": 1791307526355
+      "setupPersistence": 0,
+      "updatedAt": 1791307869077
     },
     "ETHUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 2697.46,
-          "whale": 7,
-          "fr": 0.00441493731078,
-          "cvd": "down",
-          "conv": -12
-        },
         {
           "t": 1791306956929,
           "price": 2694.99,
@@ -328,36 +320,36 @@
           "fr": 0.00513394267527,
           "cvd": "down",
           "conv": -7
+        },
+        {
+          "t": 1791307869077,
+          "price": 2695.14,
+          "whale": 14,
+          "fr": 0.00538092838641,
+          "cvd": "down",
+          "conv": -10
         }
       ],
-      "momentumSlope": -0.0223,
+      "momentumSlope": 0.0048,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": 0.00024,
+        "momentum": 0.00025,
         "trend": "ACCELERATING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 30,
+        "delta": 7,
         "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "FETUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.2441,
-          "whale": 14,
-          "fr": 0.005,
-          "cvd": "down",
-          "conv": -8
-        },
         {
           "t": 1791306956929,
           "price": 0.2438,
@@ -381,9 +373,17 @@
           "fr": 0.005,
           "cvd": "down",
           "conv": -10
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.2437,
+          "whale": 22,
+          "fr": 0.005,
+          "cvd": "down",
+          "conv": -8
         }
       ],
-      "momentumSlope": 0.0328,
+      "momentumSlope": -0.0164,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
@@ -395,22 +395,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 0,
-        "trend": "FADING"
+        "delta": 8,
+        "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "GALAUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.002479,
-          "whale": 22,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -6
-        },
         {
           "t": 1791306956929,
           "price": 0.002477,
@@ -434,13 +426,21 @@
           "fr": 0.01,
           "cvd": "up",
           "conv": -2
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.002464,
+          "whale": 14,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -6
         }
       ],
-      "momentumSlope": 0.0806,
-      "momentumTrend": "ACCELERATING",
+      "momentumSlope": -0.1816,
+      "momentumTrend": "FADING",
       "cvdMomentum": {
-        "streak": 3,
-        "trend": "ACCELERATING"
+        "streak": 1,
+        "trend": "FADING"
       },
       "oiMomentum": {
         "momentum": 0,
@@ -448,22 +448,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 48,
-        "trend": "ACCELERATING"
+        "delta": -56,
+        "trend": "FADING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "IMXUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.1807,
-          "whale": 60,
-          "fr": -0.00401831894679,
-          "cvd": "down",
-          "conv": -4
-        },
         {
           "t": 1791306956929,
           "price": 0.1805,
@@ -487,36 +479,36 @@
           "fr": -0.00554569767227,
           "cvd": "down",
           "conv": -6
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.1806,
+          "whale": 37,
+          "fr": -0.00462635518982,
+          "cvd": "down",
+          "conv": -4
         }
       ],
-      "momentumSlope": 0.0387,
+      "momentumSlope": 0.0111,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00048,
-        "trend": "FADING",
+        "momentum": 0.00042,
+        "trend": "ACCELERATING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -23,
-        "trend": "FADING"
+        "delta": 0,
+        "trend": "FLAT"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "LINKUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 13.863,
-          "whale": 37,
-          "fr": 0.00243099802974,
-          "cvd": "down",
-          "conv": -5
-        },
         {
           "t": 1791306956929,
           "price": 13.858,
@@ -540,36 +532,36 @@
           "fr": 0.0022812786950400002,
           "cvd": "down",
           "conv": -6
+        },
+        {
+          "t": 1791307869077,
+          "price": 13.887,
+          "whale": 37,
+          "fr": 0.0023181919532800003,
+          "cvd": "down",
+          "conv": -4
         }
       ],
-      "momentumSlope": 0.0692,
+      "momentumSlope": 0.0721,
       "momentumTrend": "ACCELERATING",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00005,
+        "momentum": 0,
         "trend": "FLAT",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 0,
+        "delta": 30,
         "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "NEARUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 5.053,
-          "whale": 45,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": 2
-        },
         {
           "t": 1791306956929,
           "price": 5.046,
@@ -593,9 +585,17 @@
           "fr": 0.01,
           "cvd": "down",
           "conv": -9
+        },
+        {
+          "t": 1791307869077,
+          "price": 5.03,
+          "whale": 14,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -6
         }
       ],
-      "momentumSlope": -0.0575,
+      "momentumSlope": -0.0952,
       "momentumTrend": "FADING",
       "cvdMomentum": {
         "streak": 4,
@@ -607,22 +607,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -31,
+        "delta": -16,
         "trend": "FADING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "RENDERUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 2.156,
-          "whale": 30,
-          "fr": 0.005,
-          "cvd": "down",
-          "conv": 1
-        },
         {
           "t": 1791306956929,
           "price": 2.152,
@@ -646,12 +638,20 @@
           "fr": 0.005,
           "cvd": "up",
           "conv": 6
+        },
+        {
+          "t": 1791307869077,
+          "price": 2.178,
+          "whale": 70,
+          "fr": 0.005,
+          "cvd": "up",
+          "conv": 7
         }
       ],
-      "momentumSlope": 0.2223,
+      "momentumSlope": 0.4158,
       "momentumTrend": "ACCELERATING",
       "cvdMomentum": {
-        "streak": 3,
+        "streak": 4,
         "trend": "ACCELERATING"
       },
       "oiMomentum": {
@@ -660,22 +660,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 40,
+        "delta": 0,
         "trend": "ACCELERATING"
       },
-      "setupPersistence": 313,
-      "updatedAt": 1791307526355
+      "setupPersistence": 314,
+      "updatedAt": 1791307869077
     },
     "SOLUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 120.38,
-          "whale": 37,
-          "fr": 0.0017625490384399999,
-          "cvd": "down",
-          "conv": -1
-        },
         {
           "t": 1791306956929,
           "price": 120.3,
@@ -699,36 +691,36 @@
           "fr": 0.0017324725036,
           "cvd": "down",
           "conv": -10
+        },
+        {
+          "t": 1791307869077,
+          "price": 120.31,
+          "whale": 37,
+          "fr": 0.00177200147515,
+          "cvd": "down",
+          "conv": -4
         }
       ],
-      "momentumSlope": -0.0208,
+      "momentumSlope": 0.01,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00001,
+        "momentum": 0.00004,
         "trend": "FLAT",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -30,
-        "trend": "FADING"
+        "delta": 23,
+        "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "SUIUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 1.1845,
-          "whale": 30,
-          "fr": -0.0031690646487800003,
-          "cvd": "down",
-          "conv": -7
-        },
         {
           "t": 1791306956929,
           "price": 1.184,
@@ -752,36 +744,36 @@
           "fr": -0.00478350088413,
           "cvd": "down",
           "conv": -5
+        },
+        {
+          "t": 1791307869077,
+          "price": 1.1832,
+          "whale": 22,
+          "fr": -0.00511556384918,
+          "cvd": "down",
+          "conv": -7
         }
       ],
-      "momentumSlope": 0.0574,
-      "momentumTrend": "ACCELERATING",
+      "momentumSlope": -0.0059,
+      "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00053,
+        "momentum": -0.00049,
         "trend": "FADING",
         "proxy": true
       },
       "whaleMomentum": {
         "delta": 0,
-        "trend": "ACCELERATING"
+        "trend": "FLAT"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "TAOUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 302.6,
-          "whale": 22,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -7
-        },
         {
           "t": 1791306956929,
           "price": 302.4,
@@ -805,13 +797,21 @@
           "fr": 0.01,
           "cvd": "up",
           "conv": 2
+        },
+        {
+          "t": 1791307869077,
+          "price": 302.2,
+          "whale": 37,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -3
         }
       ],
-      "momentumSlope": 0.0694,
-      "momentumTrend": "ACCELERATING",
+      "momentumSlope": -0.0033,
+      "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 1,
-        "trend": "ACCELERATING"
+        "trend": "FADING"
       },
       "oiMomentum": {
         "momentum": 0,
@@ -819,22 +819,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 48,
+        "delta": 7,
         "trend": "ACCELERATING"
       },
-      "setupPersistence": 1,
-      "updatedAt": 1791307526355
+      "setupPersistence": 0,
+      "updatedAt": 1791307869077
     },
     "UNIUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 8.598,
-          "whale": 7,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -13
-        },
         {
           "t": 1791306956929,
           "price": 8.62,
@@ -858,10 +850,18 @@
           "fr": 0.01,
           "cvd": "down",
           "conv": -15
+        },
+        {
+          "t": 1791307869077,
+          "price": 8.613,
+          "whale": 14,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -11
         }
       ],
-      "momentumSlope": 0.1438,
-      "momentumTrend": "ACCELERATING",
+      "momentumSlope": -0.0267,
+      "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
@@ -872,22 +872,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 0,
-        "trend": "FLAT"
+        "delta": 7,
+        "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "XLMUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 0.2135,
-          "whale": 56,
-          "fr": -0.006348157337750001,
-          "cvd": "down",
-          "conv": -5
-        },
         {
           "t": 1791306956929,
           "price": 0.2135,
@@ -911,36 +903,36 @@
           "fr": -0.006434599463860001,
           "cvd": "down",
           "conv": -4
+        },
+        {
+          "t": 1791307869077,
+          "price": 0.2132,
+          "whale": 48,
+          "fr": -0.00635485174668,
+          "cvd": "down",
+          "conv": -3
         }
       ],
-      "momentumSlope": -0.0234,
+      "momentumSlope": -0.0375,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": -0.00002,
-        "trend": "FLAT",
+        "momentum": 0.00012,
+        "trend": "ACCELERATING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -1,
-        "trend": "FADING"
+        "delta": 0,
+        "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "XMRUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 559.88,
-          "whale": 58,
-          "fr": -1.6600409490624815,
-          "cvd": "down",
-          "conv": 5
-        },
         {
           "t": 1791306956929,
           "price": 558.71,
@@ -964,9 +956,17 @@
           "fr": -1.6600409490624815,
           "cvd": "down",
           "conv": 3
+        },
+        {
+          "t": 1791307869077,
+          "price": 559.51,
+          "whale": 22,
+          "fr": -1.6600409490624815,
+          "cvd": "down",
+          "conv": -1
         }
       ],
-      "momentumSlope": 0.0023,
+      "momentumSlope": 0.0365,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
@@ -978,22 +978,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 10,
-        "trend": "ACCELERATING"
+        "delta": -15,
+        "trend": "FADING"
       },
-      "setupPersistence": 380,
-      "updatedAt": 1791307526355
+      "setupPersistence": 381,
+      "updatedAt": 1791307869077
     },
     "XRPUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 1.5025,
-          "whale": 37,
-          "fr": 0.01,
-          "cvd": "down",
-          "conv": -4
-        },
         {
           "t": 1791306956929,
           "price": 1.5006,
@@ -1017,9 +1009,17 @@
           "fr": 0.01,
           "cvd": "down",
           "conv": -6
+        },
+        {
+          "t": 1791307869077,
+          "price": 1.5009,
+          "whale": 37,
+          "fr": 0.01,
+          "cvd": "down",
+          "conv": -4
         }
       ],
-      "momentumSlope": -0.024,
+      "momentumSlope": 0.0187,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
@@ -1031,22 +1031,14 @@
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": 0,
+        "delta": 30,
         "trend": "ACCELERATING"
       },
       "setupPersistence": 0,
-      "updatedAt": 1791307526355
+      "updatedAt": 1791307869077
     },
     "ZECUSDT": {
       "history": [
-        {
-          "t": 1791306643663,
-          "price": 1342.55,
-          "whale": 40,
-          "fr": -0.00613292472107,
-          "cvd": "down",
-          "conv": -1
-        },
         {
           "t": 1791306956929,
           "price": 1343.82,
@@ -1070,25 +1062,33 @@
           "fr": -0.00490672116025,
           "cvd": "down",
           "conv": -2
+        },
+        {
+          "t": 1791307869077,
+          "price": 1344.46,
+          "whale": 55,
+          "fr": -0.00476525639786,
+          "cvd": "down",
+          "conv": 4
         }
       ],
-      "momentumSlope": 0.006,
+      "momentumSlope": 0.017,
       "momentumTrend": "FLAT",
       "cvdMomentum": {
         "streak": 4,
         "trend": "FADING"
       },
       "oiMomentum": {
-        "momentum": 0.0004,
+        "momentum": 0.00034,
         "trend": "ACCELERATING",
         "proxy": true
       },
       "whaleMomentum": {
-        "delta": -8,
-        "trend": "FADING"
+        "delta": 0,
+        "trend": "FLAT"
       },
-      "setupPersistence": 128,
-      "updatedAt": 1791307526355
+      "setupPersistence": 129,
+      "updatedAt": 1791307869077
     }
   }
 }
