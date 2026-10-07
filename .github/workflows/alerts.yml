@@ -356,10 +356,11 @@ jobs:
           # Late-retest cap and retest sizing (0 / 1 disable) — see st-entry-gate.js
           ST_RETEST_MAX_AGE_MIN:          ${{ vars.ST_RETEST_MAX_AGE_MIN || '15' }}
           ST_RETEST_SIZE_MULT:            ${{ vars.ST_RETEST_SIZE_MULT || '0.5' }}
-          # Spike-breakout exception (ON by default since 2026-10-05; set ST_BO_ENABLE=false to disable). When true, a cross with a confirmed
+          # Spike-breakout exception. ST_BO_MODE: off | log (shadow, default: records what it would
+          # have done, buys nothing extra) | live (actually relaxes the overextension / exhausted gates). When true, a cross with a confirmed
           # range breakout + volume expansion + rising CVD may pass the RSI-overextension
           # skip and the EXHAUSTED wait-for-retest, at reduced size. See st-entry-gate.js.
-          ST_BO_ENABLE:                   ${{ vars.ST_BO_ENABLE || 'true' }}
+          ST_BO_MODE:                     ${{ vars.ST_BO_MODE || 'log' }}
           ST_BO_SIZE_MULT:                ${{ vars.ST_BO_SIZE_MULT || '0.5' }}
           ST_BO_MAX_ATR:                  ${{ vars.ST_BO_MAX_ATR || '4.5' }}
           ST_BO_MAX_RSI15:                ${{ vars.ST_BO_MAX_RSI15 || '84' }}
