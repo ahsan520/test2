@@ -16,6 +16,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { mexcMarketSell, mexcFreeBalance, mexcGetAllBalances, getBaseSizePrecision, floorToStep, mexcGetOrderStatus, mexcCancelOrder } from './mexc-client.js';
+import { sellWithScaleRetry } from './partial-sell-retry.js';
 import {
   logAudit, loadCvdState, saveCvdState, TERMINAL_EVICT_MS, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeClose, recordTradePartialExit, pushTradeLogToGitHub,
@@ -536,7 +537,7 @@ export async function closeLiveOrderPartial(pos, pct, reason, currentPrice, tele
       mexcFreeBalance(MEXC_API_KEY, MEXC_API_SECRET, pos.base, true),
     ]);
     const free = typeof bal === 'object' ? bal.free : bal;
-    const sellQty = floorToStep(free * pct, step);
+    let sellQty = floorToStep(free * pct, step);
 
     const refPrice          = parseFloat(currentPrice || pos.entryPrice || 0);
     const sellNotional      = sellQty * refPrice;
@@ -555,7 +556,14 @@ export async function closeLiveOrderPartial(pos, pct, reason, currentPrice, tele
       return { executed: false, reason: 'remainder_would_be_dust', escalateToFullClose: true };
     }
 
-    const sell = await mexcMarketSell(MEXC_API_KEY, MEXC_API_SECRET, symbol, sellQty);
+    // Retries with coarser precision if MEXC answers "quantity scale is invalid" (see partial-sell-retry.js).
+    const retried = await sellWithScaleRetry({
+      sellFn: (q) => mexcMarketSell(MEXC_API_KEY, MEXC_API_SECRET, symbol, q),
+      free, pct, step, firstQty: sellQty, refPrice, minNotional: MIN_SELL_NOTIONAL_USDT,
+      onRetry: (info) => logAudit('mexc_partial_sell_scale_retry', { sym: symbol, reason, ...info }),
+    });
+    const sell = retried.sell;
+    sellQty = retried.qty;
     pos.liveOrder.qty     = parseFloat((free - sellQty).toFixed(8));
     pos.liveOrder.usdSize = parseFloat((pos.liveOrder.qty * (pos.entryPrice || sell.fillPrice)).toFixed(2));
     telegramAlerts.push(`🟡 *PARTIAL SELL* — sold ${sellQty} ${pos.base} (${Math.round(pct * 100)}%) @ $${sell.fillPrice.toFixed(6)} on MEXC (${reason}) — ${pos.liveOrder.qty} ${pos.base} remains open.`);

@@ -297,6 +297,10 @@ export function recordTradeClose(pos, reason, sell = {}) {
   entry.pnlPct      = (entry.buyPrice && entry.sellPrice)
     ? parseFloat(((entry.sellPrice - entry.buyPrice) / entry.buyPrice * 100).toFixed(2))
     : null;
+  // Worst unrealized P&L while open (max adverse excursion), capped by the final P&L so a
+  // stop hit that gapped through the last check is still counted. For stop-loss tuning.
+  entry.troughPct   = (pos.lowestPnLSeen != null && isFinite(pos.lowestPnLSeen))
+    ? parseFloat(Math.min(pos.lowestPnLSeen, entry.pnlPct ?? pos.lowestPnLSeen).toFixed(2)) : null;
 
   saveTradeLog(log);
   return log;

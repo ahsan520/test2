@@ -839,7 +839,7 @@ export async function executeSTPriorityRotation({
         await sendTelegram(`⚡ *ST15 CROSS — ${base}* — overextended (${st15Ext.reason}) but a confirmed spike breakout (volume + CVD up, ${st15Spike.snapshot.distanceATR ?? '?'} ATR) — buying at ${ST_BO_SIZE_MULT * 100}% size with the wider stop.`);
       } else if (!ST_ALLOW_OVEREXTENDED_BUY) {
         event.status = 'SKIPPED_OVEREXTENDED';
-        logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st15Spike.disabled ? null : st15Spike.failed });
+        logAudit('st15_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st15Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st15Spike.disabled ? null : st15Spike.failed, spikeWouldPass: st15Spike.disabled ? null : st15Spike.wouldPass });
         await sendTelegram(`🚫 *ST15 CROSS — ${base}* — skipped, already overextended (${st15Ext.reason}). Event marked handled, no positions touched.`);
         continue;
       }
@@ -917,7 +917,7 @@ export async function executeSTPriorityRotation({
         });
         if (st15LiveCheck.waitRetest) {
           event.status = 'PENDING';
-          logAudit('st15_wait_retest', { pair, id: event.id, reason: st15LiveCheck.reason });
+          logAudit('st15_wait_retest', { pair, id: event.id, reason: st15LiveCheck.reason, spikeWouldPass: st15Spike.disabled ? null : st15Spike.wouldPass });
           continue;
         }
         logAudit('st15_retest_confirmed', { pair, id: event.id, reason: st15LiveCheck.reason });
@@ -1482,7 +1482,7 @@ export async function executeST5PriorityRotation({
         await sendTelegram(`⚡ *ST5 CROSS — ${base}* — overextended (${st5Ext.reason}) but a confirmed spike breakout (volume + CVD up, ${st5Spike.snapshot.distanceATR ?? '?'} ATR) — buying at ${ST_BO_SIZE_MULT * 100}% size with the wider stop.`);
       } else if (!ST_ALLOW_OVEREXTENDED_BUY) {
         event.status = 'SKIPPED_OVEREXTENDED';
-        logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st5Spike.disabled ? null : st5Spike.failed });
+        logAudit('st5_skipped_overextended', { pair, id: event.id, r15: entry?.d?.r15, r1h: entry?.d?.r1h, reason: st5Ext.reason, close: event.close ?? null, price: entry?.price ?? null, spikeFailed: st5Spike.disabled ? null : st5Spike.failed, spikeWouldPass: st5Spike.disabled ? null : st5Spike.wouldPass });
         await sendTelegram(`🚫 *ST5 CROSS — ${base}* — skipped, already overextended (${st5Ext.reason}). Event marked handled, no positions touched.`);
         continue;
       }
@@ -1542,7 +1542,7 @@ export async function executeST5PriorityRotation({
         });
         if (st5LiveCheck.waitRetest) {
           event.status = 'PENDING';
-          logAudit('st5_wait_retest', { pair, id: event.id, reason: st5LiveCheck.reason });
+          logAudit('st5_wait_retest', { pair, id: event.id, reason: st5LiveCheck.reason, spikeWouldPass: st5Spike.disabled ? null : st5Spike.wouldPass });
           continue;
         }
         logAudit('st5_retest_confirmed', { pair, id: event.id, reason: st5LiveCheck.reason });

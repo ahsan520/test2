@@ -67,14 +67,18 @@ def load_events(paths):
             ts = parse_ts(r["timestamp"])
             cur = by_key.get(key)
             if cur is None:
-                by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts}
+                cur = by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts, "spike": False}
             else:
                 cur["ts"] = min(cur["ts"], ts)                       # decision moment = earliest
                 if ts >= cur["_last"]:
                     cur["action"], cur["_last"] = a, ts              # label = terminal state
+            if r.get("spikeWouldPass") is True:                      # shadow verdict of the spike exception
+                cur["spike"] = True
     out = list(by_key.values())
     for e in out:
         e.pop("_last", None)
+        if e.pop("spike", False) and e["action"] in SKIP_ACTIONS:
+            e["action"] += " [spike-pass]"      # skipped crosses the spike exception WOULD have allowed
     return sorted(out, key=lambda e: e["ts"])
 
 

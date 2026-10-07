@@ -134,13 +134,17 @@ export function buildEntryContext({ entry, market, marketState }) {
 // Such buys are sized down (ST_BO_SIZE_MULT) and use the wider overextended
 // stop. Unproven on live data: keep disabled until the entry-context log
 // (or missed_signal_check.py) shows these entries pay.
-export const ST_BO_ENABLE    = (process.env.ST_BO_ENABLE ?? 'false') === 'true';
+// ST_BO_MODE: 'off' = ignore; 'log' = evaluate and record spikeWouldPass in the audit log
+// but NEVER relax a gate (shadow mode); 'live' = actually let a confirmed spike through.
+// Default is 'log' (2026-10-06): the first 9 live spike entries went 2 wins / 7 losses, -$29 gross.
+export const ST_BO_MODE      = (process.env.ST_BO_MODE || 'log').toLowerCase();
+export const ST_BO_ENABLE    = ST_BO_MODE === 'live';   // kept so existing imports keep working
 export const ST_BO_SIZE_MULT = num('ST_BO_SIZE_MULT', '0.5');
 const BO_MAX_ATR   = num('ST_BO_MAX_ATR', '4.5');
 const BO_MAX_RSI15 = num('ST_BO_MAX_RSI15', '84');
 
 export function checkSpikeBreakout({ entry, event, tf = '5' }) {
-  if (!ST_BO_ENABLE) return { ok: false, disabled: true, failed: [], snapshot: null };
+  if (ST_BO_MODE === 'off') return { ok: false, wouldPass: false, disabled: true, failed: [], snapshot: null };
   // The event's *AtCross snapshot only carries distanceATR/extensionZone (no
   // consolidation data), so range-breakout state comes from the live per-timeframe
   // supertrend block, and the distance from the snapshot when present.
@@ -164,8 +168,9 @@ export function checkSpikeBreakout({ entry, event, tf = '5' }) {
   if (entry?.conv != null && entry.conv < MIN_CONV) failed.push(`conviction ${entry.conv} < ${MIN_CONV}`);
   if (entry?.signal && BAD_SIGNALS.has(entry.signal)) failed.push(`signal ${entry.signal}`);
 
+  const wouldPass = failed.length === 0;
   return {
-    ok: failed.length === 0, failed,
+    ok: ST_BO_MODE === 'live' && wouldPass, wouldPass, failed,
     snapshot: { breakout, vol: entry?.bullChecks?.volExpansion ?? null, cvd: entry?.d?.cvdTrend ?? null, r15: r15 ?? null, distanceATR: dist ?? null },
   };
 }

@@ -177,6 +177,9 @@ export function evaluateProfitProtection({ pos, symbolState, marketState, r15, p
   const priorHigh       = pos.highestPnLSeen ?? -Infinity;
   const highestPnLSeen  = Math.max(priorHigh, pnlPct);
   pos.highestPnLSeen    = highestPnLSeen;
+  // Worst P&L seen while open (max adverse excursion) — recorded as troughPct in the
+  // trade log so the stop-loss % can be tuned from data instead of guessed.
+  pos.lowestPnLSeen     = Math.min(pos.lowestPnLSeen ?? pnlPct, pnlPct);
 
   const lastR15 = pos.lastR15 ?? null;
   pos.lastR15   = r15 ?? lastR15;
