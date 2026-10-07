@@ -42,9 +42,9 @@
     "t2": 357.47,
     "score": 3,
     "spikeScore": 5.599325639675955,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1791332729291,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-TAO-20261006T220000Z",
@@ -56,7 +56,11 @@
       "qty": 0.898,
       "fillPrice": 306.06220489977727,
       "buyOrderId": "C02__736278249478234112036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__736312140406661121036",
+      "exitFillPrice": 307.51056179775276,
+      "closedAt": 1791332730865,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1791324650580,
@@ -89,31 +93,33 @@
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 3 below 50 threshold",
-      "fallingKnifeScore": 0,
-      "thesisDrop": -10,
+      "reason": "dynamicPositionRisk 9 below 50 threshold",
+      "fallingKnifeScore": 9,
+      "thesisDrop": 7,
       "confidenceDecay": 13,
-      "exitProbability": 3,
-      "dynamicPositionRisk": 3,
+      "exitProbability": 9,
+      "dynamicPositionRisk": 9,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1791332423073
+      "evaluatedAt": 1791332729291
     },
     "highestPnLSeen": 1.12,
-    "lastR15": 63.3,
+    "lastR15": 59.8,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.32% below tier A give-back 0.50%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.12% fell 0.55% to +0.57% (≥ 0.50% trail)",
       "highestPnLSeen": 1.12,
-      "drawdownFromPeak": 0.32000000000000006,
-      "tier": "A",
+      "drawdownFromPeak": 0.5500000000000002,
+      "tier": "TRAIL",
       "giveBack": 0.5,
-      "evaluatedAt": 1791332423073
+      "evaluatedAt": 1791332729291
     },
-    "prevPnLPct": 0.8
+    "prevPnLPct": 0.57,
+    "exitPrice": 307.8,
+    "statusChangedAt": 1791332729291
   }
 }
