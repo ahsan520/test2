@@ -366,6 +366,8 @@ jobs:
           ST_BO_MAX_RSI15:                ${{ vars.ST_BO_MAX_RSI15 || '84' }}
           # Skip ST5/ST15 priority buys sized below this many USDT (dust positions). 0 disables.
           ST_MIN_BUY_USD:                 ${{ vars.ST_MIN_BUY_USD || '100' }}
+          # Setups that raise the buy ALERT but are not auto-bought (comma list, NONE = auto-buy all).
+          LB_LIVE_SKIP_SETUPS:            ${{ vars.LB_LIVE_SKIP_SETUPS || 'BREAKOUT' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
