@@ -299,6 +299,21 @@ function resetPeaks(market) {
 // ════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════
+// ── "Alert only" tag for crypto buy alerts that will NOT be auto-bought ──
+// Mirrors the blocking rules in mexc-trader.js so an alert is never mistaken for a purchase
+// (2026-10-04: a BTC alert looked like a buy but the symbol was on the no-trade list).
+const _NO_TRADE = (process.env.MEXC_NO_TRADE_SYMBOLS || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+const _LIVE_SKIP = new Set((process.env.LB_LIVE_SKIP_SETUPS ?? 'BREAKOUT').split(',')
+  .map(x => x.trim().toUpperCase()).filter(x => x && x !== 'NONE'));
+function alertOnlyReason(a) {
+  if (a.entry?.assetType !== 'crypto') return null;          // stocks are always manual - no tag needed
+  const bare = String(a.pair || '').replace(/^BINANCE:/, '').toUpperCase();
+  if (_NO_TRADE.includes(bare)) return 'this symbol is on the MEXC no-trade list';
+  const label = String(a.evald?.setup?.label || '').toUpperCase();
+  if (_LIVE_SKIP.has(label)) return `${label} setups are not auto-bought`;
+  return null;
+}
+
 async function main() {
   console.log(`\n${'═'.repeat(60)}`);
   console.log(`Leaderboard Decider v11.0 — ${new Date().toUTCString()}`);
@@ -1290,6 +1305,7 @@ async function main() {
     const l          = a.levels;
     const peakNote   = a.evald.source === 'peak' ? ' _(peak)_' : '';
     const assetBadge = a.entry.assetType === 'stock' ? ' 📊' : '';
+    const onlyWhy    = alertOnlyReason(a);
     const sessionTag = a.entry.session !== 'open' && a.entry.session !== '24/7'
       ? ` _(${a.entry.session})_` : '';
     const star       = recommended ? '⭐ ' : '';
@@ -1309,6 +1325,7 @@ async function main() {
       `  Entry $${l?.entry||'—'}  Stop $${l?.stop||'—'}  T1 $${l?.t1||'—'}  T2 $${l?.t2||'—'}  R:R ${l?.rr||'—'}`,
       histLine,
       cautionLine,
+      onlyWhy ? `  👁 Alert only — no auto-buy (${onlyWhy})` : '',
       `  _Pos: ${a.sym}_`,
     ].filter(Boolean).join('\n');
   });

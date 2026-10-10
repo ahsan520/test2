@@ -128,6 +128,14 @@ async function checkBuySlippage(pair, signalPrice, label) {
 const NO_TRADE_SYMBOLS = (process.env.MEXC_NO_TRADE_SYMBOLS || '')
   .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 
+// Setup labels that still raise the Telegram buy alert but are NOT auto-bought with real money.
+// Default 'BREAKOUT' (2026-10-10 review): the leaderboard BREAKOUT setup (EMA above + conviction > 5)
+// went 18 trades, 33% wins, avg -0.40%, -$56 since Sep 1, 6 of them stop-outs, and the second half
+// (-0.66%) was worse than the first (-0.15%). Comma list; set the variable to NONE to auto-buy every setup.
+const LIVE_SKIP_SETUPS = new Set(
+  (process.env.LB_LIVE_SKIP_SETUPS ?? 'BREAKOUT').split(',')
+    .map(x => x.trim().toUpperCase()).filter(x => x && x !== 'NONE'));
+
 function isNoTradeSymbol(pair) {
   const bare = (pair || '').replace(/^BINANCE:/, '').toUpperCase();
   return NO_TRADE_SYMBOLS.includes(bare);
@@ -2351,6 +2359,8 @@ async function executeAutoBuys({
     const blockedReasons = [
       pick.entry?.assetType !== 'crypto' ? `assetType:${pick.entry?.assetType} — MEXC is crypto-only` : null,
       isNoTradeSymbol(pick.pair)         ? `${pick.pair} in MEXC_NO_TRADE_SYMBOLS — alert-only, no auto-buy` : null,
+      LIVE_SKIP_SETUPS.has(String(pick.evald?.setup?.label || '').toUpperCase())
+                                         ? `${pick.evald.setup.label} setup is in LB_LIVE_SKIP_SETUPS — alert-only, no auto-buy` : null,
       pos?.liveOrder                    ? 'liveOrder already set (idempotency guard)' : null,
       liveLock >= effectiveMaxLive      ? `already ${liveLock}/${effectiveMaxLive} live trades open` : null,
     ].filter(Boolean);
