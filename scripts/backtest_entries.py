@@ -284,6 +284,7 @@ def main():
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--synthetic", choices=["null", "plant"], help="self-test on generated candles instead of Binance")
     ap.add_argument("--out", help="write the raw trades to this JSON file")
+    ap.add_argument("--stop-sweep", help="comma list of stop %% values, e.g. 0.4,0.7,1.0,1.25,1.5: prints average %% per trade for every rule at each stop")
     a = ap.parse_args()
 
     bars = a.days * 288
@@ -308,6 +309,25 @@ def main():
     print(f"{len(all_k)} symbols, about {span:.0f} days of 5m candles each")
     trades = run(all_k, a)
     report(trades, a)
+    if a.stop_sweep:
+        sweep = [float(x) for x in a.stop_sweep.split(",") if x.strip()]
+        print("\nSTOP SWEEP - average % per trade (and stop-out share) by stop distance; entries and all other exits unchanged")
+        print(f"{'rule':26}" + "".join(f"{('stop '+str(x)+'%'):>16}" for x in sweep))
+        grid = {}
+        for st in sweep:
+            a.stop = st
+            by = defaultdict(list)
+            for t in run(all_k, a):
+                by[t["rule"]].append(t)
+            for rule in RULES:
+                grid[(rule, st)] = stats(by.get(rule, []))
+        for rule in RULES:
+            cells = ""
+            for st in sweep:
+                g = grid[(rule, st)]
+                cells += f"{(f'{g['avg']:+.2f} ({g['stop']:.0f}%)' if g else 'n/a'):>16}"
+            print(f"{rule:26}{cells}")
+        print("Pick the stop where the rules you actually trade stay best; if the control R0 barely moves between stops, the stop is not what decides profit.")
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(trades, fh)
