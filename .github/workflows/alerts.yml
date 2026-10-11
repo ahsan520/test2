@@ -328,13 +328,13 @@ jobs:
           # (found 2026-09-03), running on mexc-trader.js's hardcoded
           # default with no repo-Variable override ever reaching it.
           BUY_SCOUT_SIZE_PCT:           ${{ vars.BUY_SCOUT_SIZE_PCT || '30' }}
-          # ── ST5/ST15 Priority Rotation (P0/P1) — new RISK_OFF gate ──
+          # ── ST5/ST15 Priority Rotation (P1/P2) — new RISK_OFF gate ──
           # NOTE: none of this path's other vars (ST_EVENT_TTL_MIN,
           # ST_MAX_DISTANCE_PCT, ST_ROTATION_COOLDOWN_MIN, ST_EQUAL_ALLOCATE,
           # ST_FAILED_SELL_QUARANTINE_MIN, ST5_ENABLE, ST15_ENABLE,
           # ST5_PRIORITY_USD_SIZE, ST15_PRIORITY_USD_SIZE,
           # ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT) are wired into this
-          # workflow at all (found 2026-09-06) — the whole P0/P1 system has
+          # workflow at all (found 2026-09-06) — the whole P1/P2 system has
           # been running purely on mexc-trader.js's hardcoded defaults this
           # entire time, with no way to tune any of it via a repo Variable.
           # Only wiring the one requested here for now; flag if you want the
@@ -368,7 +368,8 @@ jobs:
           ST_MIN_BUY_USD:                 ${{ vars.ST_MIN_BUY_USD || '100' }}
           # Setups that raise the buy ALERT but are not auto-bought (comma list, NONE = auto-buy all).
           LB_LIVE_SKIP_SETUPS:            ${{ vars.LB_LIVE_SKIP_SETUPS || 'BREAKOUT' }}
-          # EARLY BUY (P0 pre-spike) — alert-only. EARLY_BUY_MODE: off | alert. See scripts/early-buy.js.
+          # EARLY BUY (P0 pre-spike, top tier: P0 Early Buy > P1 5m ST > P2 15m ST > P3 scan/MOM WATCH).
+          # EARLY_BUY_MODE: off | alert (Telegram+audit only, default) | live (also buys, reduced size, never rotates). See scripts/early-buy.js.
           EARLY_BUY_MODE:                 ${{ vars.EARLY_BUY_MODE || 'alert' }}
           EARLY_SHOCK_MIN:                ${{ vars.EARLY_SHOCK_MIN || '1.0' }}
           EARLY_BULLCONF_MIN:             ${{ vars.EARLY_BULLCONF_MIN || '3' }}
@@ -376,7 +377,17 @@ jobs:
           EARLY_WHALE_MIN:                ${{ vars.EARLY_WHALE_MIN || '60' }}
           EARLY_MAX_RSI15:                ${{ vars.EARLY_MAX_RSI15 || '68' }}
           EARLY_APPROACH_ATR:             ${{ vars.EARLY_APPROACH_ATR || '1.5' }}
-          EARLY_REQUIRE_OI_CONFIRM:       ${{ vars.EARLY_REQUIRE_OI_CONFIRM || 'true' }}
+          # OI states accepted (spec: CONFIRM or NEUTRAL). Set EARLY_REQUIRE_OI_CONFIRM=true to force CONFIRM only.
+          EARLY_REQUIRE_OI_CONFIRM:       ${{ vars.EARLY_REQUIRE_OI_CONFIRM || 'false' }}
+          EARLY_OI_ACCEPT:                ${{ vars.EARLY_OI_ACCEPT || 'CONFIRM,NEUTRAL' }}
+          EARLY_ST15_MAX_BEAR_ATR:        ${{ vars.EARLY_ST15_MAX_BEAR_ATR || '2.5' }}
+          EARLY_MAX_CHG24:                ${{ vars.EARLY_MAX_CHG24 || '12' }}
+          # Live-execution controls (only used when EARLY_BUY_MODE=live)
+          EARLY_BUY_SIZE_PCT:             ${{ vars.EARLY_BUY_SIZE_PCT || '40' }}
+          EARLY_MAX_OPEN:                 ${{ vars.EARLY_MAX_OPEN || '2' }}
+          EARLY_MAX_PER_CYCLE:            ${{ vars.EARLY_MAX_PER_CYCLE || '1' }}
+          EARLY_BLOCK_RISK_OFF:           ${{ vars.EARLY_BLOCK_RISK_OFF || 'true' }}
+          EARLY_STOP_LOSS_PCT:            ${{ vars.EARLY_STOP_LOSS_PCT || '' }}
           EARLY_COOLDOWN_MIN:             ${{ vars.EARLY_COOLDOWN_MIN || '60' }}
           EARLY_LOG_MAX_FAILED:           ${{ vars.EARLY_LOG_MAX_FAILED || '2' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
