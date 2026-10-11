@@ -1,22 +1,22 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// st-timing-engine.js — ST5/ST15 TIMING ENGINE (P2 entry-timing layer)
+// st-timing-engine.js — ST5/ST15 TIMING ENGINE (P3 entry-timing layer)
 //
 // Implements the "ST5/ST15 Timing Engine" dev-team doc (22 Aug 2026) —
 // supersedes the simpler st-alignment-check.js gate from the earlier
 // "P0/P1/P2 WATCH + ST Alignment" doc. Same architectural boundary as
-// before: this is an entry-TIMING confirmation layer for the P2 (frequent)
+// before: this is an entry-TIMING confirmation layer for the P3 (frequent)
 // engine, entirely separate from:
 //
-//   - P0/P1 (mexc-trader.js executeST5PriorityRotation /
+//   - P1/P2 (mexc-trader.js executeST5PriorityRotation /
 //     executeSTPriorityRotation) — fresh closed-candle RED→GREEN Supertrend
 //     CROSS EVENTS. Rare, event-driven, unaffected by any of this.
 //   - Conviction scoring (evald.conv / calcConviction) — this module NEVER
 //     feeds into that score. It produces a separate ST_TIMING_SCORE (0-95,
 //     per the doc's own stated component weights, which sum to 95 not 100 —
 //     reported as-is rather than padded to a round number) used only for
-//     display/tie-breaking, plus a pass/fail P2 state.
+//     display/tie-breaking, plus a pass/fail P3 state.
 //
-// ── P2 STATE (§9 flow, §14 pseudocode) ──
+// ── P3 STATE (§9 flow, §14 pseudocode) ──
 //   BLOCK        — falling knife. Hard. No score, no trigger, no CONV can
 //                  override this.
 //   WAIT_RETEST  — extended/very-extended/EXHAUSTED zone (>0.75 ATR, incl.
@@ -32,12 +32,12 @@
 //                  BULL/BEAR mixed without the stricter-trigger exception).
 //   READY        — passed every ST-timing check. Caller still must confirm
 //                  a real trigger (BREAKOUT/TRIGGERING) and run every other
-//                  existing P2 gate (Entry Quality Check, cooldown, open-
+//                  existing P3 gate (Entry Quality Check, cooldown, open-
 //                  position, etc.) before this becomes an actual buy —
 //                  READY means "ST timing is not the reason to say no."
 //
 // ── ALIGNMENT (§3) ──
-//   ST5 BULL, ST15 BULL           → STRONG        — preferred, normal P2.
+//   ST5 BULL, ST15 BULL           → STRONG        — preferred, normal P3.
 //   ST5 BULL, ST15 BEAR           → mixed          — "reject unless explicit
 //                                                     exception exists" (§3).
 //                                                     Exception used here:
@@ -52,7 +52,7 @@
 //                                                     prior alignment gate.
 //   ST5 BEAR, ST15 BULL           → "avoid while fast trend is falling" (§3)
 //                                    — always WAIT, no exception defined.
-//   ST5 BEAR, ST15 BEAR           → falling knife / no P2 (§3, §5) — BLOCK.
+//   ST5 BEAR, ST15 BEAR           → falling knife / no P3 (§3, §5) — BLOCK.
 //   Either ST missing              → WAIT — never treated as confirmation.
 //
 // All numeric thresholds below are env-var configurable with the doc's own
@@ -229,29 +229,29 @@ export function calcTimingScore({ st5, st15, alignment, fallingKnife, exhausted 
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// P2-A / P2-B / P2-C — CONTINUATION TRIGGER CLASSIFICATION
+// P3-A / P3-B / P3-C — CONTINUATION TRIGGER CLASSIFICATION
 //
-// Implements the "P2 Continuation Strategy" dev-team doc's P2-A/P2-B/P2-C
+// Implements the "P2 Continuation Strategy" dev-team doc's P3-A/P3-B/P3-C
 // split. This is a LABELING pass only, run once evaluateSTTiming below has
 // already independently reached READY — it never bypasses alignment,
-// exhaustion, or falling-knife (per the doc: "P2-A and P2-B are entry
+// exhaustion, or falling-knife (per the doc: "P3-A and P3-B are entry
 // triggers, not permission to bypass risk controls"). Priority on a tie is
-// P2-A > P2-B > P2-C, matching the doc's router (§6).
+// P3-A > P3-B > P3-C, matching the doc's router (§6).
 //
-// P2-A — pullback + ST5 reclaim (XRP-style second leg). The doc's literal
+// P3-A — pullback + ST5 reclaim (XRP-style second leg). The doc's literal
 // pseudocode ("prevClose <= prevST5 && close > ST5") can't actually occur
 // in this repo's Supertrend: with sticky bands (leaderboard-scanner.js
 // calcSupertrend), a close at/below the ST5 line while direction stays BULL
 // is structurally impossible without direction flipping to BEAR first —
-// which would make it a fresh cross (P0 territory), not a continuation.
+// which would make it a fresh cross (P1 territory), not a continuation.
 // calcSupertrend's own `retest` field already encodes the doc's intent —
 // "pushed into EXTENDED-or-worse, closed back near ST5, turning back up,
-// direction never flipped" — so P2-A reuses it directly rather than
+// direction never flipped" — so P3-A reuses it directly rather than
 // re-deriving the same pattern twice.
-// P2-B — consolidation breakout (UNI-style second leg). Reuses
+// P3-B — consolidation breakout (UNI-style second leg). Reuses
 // calcSupertrend's `consolidation` field.
-// P2-C — normal/fallback P2 path — unchanged behavior for anything that
-// reaches READY without qualifying for P2-A or P2-B.
+// P3-C — normal/fallback P3 path — unchanged behavior for anything that
+// reaches READY without qualifying for P3-A or P3-B.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const P2_CONTINUATION_ENABLED = (process.env.P2_CONTINUATION_ENABLED ?? 'true') !== 'false';
@@ -261,12 +261,12 @@ const P2A_REQUIRE_ST15_BULL   = (process.env.P2A_REQUIRE_ST15_BULL ?? 'true') !=
 const P2B_BREAKOUT_ENABLED    = (process.env.P2B_BREAKOUT_ENABLED ?? 'true') !== 'false';
 
 export function classifyP2Trigger({ st5, st15 }) {
-  if (!P2_CONTINUATION_ENABLED) return { p2Trigger: 'P2-C-NORMAL', eventKey: null };
+  if (!P2_CONTINUATION_ENABLED) return { p2Trigger: 'P3-C-NORMAL', eventKey: null };
 
   const st5Bull  = st5.direction  === 'BULL';
   const st15Bull = st15.direction === 'BULL';
 
-  // P2-A — pullback/reclaim. Condition 6 from the doc ("ST5 slope
+  // P3-A — pullback/reclaim. Condition 6 from the doc ("ST5 slope
   // non-negative/improving") kept explicit here even though `retest`
   // already implicitly requires price to be turning back up.
   if (
@@ -276,12 +276,12 @@ export function classifyP2Trigger({ st5, st15 }) {
     st5.retest === true &&
     (st5.slope == null || st5.slope >= 0)
   ) {
-    return { p2Trigger: 'P2-A-PULLBACK-RECLAIM', eventKey: `P2A:${st5.lastClosedCandle}` };
+    return { p2Trigger: 'P3-A-PULLBACK-RECLAIM', eventKey: `P2A:${st5.lastClosedCandle}` };
   }
 
-  // P2-B — consolidation breakout. Requires both ST5/ST15 BULL per the
-  // doc's own conditions 1-2 (not configurable per-leg like P2-A, since the
-  // doc doesn't offer that knob for P2-B).
+  // P3-B — consolidation breakout. Requires both ST5/ST15 BULL per the
+  // doc's own conditions 1-2 (not configurable per-leg like P3-A, since the
+  // doc doesn't offer that knob for P3-B).
   if (
     P2B_BREAKOUT_ENABLED &&
     st5Bull && st15Bull &&
@@ -292,12 +292,12 @@ export function classifyP2Trigger({ st5, st15 }) {
     // distinct event, while the SAME breakout bar/range re-evaluated next
     // cycle collapses to the same key (dedupe hook for callers).
     return {
-      p2Trigger: 'P2-B-CONSOLIDATION-BREAKOUT',
+      p2Trigger: 'P3-B-CONSOLIDATION-BREAKOUT',
       eventKey: `P2B:${st5.consolidation.rangeHigh}:${st5.lastClosedCandle}`,
     };
   }
 
-  return { p2Trigger: 'P2-C-NORMAL', eventKey: null };
+  return { p2Trigger: 'P3-C-NORMAL', eventKey: null };
 }
 
 // Main entry point — mirrors §14's pseudocode shape.
@@ -347,7 +347,7 @@ export function evaluateSTTiming(entry, marketState = null) {
   return {
     p2State: 'READY', timingScore, reason: alignment.reason, alignment,
     st5Dir: st5.direction, st15Dir: st15.direction,
-    p2Trigger: trigger.p2Trigger,     // 'P2-A-PULLBACK-RECLAIM' | 'P2-B-CONSOLIDATION-BREAKOUT' | 'P2-C-NORMAL'
-    p2EventKey: trigger.eventKey,     // dedupe hook, null for P2-C
+    p2Trigger: trigger.p2Trigger,     // 'P3-A-PULLBACK-RECLAIM' | 'P3-B-CONSOLIDATION-BREAKOUT' | 'P3-C-NORMAL'
+    p2EventKey: trigger.eventKey,     // dedupe hook, null for P3-C
   };
 }

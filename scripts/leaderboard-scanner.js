@@ -435,7 +435,7 @@ function calcCVD(k15m) {
 // ── 15m Supertrend(period,multiplier) — closed candles only ──────────────
 // Per the "15m Supertrend Priority Execution" dev-team note: this is a
 // SEPARATE entry-timing signal from calcConviction/calcSpikeTrigger above,
-// consumed by leaderboard-decider.js as a Priority-0 execution path (an
+// consumed by leaderboard-decider.js as a Priority-1 execution path (an
 // independent gate that bypasses normal strategy qualification, not a
 // score input) — never folded into d.conv/calcConviction. Standard
 // Supertrend: ATR(period) (Wilder-smoothed) sets basic upper/lower bands
@@ -522,7 +522,7 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
   // ── ST5/ST15 TIMING ENGINE ENRICHMENT ──────────────────────────────────
   // Per the "ST5/ST15 Timing Engine" dev-team doc (§2-§4): ATR-normalized
   // distance/extension, slope, bars-since-cross, and candle-impulse — used
-  // downstream by st-timing-engine.js as a P2 entry-timing/falling-knife/
+  // downstream by st-timing-engine.js as a P3 entry-timing/falling-knife/
   // exhaustion layer, kept entirely separate from conviction scoring.
   // distanceATR is SIGNED: positive = price above the ST line (normal for
   // BULL), negative = price below it (normal for BEAR, or an early warning
@@ -603,7 +603,7 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
     retest = pushedExtended && closes[last] >= closes[last - 1];
   }
 
-  // consolidation — P2-B (Consolidation Breakout) support, per the
+  // consolidation — P3-B (Consolidation Breakout) support, per the
   // "P2 Continuation Strategy" dev doc §4-5 (UNI-style second leg): was a
   // tight sideways range formed over the last P2B_RANGE_LOOKBACK CLOSED
   // bars, and did THIS closed candle break above that range's high? The
@@ -655,7 +655,7 @@ function calcSupertrend(k15, period = 10, multiplier = 3, intervalMs = ST15_INTE
     slopeStrength,      // 'WEAK' | 'NORMAL' | 'STRONG' | null
     candleImpulseATR,
     retest,
-    consolidation,      // { detected, breakout, bars, rangeHigh, rangeLow, widthATR } | null — P2-B support
+    consolidation,      // { detected, breakout, bars, rangeHigh, rangeLow, widthATR } | null — P3-B support
   };
 }
 
@@ -1035,7 +1035,7 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     const [ticker, k5m, k15m, k1h, k4h, kDay, depth, fundingResult] = await Promise.allSettled([
       useKraken ? fetchKrakenTicker(krakenPair)                    : fetchBinance(`/api/v3/ticker/24hr?symbol=${pair}`),
       // 5m candles — short-timeframe trigger confirmation (calcSpikeTrigger
-      // in buy-intelligence.js) AND the 5m Supertrend/ST5 P0 calc below.
+      // in buy-intelligence.js) AND the 5m Supertrend/ST5 P1 calc below.
       // limit=200 (not 60) — Wilder/RMA-smoothed ATR technically never
       // fully "forgets" its seed value, it only decays it by a factor of
       // (period-1)/period each bar. At period=10 that's roughly 0.5%
@@ -1129,7 +1129,7 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
     // ── 15m Supertrend Priority Execution (dev-team note) — entry-timing
     // signal, independent of conv/calcConviction above. market-fetcher.js
     // reads d.supertrend15m to detect a fresh closed-candle RED→GREEN
-    // cross and persist a Priority-1 (P1) event; leaderboard-decider.js/
+    // cross and persist a Priority-2 (P2) event; leaderboard-decider.js/
     // mexc-trader.js consume it. period/multiplier configurable per the
     // note's "make them environment-configurable and backtestable".
     d.supertrend15m = calcSupertrend(
@@ -1152,18 +1152,18 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
       }
     }
 
-    // ── 5m Supertrend Priority Execution (Priority-0 / P0) ──
+    // ── 5m Supertrend Priority Execution (Priority-1 / P1) ──
     // Same mechanism as the 15m version above, one timeframe down — a
     // fresh 5m RED→GREEN cross is the earliest, least-lagging structural
     // signal in this pipeline and per the dev-team doc takes priority over
-    // BOTH the 15m cross (P1) and the normal WATCH/EARLY BUY + BREAKOUT/
-    // TRIGGERING candidate path (P2). Reuses k5 — already fetched above
+    // BOTH the 15m cross (P2) and the normal WATCH/EARLY BUY + BREAKOUT/
+    // TRIGGERING candidate path (P3). Reuses k5 — already fetched above
     // for calcSpikeTrigger's short-timeframe trigger confirmation, no new
     // API call needed. market-fetcher.js reads d.supertrend5m to detect
     // the fresh crossUp and persist a PENDING st5Event; only a genuine
     // fresh cross creates an event (a candle that's simply still BULL from
     // last cycle has crossUp=false), so a persistent bullish ST5 state
-    // does not generate repeated P0 buys.
+    // does not generate repeated P1 buys.
     d.supertrend5m = calcSupertrend(
       k5,
       parseInt(process.env.ST5_PERIOD || '10', 10),

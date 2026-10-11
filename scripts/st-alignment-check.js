@@ -1,32 +1,32 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// st-alignment-check.js — ST5/ST15 CURRENT-STATE alignment (P2 timing/
+// st-alignment-check.js — ST5/ST15 CURRENT-STATE alignment (P3 timing/
 // confirmation layer)
 //
 // Implements the "P0/P1/P2 WATCH + ST Alignment" dev-team doc (§3, §4, §7,
-// §8) — a SEPARATE confirmation/timing gate for the P2 (frequent) buy
+// §8) — a SEPARATE confirmation/timing gate for the P3 (frequent) buy
 // engine, distinct from and complementary to:
 //
-//   - P0/P1 (mexc-trader.js executeST5PriorityRotation /
+//   - P1/P2 (mexc-trader.js executeST5PriorityRotation /
 //     executeSTPriorityRotation) — fire on a FRESH closed-candle
 //     RED→GREEN Supertrend CROSS EVENT. Rare, event-driven, independent
-//     priority paths that bypass normal P2 strategy qualification entirely.
+//     priority paths that bypass normal P3 strategy qualification entirely.
 //
 //   - This module — reads the CURRENT ST5/ST15 direction (BULL/BEAR), no
-//     fresh cross required, as a confirmation/timing layer for the P2
+//     fresh cross required, as a confirmation/timing layer for the P3
 //     engine's much more frequent BUY/EARLY BUY/WATCH candidates.
 //
-// Per the doc: "P2 uses the current ST5/ST15 state as a timing/confirmation
+// Per the doc: "P3 uses the current ST5/ST15 state as a timing/confirmation
 // layer; it does not wait for a fresh Supertrend cross." And explicitly:
 // "Do not add ST5/ST15 as arbitrary conviction-score weights" — this is a
 // pass/fail gate only, never folded into evald.conv/calcConviction.
 //
 // ── ALIGNMENT (§3) ──
-//   ST5 BULL, ST15 BULL → STRONG        — normal P2 threshold, best case.
+//   ST5 BULL, ST15 BULL → STRONG        — normal P3 threshold, best case.
 //   ST5 BULL, ST15 BEAR → EARLY_MIXED   — allowed, but requires a stricter
 //                                          trigger bar (a fully confirmed
 //                                          BREAKOUT, not merely TRIGGERING /
 //                                          the RETEST exception) per §3/§7
-//                                          (P2-B tier: "strong trigger +
+//                                          (P3-B tier: "strong trigger +
 //                                          good entry").
 //   ST5 BEAR, ST15 BULL → TRANSITION    — per the doc's own §8 decision-
 //                                          boundary pseudocode, this never
@@ -68,23 +68,23 @@ export function checkSTAlignment(entry) {
   if (st5Dir === 'BEAR' && st15Dir === 'BEAR') {
     return {
       pass: false, alignment: 'BEAR_BEAR', st5Dir, st15Dir,
-      reason: 'ST5 and ST15 both BEAR — bearish structure, P2 BUY blocked, remain WATCH',
+      reason: 'ST5 and ST15 both BEAR — bearish structure, P3 BUY blocked, remain WATCH',
     };
   }
 
   if (st5Dir === 'BULL' && st15Dir === 'BULL') {
     return {
       pass: true, alignment: 'STRONG', st5Dir, st15Dir,
-      reason: 'ST5 and ST15 both BULL — strong alignment, normal P2 threshold',
+      reason: 'ST5 and ST15 both BULL — strong alignment, normal P3 threshold',
     };
   }
 
   if (st5Dir === 'BULL' && st15Dir === 'BEAR') {
-    // §7 P2-B tier — "strong trigger + good entry" — reuses the existing
+    // §7 P3-B tier — "strong trigger + good entry" — reuses the existing
     // triggerStatus primitive (buy-intelligence.js calcSpikeTrigger via
     // market-fetcher.js) rather than inventing a new numeric threshold:
     // a fully confirmed BREAKOUT is the "stronger trigger" the doc calls
-    // for. TRIGGERING (even via the RETEST exception elsewhere in the P2
+    // for. TRIGGERING (even via the RETEST exception elsewhere in the P3
     // pipeline) is deliberately NOT enough here — that exception exists
     // for an otherwise-clean STRONG-alignment setup, not to also relax
     // the bar on a mixed ST reading.

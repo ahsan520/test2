@@ -9,18 +9,18 @@ averages, and then trades every signal of every rule through the SAME exit model
 
 Rules compared (all with the same exits):
   R0  random           control: random entries. The number every rule has to beat.
-  R1  st5_cross        5m Supertrend flips up (what P0 buys today), then split by how far above the
+  R1  st5_cross        5m Supertrend flips up (what P1 buys today), then split by how far above the
                        line the close is, in ATR: R1a <=1.5, R1b 1.5-2.5, R1c >2.5 (the bot's EXHAUSTED zone)
   R1d cross_then_retest the bot's WAIT_RETEST behaviour: after a cross, wait (up to 3h) for price to pull back within
                        1.5 ATR of the line, then buy the first bullish close. NOTE: at a Supertrend(10,3) flip the close
                        is ~3 ATR above the new line by construction, so R1a/R1b are almost empty and nearly every fresh
                        cross counts as 'far' - the live bot's EXHAUSTED label is true of almost every cross.
-  R2  pre_cross        P2-style, BEFORE the cross: trend still down, close within 1.5 ATR below the Supertrend
+  R2  pre_cross        P3-style, BEFORE the cross: trend still down, close within 1.5 ATR below the Supertrend
                        line, breaking the 12-bar high on volume >= 1.5x average
-  R3  squeeze_break    P2-B-style: 12-bar range compressed (<= 2.5 ATR), close breaks above it on volume >= 1.5x
+  R3  squeeze_break    P3-B-style: 12-bar range compressed (<= 2.5 ATR), close breaks above it on volume >= 1.5x
   R5  vol_shock_buyers the live 'SQUEEZE NOW' idea (buy as a spike starts): volume >= 2x average, taker-buy share >= 58%
                        (the candle-data stand-in for the bot's CVD-up), bullish candle, any trend
-  R4  pullback_reclaim P2-A-style: uptrend >= 8 bars, pulled back within 0.7 ATR of the line in the last 6
+  R4  pullback_reclaim P3-A-style: uptrend >= 8 bars, pulled back within 0.7 ATR of the line in the last 6
                        bars, then closes above the prior high on an up candle, <= 2 ATR above the line
 
 A rule only counts as promising if it beats R0 by more than 2 standard errors AND is positive versus R0 in

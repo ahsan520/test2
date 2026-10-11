@@ -37,12 +37,12 @@ import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
 import { monitorPositions, reconcileTrackedLiveBalances } from './position-monitor.js';
-import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation } from './mexc-trader.js';
+import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation, executeEarlyBuyP0 } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
 import { checkEntryQuality } from './entry-quality-check.js';
 import { evaluateSTTiming } from './st-timing-engine.js';
 
-import { collectEarlyBuyAlerts, EARLY_MODE } from './early-buy.js';
+import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, EARLY_MODE } from './early-buy.js';
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
 // Off by default; each threshold is independently overridable via repo
@@ -538,13 +538,53 @@ async function main() {
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 1.6 — 5m Supertrend Priority Execution (Priority-0 / P0)
+  // STEP 1.5b — EARLY BUY (Priority-0 / P0, pre-spike accumulation)
+  // Top tier: P0 Early Buy > P1 5m ST > P2 15m ST > P3 normal scan / MOM WATCH.
+  // Flags (and, when EARLY_BUY_MODE=live, buys at reduced size) coins BEFORE the
+  // 5m/15m Supertrend cross confirms. See early-buy.js (clauses) and
+  // mexc-trader.js executeEarlyBuyP0 (execution + safety set).
+  //   off   - nothing
+  //   alert - Telegram + audit only, no order (default, same as before)
+  //   live  - execute; never rotates other positions out to make room
+  // Skipped on stale market data - a pre-confirmation entry must not be priced off old data.
+  // Runs BEFORE the P1 pass so a symbol P0 already holds is NOOP_ALREADY_HELD for P1/P2.
+  // ══════════════════════════════════════════════════════
+  if (EARLY_MODE !== 'off' && !dataIsStale) {
+    const earlyCooldowns = loadCooldowns();
+    if (EARLY_MODE === 'live') {
+      const cands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit });
+      if (cands.length) {
+        const earlyRes = await executeEarlyBuyP0({
+          candidates: cands, market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+          utc: new Date().toUTCString().slice(17, 22) + ' UTC',
+          cooldowns: earlyCooldowns, marketState,
+        });
+        if (earlyRes.changed) {
+          savePositions(positions);
+          await pushPositionsToGitHub(positions);
+        }
+      }
+    } else {
+      const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns: earlyCooldowns, positions, logAudit });
+      if (earlyLines.length) {
+        await sendTelegram([
+          `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
+          `Alert only, no auto-buy. Pre-cross setup: flow and volume are turning up before the Supertrend confirms.`,
+          '', earlyLines.join('\n\n'),
+        ].join('\n'));
+      }
+    }
+    saveCooldowns(earlyCooldowns);
+  }
+
+  // ══════════════════════════════════════════════════════
+  // STEP 1.6 — 5m Supertrend Priority Execution (Priority-1 / P1)
   // Highest-priority buy path — see mexc-trader.js executeST5PriorityRotation
-  // for the full rationale. Runs BEFORE the 15m/P1 pass just below, so a
+  // for the full rationale. Runs BEFORE the 15m/P2 pass just below, so a
   // symbol with both a fresh 5m and 15m cross pending in the same cycle
-  // gets bought via P0 (this pass); P1 then sees the resulting position
+  // gets bought via P1 (this pass); P2 then sees the resulting position
   // and marks its own pending event NOOP_ALREADY_HELD rather than
-  // double-buying. Same persistence/history pattern as the P1 block.
+  // double-buying. Same persistence/history pattern as the P2 block.
   // ══════════════════════════════════════════════════════
   const st5PriorityOutcomes = [];
   const st5Result = await executeST5PriorityRotation({
@@ -570,7 +610,7 @@ async function main() {
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 1.7 — 15m Supertrend Priority Execution (Priority-1 / P1)
+  // STEP 1.7 — 15m Supertrend Priority Execution (Priority-2 / P2)
   // Per the "15m Supertrend Priority Execution" dev-team note: a confirmed
   // closed-15m Supertrend RED→GREEN cross (detected in market-fetcher.js,
   // persisted as a PENDING st15Event on the symbol's market-data.json
@@ -583,7 +623,7 @@ async function main() {
   // nothing, and does not wait on the stale-market-data gate that blocks
   // new BUYs further down (this event is priced off the same market-data.json
   // this whole run already loaded, same as everything else this cycle).
-  // Runs AFTER the P0/ST5 pass above — see that block's comment for why.
+  // Runs AFTER the P1/ST5 pass above — see that block's comment for why.
   // ══════════════════════════════════════════════════════
   const stPriorityOutcomes = [];
   const stResult = await executeSTPriorityRotation({
@@ -644,19 +684,6 @@ async function main() {
   // return path too, not just the normal buy path.
   const cooldowns = loadCooldowns();
 
-  // ── EARLY BUY (P0 pre-spike accumulation) — ALERT-ONLY, evaluated first every cycle ──
-  // Flags coins before the 5m/15m Supertrend cross buys them. Never executes a buy and does not
-  // change the existing P0 ST5 > P1 ST15 > P2 order; see early-buy.js and EARLY_BUY_MODE.
-  const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns, positions, logAudit });
-  if (earlyLines.length) {
-    await sendTelegram([
-      `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
-      `Alert only, no auto-buy. Pre-cross setup: flow and volume are turning up before the Supertrend confirms.`,
-      '', earlyLines.join('\n\n'),
-    ].join('\n'));
-  }
-  if (EARLY_MODE !== 'off') saveCooldowns(cooldowns);
-
   // Pre-screen — bail early if nothing clears min score
   const anyCandidate = entries.some(([, entry]) => {
     if (entry.marketClosed) return false;
@@ -677,7 +704,7 @@ async function main() {
     const momLines = collectMomWatchAlerts(entries, cooldowns);
     if (momLines.length) {
       await sendTelegram([
-        `⚡ *Alpha Terminal — MOM WATCH*`,
+        `⚡ *Alpha Terminal — MOM WATCH (P3)*`,
         `_informational only — not a buy signal, no execution triggered · min score ${LB_MIN_SCORE} not cleared this cycle_`,
         '', momLines.join('\n\n'),
       ].join('\n'));
@@ -836,7 +863,7 @@ async function main() {
     if (evald.conv < LB_MIN_SCORE)          continue;
     if (SKIP_SETUPS.has(evald.setup.label)) continue;
 
-    // ── P2 signal-type gate (dev-team "Buy Priority / Rotation / Sell
+    // ── P3 signal-type gate (dev-team "Buy Priority / Rotation / Sell
     // Intelligence" doc) ──────────────────────────────────────────────
     // Previously nothing here checked the signal classification at all —
     // only the numeric conv score above. signal-evaluator.js's AVOID/WEAK/
@@ -845,7 +872,7 @@ async function main() {
     // require conv<=0), so a candidate whose signal actively says "don't
     // buy this" could still reach the Entry Quality Check and beyond on
     // conv alone. Explicit allowlist closes that gap: only BUY, EARLY BUY,
-    // and WATCH are P2-eligible signal types. CAP BUY is exempt — it's
+    // and WATCH are P3-eligible signal types. CAP BUY is exempt — it's
     // already the deliberate extreme-shock exception to every other
     // STRATEGY qualification gate here (bull confirmation, trigger status,
     // impulseExhaustion/breakoutDistance in the Entry Quality Check), so
@@ -863,10 +890,10 @@ async function main() {
     const isCapBuyEarly = entry.assetType === 'crypto' && (entry.capBuy?.isCapBuy ?? false);
     const P2_ELIGIBLE_SIGNALS = new Set(['BUY', 'EARLY BUY', 'WATCH']);
     if (!isCapBuyEarly && !P2_ELIGIBLE_SIGNALS.has(entry.signal)) {
-      console.log(`  ⏭  ${pair} signal=${entry.signal} — not P2-eligible (AVOID/WEAK/FALLING KNIFE never buy, regardless of conv)`);
+      console.log(`  ⏭  ${pair} signal=${entry.signal} — not P3-eligible (AVOID/WEAK/FALLING KNIFE never buy, regardless of conv)`);
       continue;
     }
-    // "P2 rejects WATCH/EARLY BUY + SETUP" — belt-and-suspenders on top of
+    // "P3 rejects WATCH/EARLY BUY + SETUP" — belt-and-suspenders on top of
     // the triggerStatus gate further below (which already blocks non-
     // BREAKOUT/TRIGGERING triggers for every signal type); this catches
     // the specific WATCH/EARLY BUY + entryState=SETUP combo explicitly,
@@ -874,7 +901,7 @@ async function main() {
     // trigger data lagging a fresh entryState read). CAP BUY exempt for
     // the same reason as above.
     if (!isCapBuyEarly && (entry.signal === 'WATCH' || entry.signal === 'EARLY BUY') && entry.entryState === 'SETUP') {
-      console.log(`  ⏭  ${pair} signal=${entry.signal} + entryState=SETUP — rejected, too early (P2 requires BREAKOUT/TRIGGERING)`);
+      console.log(`  ⏭  ${pair} signal=${entry.signal} + entryState=SETUP — rejected, too early (P3 requires BREAKOUT/TRIGGERING)`);
       continue;
     }
 
@@ -1050,7 +1077,7 @@ async function main() {
       // on top of the Entry Quality Check above, not a conviction-score
       // weight. Reads the CURRENT ST5/ST15 state (direction, ATR-normalized
       // distance/extension, slope, retest) — no fresh cross required,
-      // that's P0/P1's job (STEP 1.6/1.7 above). CAP BUY is exempt for the
+      // that's P1/P2's job (STEP 1.6/1.7 above). CAP BUY is exempt for the
       // same reason it's exempt everywhere else in this block — a
       // deliberate extreme-shock exception, not a candidate this timing
       // layer is meant to judge. See st-timing-engine.js for full
@@ -1069,15 +1096,15 @@ async function main() {
         }
         // timing.p2State === 'READY'
         console.log(`  ✅  ${pair} — ST timing READY (score ${timing.timingScore}/95, ${timing.alignment?.alignment}) — ${timing.reason}`);
-        // ── P2-A/P2-B/P2-C trigger classification ──
+        // ── P3-A/P3-B/P3-C trigger classification ──
         // Per the "P2 Continuation Strategy" dev doc §8/§10: log the exact
         // reason and carry it on `entry` so it survives to the position
         // record below when this candidate actually gets bought. This is a
-        // label on top of READY, not an additional gate — a READY P2-C
+        // label on top of READY, not an additional gate — a READY P3-C
         // candidate buys exactly as it did before this change.
         entry.p2Trigger = timing.p2Trigger;
         entry.p2EventKey = timing.p2EventKey;
-        if (timing.p2Trigger !== 'P2-C-NORMAL') {
+        if (timing.p2Trigger !== 'P3-C-NORMAL') {
           console.log(`  🔁  ${pair} — ${timing.p2Trigger}`);
         }
         logAudit('p2_trigger_classified', { pair, p2Trigger: timing.p2Trigger, p2EventKey: timing.p2EventKey });
@@ -1160,7 +1187,7 @@ async function main() {
     const momLines = collectMomWatchAlerts(entries, cooldowns);
     if (momLines.length) {
       await sendTelegram([
-        `⚡ *Alpha Terminal — MOM WATCH*`,
+        `⚡ *Alpha Terminal — MOM WATCH (P3)*`,
         `_informational only — not a buy signal, no execution triggered · candidates were filtered by guard/gates this cycle_`,
         '', momLines.join('\n\n'),
       ].join('\n'));
@@ -1216,15 +1243,15 @@ async function main() {
       status:         'watching',
       source:         'headless_v11.0',
       scoreSource:    evald.source,
-      // P2-A-PULLBACK-RECLAIM | P2-B-CONSOLIDATION-BREAKOUT | P2-C-NORMAL —
+      // P3-A-PULLBACK-RECLAIM | P3-B-CONSOLIDATION-BREAKOUT | P3-C-NORMAL —
       // absent (isCapBuy / entryState-RETEST-exception / SCOUT paths never
       // run the ST timing engine, so never set this) means "not classified",
-      // distinct from an explicit P2-C.
+      // distinct from an explicit P3-C.
       p2Trigger:      entry.p2Trigger || undefined,
     };
 
     buyAlerts.push({ pair, sym, levels, evald, price: entry.price, chg: entry.chg, d: entry.d, entry });
-    console.log(`  🟢  ${pair} [${evald.setup.label}]${entry.p2Trigger && entry.p2Trigger !== 'P2-C-NORMAL' ? ` [${entry.p2Trigger}]` : ''} score:${evald.conv} → ${sym}`);
+    console.log(`  🟢  ${pair} [${evald.setup.label}]${entry.p2Trigger && entry.p2Trigger !== 'P3-C-NORMAL' ? ` [${entry.p2Trigger}]` : ''} score:${evald.conv} → ${sym}`);
     logAudit('position_opened', { pair, sym, setup: evald.setup.label, score: evald.conv, p2Trigger: entry.p2Trigger || null });
   }
 

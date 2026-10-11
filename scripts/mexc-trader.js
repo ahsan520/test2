@@ -27,6 +27,7 @@ import { calcEntryExtension } from './buy-intelligence.js';
 import { checkExhaustedEntry, checkFallingKnife } from './st-timing-engine.js';
 import { checkPriorityEntryGate, ST_GATE_ENABLED, ST_GATE_MODE, ST_RETEST_MAX_AGE_MIN, ST_RETEST_SIZE_MULT, eventAgeMin, buildEntryTiming, buildEntryContext, ST_BO_ENABLE, ST_BO_SIZE_MULT, checkSpikeBreakout, ST_MIN_BUY_USD } from './st-entry-gate.js';
 import { buildSymKey } from './exchange-registry.js';
+import { earlyCooldownKey } from './early-buy.js';
 import { sendTelegram } from './telegram-commands.js';
 import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
@@ -270,7 +271,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
     if (!buyPrice) return null; // no opinion — no buy price on record to compare against
     const cur = (market.symbols || {})[base + 'USDT']?.price;
     if (cur === undefined || cur === null) return null; // no opinion — no current price available
-    const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ROTATION_SELL_MIN_NET_PNL_PCT;
+    const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY', 'EARLY BUY P0'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ROTATION_SELL_MIN_NET_PNL_PCT;
     return parseFloat(cur) >= parseFloat(buyPrice) * (1 + minPct / 100);
   };
 
@@ -533,7 +534,7 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
   return { changed, rotationCandidates };
 }
 
-// ── 15m Supertrend Priority Execution (Priority-1 / P1) ──
+// ── 15m Supertrend Priority Execution (Priority-2 / P2) ──
 // Per the "15m Supertrend Priority Execution" dev-team note: a confirmed
 // closed-15m Supertrend RED→GREEN cross (detected in leaderboard-scanner.js/
 // market-fetcher.js, persisted as a PENDING st15Event on the symbol's
@@ -543,11 +544,11 @@ async function executeRotation({ ranked, showRecoTags, effectiveExecStrategy, ef
 // breakout, CVD/volume confirmation, Entry Quality Check, BUY/EARLY BUY
 // signal, Top-N ranking, normal cooldown/rotation qualification).
 //
-// NOTE — priority ordering: this is P1, not the top priority. The 5m
-// Supertrend cross (executeST5PriorityRotation, below) is P0 and runs
+// NOTE — priority ordering: this is P2, not the top priority. The 5m
+// Supertrend cross (executeST5PriorityRotation, below) is P1 and runs
 // FIRST each cycle (see leaderboard-decider.js call order) — per the
-// dev-team doc, P0 > P1 > P2 (the normal WATCH/EARLY BUY candidate scan).
-// Originally labeled "Priority-0" here before the 5m/P0 tier existed;
+// dev-team doc, P1 > P2 > P3 (the normal WATCH/EARLY BUY candidate scan).
+// Originally labeled "Priority-1" here before the 5m/P1 tier existed;
 // left this function and its identifiers (ST15_*, st15EventId, etc.)
 // unchanged to avoid an unnecessary rename churn across positions.json /
 // symbol-history.json — only the priority NUMBER changed, not the code.
@@ -568,8 +569,8 @@ const ST15_ENABLE            = (process.env.ST15_ENABLE ?? 'true') === 'true';
 const ST15_PRIORITY_USD_SIZE = parseFloat(process.env.ST15_PRIORITY_USD_SIZE || process.env.TRADE_USD_SIZE || '25');
 
 // ── Rotation-storm controls — dev-team note "ST5 / ST15 Priority Buy &
-// Multi-Alert Rotation". Shared by BOTH executeST5PriorityRotation (P0)
-// and executeSTPriorityRotation/ST15 (P1) below — one repo Variable set
+// Multi-Alert Rotation". Shared by BOTH executeST5PriorityRotation (P1)
+// and executeSTPriorityRotation/ST15 (P2) below — one repo Variable set
 // controls both timeframes, since the storm the note describes was
 // exactly "many independent ST rotations of either timeframe within
 // minutes of each other," not a per-timeframe problem.
@@ -582,7 +583,7 @@ const ST15_PRIORITY_USD_SIZE = parseFloat(process.env.ST15_PRIORITY_USD_SIZE || 
 // ST_ROTATION_COOLDOWN_MIN — after any ST5/ST15 rotation actually SELLS or
 //                         BUYs something, both functions skip entirely
 //                         (leaving events PENDING for next cycle) for this
-//                         long — this is the "only one P0 basket/rotation
+//                         long — this is the "only one P1 basket/rotation
 //                         executes at a time" control, implemented as a
 //                         cooldown rather than a lock file, since every run
 //                         is a fresh process (no in-memory lock would
@@ -640,15 +641,15 @@ const ST_FAILED_SELL_QUARANTINE_MIN  = parseFloat(process.env.ST_FAILED_SELL_QUA
 const ST_ALLOW_OVEREXTENDED_BUY      = (process.env.ST_ALLOW_OVEREXTENDED_BUY || 'false') === 'true';
 const ST_OVEREXTENDED_STOP_LOSS_PCT  = parseFloat(process.env.ST_OVEREXTENDED_STOP_LOSS_PCT || '2');
 
-// P0/P1 bypass checkMarketIntelligence entirely by design (breadth,
+// P1/P2 bypass checkMarketIntelligence entirely by design (breadth,
 // relative-strength-vs-regime, BTC-bear block — see the big comment above
 // executeSTPriorityRotation) — the ONLY place marketRegime touches either
 // function is inside checkExhaustedEntry's override, which only ever
 // WIDENS an entry (RISK_ON + high breadth lets an overextended cross
 // through). There was no symmetric narrowing for a confirmed bad regime —
-// P0/P1 bought identically in a falling market as a rising one. Off by
+// P1/P2 bought identically in a falling market as a rising one. Off by
 // default until validated; when on, blocks (not downsizes — keeping this
-// binary and simple for the first trial) a fresh P0/P1 cross when regime
+// binary and simple for the first trial) a fresh P1/P2 cross when regime
 // reads RISK_OFF. RISK_ON and NEUTRAL are untouched, preserving the whole
 // point of a priority path (speed) outside the one clearly-bad case.
 const ST_PRIORITY_BLOCK_RISK_OFF     = (process.env.ST_PRIORITY_BLOCK_RISK_OFF || 'false') === 'true';
@@ -866,8 +867,8 @@ export async function executeSTPriorityRotation({
     // candle closed and this event fired). st-timing-engine.js's
     // checkFallingKnife/checkExhaustedEntry were built for exactly this
     // (ATR-normalized distance zones + ST5/ST15 direction/slope) but were
-    // originally wired only into the P2 engine (leaderboard-decider.js) —
-    // P0/P1 bought purely on the flip with no exhaustion check at all.
+    // originally wired only into the P3 engine (leaderboard-decider.js) —
+    // P1/P2 bought purely on the flip with no exhaustion check at all.
     // Only the HARD conditions block here (BEAR/BEAR knife, strongly
     // negative ST5 slope, signal-evaluator's own FALLING KNIFE tag, or an
     // EXHAUSTED ATR zone) — WAIT/WAIT_RETEST-style softer states are
@@ -904,7 +905,7 @@ export async function executeSTPriorityRotation({
       }
       // waitRetest (incl. EXHAUSTED as of the 29 Aug 2026 ATR-balance
       // tuning — see st-timing-engine.js) is NOT safe to silently fall
-      // through on here: P0/P1 is designed to bypass soft WAIT states and
+      // through on here: P1/P2 is designed to bypass soft WAIT states and
       // buy on the raw cross, which is exactly what reopens the RENDER/
       // SUI/TAO trap for an entry that's still too extended. Re-check
       // against the LIVE entry (the frozen-at-cross snapshot only carries
@@ -958,7 +959,7 @@ export async function executeSTPriorityRotation({
       }
     }
 
-    console.log(`  🟣  ST15_CROSS_UP — ${pair} [${event.id}] — Priority-0 execution starting`);
+    console.log(`  🟣  ST15_CROSS_UP — ${pair} [${event.id}] — Priority-1 execution starting`);
     logAudit('st15_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
     await sendTelegram(
       `🟣 *HIGH PRIORITY — 15m SUPERTREND CROSS UP* — ${base}USDT — ${utc}\n` +
@@ -974,7 +975,7 @@ export async function executeSTPriorityRotation({
     // against, so it's swept unconditionally same as before) — never the
     // ST target itself.
     //
-    // ST15 is Priority-0 for STRATEGY qualification (grade/conv/cooldown/
+    // ST15 is Priority-1 for STRATEGY qualification (grade/conv/cooldown/
     // momentum/etc. — see the big comment above this function), but that
     // was never meant to force realizing a loss on an unrelated held
     // position just to fund this buy. That's the exact same "never let
@@ -1013,7 +1014,7 @@ export async function executeSTPriorityRotation({
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
-      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST15_MIN_PROFIT_PCT;
+      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY', 'EARLY BUY P0'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST15_MIN_PROFIT_PCT;
       return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + minPct / 100);
     };
 
@@ -1331,14 +1332,14 @@ export async function executeSTPriorityRotation({
   return { changed };
 }
 
-// ── 5m Supertrend Priority Execution (Priority-0 / P0) ──
-// Same mechanism as executeSTPriorityRotation (ST15/P1) above, one
+// ── 5m Supertrend Priority Execution (Priority-1 / P1) ──
+// Same mechanism as executeSTPriorityRotation (ST15/P2) above, one
 // timeframe down — a fresh 5m Supertrend RED→GREEN cross
 // (leaderboard-scanner.js/market-fetcher.js: d.supertrend5m/st5Event).
-// Per the dev-team doc this is the HIGHEST priority buy path: P0 > P1 >
-// P2. leaderboard-decider.js calls this BEFORE executeSTPriorityRotation
-// (ST15) each cycle, so a symbol with both a P0 and a P1 event pending
-// in the same cycle gets bought via P0 first; the P1 pass then sees an
+// Per the dev-team doc this is the HIGHEST priority buy path: P1 > P2 >
+// P3. leaderboard-decider.js calls this BEFORE executeSTPriorityRotation
+// (ST15) each cycle, so a symbol with both a P1 and a P2 event pending
+// in the same cycle gets bought via P1 first; the P2 pass then sees an
 // existing position for that symbol and marks its own event
 // NOOP_ALREADY_HELD rather than attempting a second buy.
 //
@@ -1467,7 +1468,7 @@ export async function executeST5PriorityRotation({
       continue;
     }
 
-    // ── RISK_OFF regime gate — see the matching ST15/P1 comment above. ──
+    // ── RISK_OFF regime gate — see the matching ST15/P2 comment above. ──
     if (ST_PRIORITY_BLOCK_RISK_OFF && marketState?.marketRegime === 'RISK_OFF') {
       event.status = 'BLOCKED_RISK_OFF';
       logAudit('st5_blocked_risk_off', { pair, id: event.id });
@@ -1504,7 +1505,7 @@ export async function executeST5PriorityRotation({
     let st5RetestBuy = false; // set true when this buy waited for / confirmed a pullback
     // ── Falling-knife / ATR-exhaustion gate — see the matching ST15 comment
     // above for the full rationale. Same hard-conditions-only scope: this
-    // is the exact pattern from the RENDER/SUI/TAO trap (all three P0 buys
+    // is the exact pattern from the RENDER/SUI/TAO trap (all three P1 buys
     // fired on an already-extended 5m cross distance with no exhaustion
     // check at all). ──
     if (entry?.supertrend5m && entry?.supertrend15m) {
@@ -1535,7 +1536,7 @@ export async function executeST5PriorityRotation({
       }
       // See the matching ST15 comment above for the full rationale —
       // waitRetest (incl. EXHAUSTED as of the 29 Aug 2026 ATR-balance
-      // tuning) must be requeued, not bypassed, or P0 buys immediately
+      // tuning) must be requeued, not bypassed, or P1 buys immediately
       // into the same over-extended entry the gate exists to stop.
       if (st5Exhausted.waitRetest && st5Spike.ok) {
         st5SpikeUsed = true;
@@ -1583,10 +1584,10 @@ export async function executeST5PriorityRotation({
       }
     }
 
-    console.log(`  🟣  ST5_CROSS_UP — ${pair} [${event.id}] — Priority-0 (P0) execution starting`);
+    console.log(`  🟣  ST5_CROSS_UP — ${pair} [${event.id}] — Priority-1 (P1) execution starting`);
     logAudit('st5_event_consumed', { pair, id: event.id, candleTime: event.candleTime });
     await sendTelegram(
-      `🟢 *HIGH PRIORITY (P0) — 5m SUPERTREND CROSS UP* — ${base}USDT — ${utc}\n` +
+      `🟢 *HIGH PRIORITY (P1) — 5m SUPERTREND CROSS UP* — ${base}USDT — ${utc}\n` +
       `  Price: $${event.close}  5m Supertrend: $${event.supertrend}  Cross distance: +${event.distancePct}%\n` +
       `  Candle: ${event.candleTime}\n` +
       `  Event: \`${event.id}\`\n` +
@@ -1599,7 +1600,7 @@ export async function executeST5PriorityRotation({
     // against, so it's swept unconditionally same as before) — never the
     // ST target itself.
     //
-    // ST5 is Priority-0 for STRATEGY qualification (grade/conv/cooldown/
+    // ST5 is Priority-1 for STRATEGY qualification (grade/conv/cooldown/
     // momentum/etc. — see the big comment above this function), but that
     // was never meant to force realizing a loss on an unrelated held
     // position just to fund this buy. That's the exact same "never let
@@ -1629,7 +1630,7 @@ export async function executeST5PriorityRotation({
     const isAboveBuyPrice = (pos, curPrice) => {
       const buyPrice = pos?.liveOrder?.fillPrice;
       if (!buyPrice || curPrice === undefined || curPrice === null || isNaN(curPrice)) return false; // no data — don't sell blind
-      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST5_MIN_PROFIT_PCT;
+      const minPct = ['ST5 PRIORITY', 'ST15 PRIORITY', 'EARLY BUY P0'].includes(pos?.setup) ? ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT : ST5_MIN_PROFIT_PCT;
       return parseFloat(curPrice) > parseFloat(buyPrice) * (1 + minPct / 100);
     };
 
@@ -1780,7 +1781,7 @@ export async function executeST5PriorityRotation({
     if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
       event.status = 'BLOCKED_MAX_LIVE';
       logAudit('st5_blocked_max_live', { pair, id: event.id, protectedPositions });
-      // See the matching ST15/P1 comment above — engages the rotation
+      // See the matching ST15/P2 comment above — engages the rotation
       // cooldown on a skip, not just a real execution, so this doesn't
       // re-fire and re-alert every cycle. Doesn't touch `changed`.
       markSTRotationExecuted(tradeState);
@@ -1840,7 +1841,7 @@ export async function executeST5PriorityRotation({
     if (effectiveUsdSize <= 0) {
       event.status = 'BLOCKED_ZERO_BALANCE';
       logAudit('st5_blocked_zero_balance', { pair, id: event.id });
-      // See the matching ST15/P1 comment above. Doesn't touch `changed`.
+      // See the matching ST15/P2 comment above. Doesn't touch `changed`.
       markSTRotationExecuted(tradeState);
       await sendTelegram(`🚫 *ST5 CROSS — ${base}* — $0 available after rotation sells (percent sizing) — BUY skipped this cycle.`);
       continue;
@@ -1934,6 +1935,156 @@ export async function executeST5PriorityRotation({
   }
 
   if (changed) markSTRotationExecuted(tradeState);
+  return { changed };
+}
+
+// ── P0 EARLY BUY — pre-spike accumulation, executes BEFORE the 5m cross (P1) ──
+// Candidates come from early-buy.js collectEarlyBuyCandidates (every clause passed, not held, off cooldown).
+// Only runs when EARLY_BUY_MODE=live; 'alert' mode never reaches this function.
+//
+// Deliberately MORE conservative than P1/P2 on everything except timing, because the entry is made before
+// the Supertrend confirms:
+//   * reduced size   - EARLY_BUY_SIZE_PCT (default 40) % of the priority-sized amount
+//   * hard cap       - EARLY_MAX_OPEN simultaneous early positions (default 2), EARLY_MAX_PER_CYCLE new ones per cycle (default 1)
+//   * never rotates  - it does NOT sell another position to fund itself; no free slot / balance = skip
+//   * RISK_OFF block - EARLY_BLOCK_RISK_OFF (default true)
+//   * same safety set as P1/P2 - TRADE_MODE off, /pause, credentials, no-trade list, duplicate holding,
+//     live cap, falling-knife + RSI-overextension checks, slippage guard, minimum buy size
+// The position is then watched by the normal stop / T1 / T2 monitor like every other position.
+const EARLY_SIZE_PCT       = parseFloat(process.env.EARLY_BUY_SIZE_PCT || '40');
+const EARLY_MAX_OPEN       = parseInt(process.env.EARLY_MAX_OPEN || '2', 10);
+const EARLY_MAX_PER_CYCLE  = parseInt(process.env.EARLY_MAX_PER_CYCLE || '1', 10);
+const EARLY_BLOCK_RISK_OFF = (process.env.EARLY_BLOCK_RISK_OFF ?? 'true') === 'true';
+const EARLY_STOP_LOSS_PCT  = process.env.EARLY_STOP_LOSS_PCT ? parseFloat(process.env.EARLY_STOP_LOSS_PCT) : null; // null = global STOP_LOSS_PCT
+
+export async function executeEarlyBuyP0({
+  candidates, market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+  utc, cooldowns, marketState = {},
+}) {
+  let changed = false;
+  if (!candidates?.length) return { changed };
+  if (effectiveTradeMode === 'off') return { changed };
+  if (!tradeState.tradingEnabled) return { changed };           // Telegram /pause kill-switch
+
+  const isOpenEarly = p => p.setup === 'EARLY BUY P0' && !p.liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(p.status);
+  let openEarly = Object.values(positions).filter(isOpenEarly).length;
+  let placed = 0;
+
+  for (const { pair, entry, result } of candidates) {
+    if (placed >= EARLY_MAX_PER_CYCLE) break;
+    const base = pair.replace('USDT', '').replace(/\.\w+$/, '');
+    const sym  = buildSymKey(pair);
+    const skip = (reason, extra = {}) => {
+      cooldowns[earlyCooldownKey(pair)] = Date.now();            // one attempt per cooldown window, whatever the outcome
+      logAudit('early_buy_skipped', { pair, reason, stage: result.stage, ...extra });
+      console.log(`  ⏭  EARLY BUY P0 ${pair} skipped — ${reason}`);
+    };
+
+    if (isNoTradeSymbol(pair))                                   { skip('no_trade_symbol'); continue; }
+    if (effectiveTradeMode === 'live' && (!MEXC_API_KEY || !MEXC_API_SECRET)) { skip('missing_api_credentials'); continue; }
+    if (openEarly >= EARLY_MAX_OPEN)                             { skip('max_open_early', { openEarly, max: EARLY_MAX_OPEN }); continue; }
+    if (Object.values(positions).some(p => p.base === base && p.assetType === 'crypto' && !p.liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(p.status))) {
+      skip('already_held'); continue;
+    }
+    if (EARLY_BLOCK_RISK_OFF && marketState?.marketRegime === 'RISK_OFF') { skip('risk_off'); continue; }
+    if (effectiveTradeMode === 'live' && countLiveOpenPositions(positions) >= effectiveMaxLive) {
+      skip('max_live_cap', { cap: effectiveMaxLive }); continue;  // never rotates another position out to make room
+    }
+    const ext = calcEntryExtension(entry?.d?.r15, entry?.d?.r1h);
+    if (ext.penalty > 0)                                         { skip('overextended', { reason: ext.reason }); continue; }
+    if (entry?.supertrend5m && entry?.supertrend15m) {
+      const knife = checkFallingKnife(entry, entry.supertrend5m, entry.supertrend15m);
+      if (knife.isFallingKnife)                                  { skip('falling_knife', { reasons: knife.reasons }); continue; }
+    }
+
+    // Size: priority-sized total x EARLY_BUY_SIZE_PCT.
+    const { totalUsd } = await computeSTPriorityUsdSize({
+      effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
+      fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'EARLY BUY P0',
+    });
+    const usdSize = parseFloat((totalUsd * (EARLY_SIZE_PCT / 100)).toFixed(2));
+    if (usdSize <= 0)                                            { skip('zero_balance'); continue; }
+    if (ST_MIN_BUY_USD > 0 && usdSize < ST_MIN_BUY_USD)          { skip('below_min_size', { usdSize, minUsd: ST_MIN_BUY_USD }); continue; }
+
+    const now = Date.now();
+    const shock = entry?.d?.shock ?? 1;
+    const signalPrice = parseFloat(entry?.d?.p || entry?.price || 0);
+    const snap = result.snap;
+    const mkPos = () => ({
+      sym, base, assetType: 'crypto', exchangePrefix: entry.exchangePrefix || 'BINANCE', session: '24/7',
+      setup: 'EARLY BUY P0', dir: 'bull',
+      alertedAt: now, holdLockUntil: now,
+      entryPrice: 0, stop: 0, t1: 0, t2: 0,                       // resynced to the real fill just below
+      score: entry.conv ?? null, spikeScore: shock,
+      exitAlertedAt: null, tier1AlertedAt: null,
+      status: 'watching',
+      source: 'early_buy_p0_v1',
+      scoreSource: 'early_buy',
+      earlyStage: result.stage,
+    });
+    const timing = fillPrice => ({
+      eventId: null, entryDelayMin: null, crossClose: null, fillVsCrossPct: null, zone: null,
+      distanceATR: snap.st5DistATR ?? null, retestBuy: result.stage === 'retest', earlyStage: result.stage,
+    });
+    const ctx = () => ({ ...buildEntryContext({ entry, market, marketState }), earlyBuy: true, earlyStage: result.stage, earlyClauses: result.clauses });
+
+    positions[sym] = mkPos();
+    cooldowns[earlyCooldownKey(pair)] = now;
+
+    if (effectiveTradeMode === 'paper') {
+      const fillPrice = signalPrice;
+      const qty = fillPrice > 0 ? usdSize / fillPrice : 0;
+      positions[sym].liveOrder = { mode: 'paper', buyAt: now, usdSize, qty, fillPrice, buyOrderId: `PAPER_EARLY_${now}` };
+      const lvl = recalcLevelsFromFill(fillPrice, shock, signalPrice, EARLY_STOP_LOSS_PCT);
+      if (lvl) { positions[sym].entryPrice = fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
+      positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
+      positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
+      positions[sym].entryStateAtBuy    = 'EARLY_BUY_P0';
+      logAudit('early_buy_paper_buy', { sym, usdSize, fillPrice, stage: result.stage });
+      recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize, timing: { ...timing(fillPrice), ctx: ctx() } });
+      await pushTradeLogToGitHub(loadTradeLog());
+      if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-usdSize);
+      changed = true; placed++; openEarly++;
+      await sendTelegram(`📝 *EARLY BUY (P0) PAPER BUY* — ${base} $${usdSize} USDT @ ~$${fillPrice.toFixed(6)}  [${result.stage}]\n  _Paper mode — no real order placed._`);
+      continue;
+    }
+
+    const slip = await checkBuySlippage(pair, signalPrice, 'EARLY');
+    if (!slip.ok) {
+      delete positions[sym];
+      skip('slippage', { signalPrice, curPrice: slip.curPrice, driftPct: slip.driftPct });
+      continue;
+    }
+    console.log(`  🟡  EARLY BUY (P0) LIVE BUY — ${pair} $${usdSize} USDT via MEXC...`);
+    try {
+      const buy = await mexcMarketBuy(MEXC_API_KEY, MEXC_API_SECRET, pair, usdSize);   // bare pair, not the prefixed sym key
+      positions[sym].liveOrder = {
+        mode: 'live', buyAt: now, usdSize,
+        qty: buy.executedQty, fillPrice: buy.fillPrice, buyOrderId: buy.orderId, qtyEstimated: buy.estimated || false,
+      };
+      const lvl = recalcLevelsFromFill(buy.fillPrice, shock, signalPrice, EARLY_STOP_LOSS_PCT);
+      if (lvl) { positions[sym].entryPrice = buy.fillPrice; positions[sym].stop = lvl.stop; positions[sym].t1 = lvl.t1; positions[sym].t2 = lvl.t2; }
+      positions[sym].entrySnapshot      = buildEntrySnapshot(entry || {}, {});
+      positions[sym].entryTriggerStatus = entry.triggerStatus ?? null;
+      positions[sym].entryStateAtBuy    = 'EARLY_BUY_P0';
+      logAudit('early_buy_live_buy', { sym, usdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId, stage: result.stage });
+      recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize, timing: { ...timing(buy.fillPrice), ctx: ctx() } });
+      await pushTradeLogToGitHub(loadTradeLog());
+      changed = true; placed++; openEarly++;
+      await sendTelegram(
+        `🟡 *EARLY BUY (P0) LIVE BUY* — ${base} — ${utc}\n` +
+        `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
+        `  Size: $${usdSize} USDT (${EARLY_SIZE_PCT}% of priority size)  Order ID: \`${buy.orderId}\`\n` +
+        `  Pre-cross [${result.stage}]: ST5 ${snap.st5Dir} ${snap.st5DistATR} ATR · BullConf ${snap.bullConf}/10 · whale ${snap.whale} · CVD ${snap.cvd} · OI ${snap.oiDiv}\n` +
+        `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
+        `  _Send /pause to halt further auto-buys_`
+      );
+    } catch (e) {
+      delete positions[sym];
+      logAudit('early_buy_live_buy_failed', { sym, error: e.message });
+      await sendTelegram(`🚨 *EARLY BUY (P0) BUY FAILED* — ${base}: ${e.message}\n  No order was confirmed; no position tracked. Check MEXC manually if unsure.`);
+    }
+  }
   return { changed };
 }
 

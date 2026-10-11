@@ -119,13 +119,13 @@ function buildST15Event(prev, st15, st5, base) {
   };
 }
 
-// ── 5m Supertrend Priority Execution (Priority-0 / P0) — same idempotency
+// ── 5m Supertrend Priority Execution (Priority-1 / P1) — same idempotency
 // design as buildST15Event above, one timeframe down. Candle open time
 // (not detection time) is the id key, so re-fetching the same closed 5m
 // candle across cycles never creates a second event, and a sustained
 // bullish ST5 direction that isn't a fresh cross (crossUp=false) never
 // creates one at all — "a persistent bullish ST5 state does not generate
-// repeated P0 buys" per the dev-team acceptance criteria.
+// repeated P1 buys" per the dev-team acceptance criteria.
 function buildST5Event(prev, st5, st15, base) {
   const prevEvent = prev?.st5Event || null;
   if (!st5) return prevEvent;
@@ -204,8 +204,8 @@ function buildEntry(r, prev, now, session) {
     ? buildST15Event(prev, r.d?.supertrend15m, r.d?.supertrend5m, st15Base)
     : (prev?.st15Event || null);
 
-  // ── 5m Supertrend Priority Execution (P0) — same pattern, one timeframe
-  // down. Highest priority of the three buy paths (P0 > P1/ST15 > P2/
+  // ── 5m Supertrend Priority Execution (P1) — same pattern, one timeframe
+  // down. Highest priority of the three buy paths (P1 > P2/ST15 > P3/
   // normal candidate scan) — see mexc-trader.js executeSTPriorityRotation.
   const st5Event = r.assetType === 'crypto'
     ? buildST5Event(prev, r.d?.supertrend5m, r.d?.supertrend15m, st15Base)
@@ -235,9 +235,9 @@ function buildEntry(r, prev, now, session) {
     momentumContinuation: trigger?.momentumContinuation ?? false, // TRIGGERING reached via the looser rising-5m-candle path, not a level reclaim — caller must size down
     risingStreak:       trigger?.risingStreak ?? 0,
     supertrend15m:  r.d?.supertrend15m || null,   // { value, direction, previousDirection, crossUp, close, lastClosedCandle, distancePct }
-    st15Event,                                     // Priority-1 (P1) event — PENDING until leaderboard-decider.js/mexc-trader.js consume it
+    st15Event,                                     // Priority-2 (P2) event — PENDING until leaderboard-decider.js/mexc-trader.js consume it
     supertrend5m:   r.d?.supertrend5m || null,     // same shape as supertrend15m, 5m timeframe
-    st5Event,                                      // Priority-0 (P0) event — highest priority buy path; PENDING until consumed
+    st5Event,                                      // Priority-1 (P1) event — highest priority buy path; PENDING until consumed
     bullConf:       r.bullConf,
     bullChecks:     r.bullChecks,
     whale:          r.whale,
