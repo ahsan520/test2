@@ -1294,13 +1294,13 @@ function _mdSt15Cell(e) {
       : { label: '—', color: 'var(--text-dim)', title };
 }
 
-// ── ST5 cell (Priority-0 / P0) — same read-only, server-computed pattern
+// ── ST5 cell (Priority-1 / P1) — same read-only, server-computed pattern
 // as _mdSt15Cell above, one timeframe down. e.st5Event / e.supertrend5m are
 // persisted by market-fetcher.js exactly like their ST15 counterparts, so
 // this is a straight duplicate with the field names swapped — no new
 // logic, deliberately kept in sync with _mdSt15Cell rather than sharing a
 // helper, so the two can diverge later (e.g. different status labels) if
-// P0 vs P1 ever need to look different, without one edit silently
+// P1 vs P2 ever need to look different, without one edit silently
 // changing both columns.
 function _mdSt5Cell(e) {
   const ev = e.st5Event;
@@ -1397,7 +1397,7 @@ const _MD_SORT_ACCESSORS = {
     const dirRank = e.supertrend15m?.direction === 'BULL' ? 1 : e.supertrend15m?.direction === 'BEAR' ? 0 : -1;
     return dirRank * 100 + (e.supertrend15m?.distancePct ?? 0) / 100;
   },
-  // Same pattern as st15 above, one timeframe down — P0 instead of P1.
+  // Same pattern as st15 above, one timeframe down — P1 instead of P2.
   st5: e => {
     const ev = e.st5Event;
     const evRank = ev ? (_MD_ST15_STATUS_RANK[ev.status] ?? 1) : 0; // same status vocabulary/rank as ST15, shared map
