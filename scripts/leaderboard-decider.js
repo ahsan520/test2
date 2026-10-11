@@ -42,6 +42,7 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 import { checkEntryQuality } from './entry-quality-check.js';
 import { evaluateSTTiming } from './st-timing-engine.js';
 
+import { collectEarlyBuyAlerts, EARLY_MODE } from './early-buy.js';
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
 // Off by default; each threshold is independently overridable via repo
@@ -642,6 +643,19 @@ async function main() {
   // see below — has cooldown state available on the early no-candidate
   // return path too, not just the normal buy path.
   const cooldowns = loadCooldowns();
+
+  // ── EARLY BUY (P0 pre-spike accumulation) — ALERT-ONLY, evaluated first every cycle ──
+  // Flags coins before the 5m/15m Supertrend cross buys them. Never executes a buy and does not
+  // change the existing P0 ST5 > P1 ST15 > P2 order; see early-buy.js and EARLY_BUY_MODE.
+  const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns, positions, logAudit });
+  if (earlyLines.length) {
+    await sendTelegram([
+      `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
+      `Alert only, no auto-buy. Pre-cross setup: flow and volume are turning up before the Supertrend confirms.`,
+      '', earlyLines.join('\n\n'),
+    ].join('\n'));
+  }
+  if (EARLY_MODE !== 'off') saveCooldowns(cooldowns);
 
   // Pre-screen — bail early if nothing clears min score
   const anyCandidate = entries.some(([, entry]) => {

@@ -33,6 +33,7 @@ SKIP_ACTIONS = {
     "st5_skipped_late_retest", "st15_skipped_late_retest",
     "st5_wait_retest", "st15_wait_retest",
     "st5_expired", "st15_expired",
+    "early_buy_candidate",            # shadow EARLY BUY (P0) hits and near-misses, see early-buy.js
 }
 # ...and the ones where it DID, for comparison
 TAKEN_ACTIONS = {"st5_live_buy", "st15_live_buy", "st5_overextended_override",
@@ -62,6 +63,9 @@ def load_events(paths):
             sym = sym.split(":")[-1].upper()            # "BINANCE:RENDERUSDT" -> "RENDERUSDT"
             if not sym.endswith("USDT"):
                 sym += "USDT"
+            if a == "early_buy_candidate":              # label by how close it was to a full pass
+                failed = r.get("failed") or []
+                a = "early_strict" if r.get("strict") else (f"early_miss:{failed[0]}" if len(failed) == 1 else f"early_miss:{len(failed)} clauses")
             kind = "taken" if a in TAKEN_ACTIONS else "skipped"
             key = (kind, r.get("id") or (sym, a, r["timestamp"][:13]))
             ts = parse_ts(r["timestamp"])
