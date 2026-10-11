@@ -1,0 +1,82 @@
+name: Entry Rule Backtest
+
+# Manual only. Replays our entry rules (5m Supertrend cross, wait-for-retest, pre-cross breakout,
+# squeeze breakout, pullback reclaim) and a random-entry control on real Binance 5m candles through
+# the same exits the bot uses, and prints the comparison in the run summary.
+# Runs on a GitHub-hosted runner (no certificates / network access needed on your machine).
+# Read-only: it never touches positions, trades or state files.
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of history (30 is quick; 60-90 gives more trades)'
+        required: false
+        default: '45'
+      stop_pct:
+        description: 'Stop loss %'
+        required: false
+        default: '1.25'
+      t1_pct:
+        description: 'T1 take-profit % (0 = no target, trail only)'
+        required: false
+        default: '3'
+      fee_pct:
+        description: 'Round-trip fee % (check your MEXC tier)'
+        required: false
+        default: '0.1'
+      stop_sweep:
+        description: 'Also compare stop distances (comma list, blank = skip)'
+        required: false
+        default: '0.4,0.7,1.0,1.25,1.5'
+      delay_bars:
+        description: 'Bars between the signal candle and the entry (1 = next candle open)'
+        required: false
+        default: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run backtest
+        env:
+          DAYS: ${{ inputs.days }}
+          STOP_PCT: ${{ inputs.stop_pct }}
+          T1_PCT: ${{ inputs.t1_pct }}
+          FEE_PCT: ${{ inputs.fee_pct }}
+          DELAY_BARS: ${{ inputs.delay_bars }}
+          STOP_SWEEP: ${{ inputs.stop_sweep }}
+        run: |
+          set -o pipefail
+          SWEEP=()
+          [ -n "$STOP_SWEEP" ] && SWEEP=(--stop-sweep "$STOP_SWEEP")
+          python3 scripts/backtest_entries.py --days "$DAYS" --stop "$STOP_PCT" --t1 "$T1_PCT" \
+            --fee "$FEE_PCT" --delay-bars "$DELAY_BARS" "${SWEEP[@]}" --out trades.json 2>&1 | tee result.txt
+          {
+            echo '### Entry rule backtest'
+            echo '```'
+            cat result.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save result
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest-${{ github.run_id }}
+          path: |
+            result.txt
+            trades.json
+          retention-days: 90
