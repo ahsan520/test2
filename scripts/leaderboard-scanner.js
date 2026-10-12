@@ -16,7 +16,7 @@ import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry
 import { evaluateBuyReadiness, evaluateStockBuyReadiness, calcSpikeTrigger } from './buy-intelligence.js';
 import { classifySignal, isBuyEligible } from './signal-evaluator.js';
 import { runAllBuyGuards, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
-import { loadMarketData, loadMarketState, loadPositions } from './job-state.js';
+import { loadMarketData, loadMarketState, loadPositions, priceDecimals } from './job-state.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -769,7 +769,7 @@ function calcEntryLevels(price, shock) {
   const p = parseFloat(price) || 0;
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp    = p < 10 ? 4 : 2;
+  const dp    = priceDecimals(p);
   // Entry = current price, no chase markup. All buys execute as MEXC MARKET
   // orders anyway (fills near-instantly at whatever price is live) — the old
   // +0.4% markup didn't change what got paid, it just inflated the reference

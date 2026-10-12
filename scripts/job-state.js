@@ -83,10 +83,15 @@ export const SKIP_SETUPS = new Set(['SHORT SETUP']);
 // precision can't silently differ between the code that OPENS a
 // position and the code that MONITORS it.
 export function priceDecimals(p) {
-  if (p < 0.01) return 6;
-  if (p < 1)    return 4;
-  if (p < 100)  return 3;
-  return 2;
+  // ~5 significant digits below $10 so a stop is never rounded away (or rounded ABOVE price):
+  // $0.002462 -> 7 dp, $0.2 -> 5 dp, $1.39 -> 4 dp. The old fixed tiers (and `p < 10 ? 4 : 2` in the
+  // decider/trader) turned GALA's entry into 0.0025 and its stop into a value above the market price,
+  // which stopped the position out within one monitor cycle.
+  const v = Number(p);
+  if (!(v > 0)) return 4;
+  if (v >= 100) return 2;
+  if (v >= 10)  return 3;
+  return Math.min(10, Math.max(4, 4 - Math.floor(Math.log10(v))));
 }
 
 // ── Generic I/O helpers ──
@@ -387,14 +392,25 @@ export async function pushTradeLogToGitHub(tradeLog) {
 // useful history. 3000 entries is roughly several days of activity at
 // typical per-cycle volume, which is what the GUI's API Audit tab needs to
 // show something meaningful rather than just the last run or two.
-const AUDIT_MAX_ROWS = 3000;
+const AUDIT_MAX_ROWS = 2500;
+
+// Keeps audit.json useful for replay (missed_signal_check needs hours of history): count cap, and the
+// bulky per-pair `results` array is dropped from all but the newest fetch_complete rows.
+export function compactAudit(logs, keepFullFetch = 6) {
+  if (logs.length > AUDIT_MAX_ROWS) logs = logs.slice(logs.length - AUDIT_MAX_ROWS);
+  let seen = 0;
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if (logs[i].action === 'fetch_complete' && logs[i].results) { if (++seen > keepFullFetch) delete logs[i].results; }
+  }
+  return logs;
+}
 
 export function logAudit(action, details = {}) {
   const entry = { timestamp: new Date().toISOString(), job: 'leaderboard-decider', action, ...details };
   let logs = [];
   try { logs = JSON.parse(fs.readFileSync(AUDIT_PATH, 'utf8')); if (!Array.isArray(logs)) logs = []; } catch {}
   logs.push(entry);
-  if (logs.length > AUDIT_MAX_ROWS) logs = logs.slice(logs.length - AUDIT_MAX_ROWS);
+  logs = compactAudit(logs);
   fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2));
 }
 

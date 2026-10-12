@@ -33,6 +33,7 @@ import {
   logAudit, MEXC_API_KEY, MEXC_API_SECRET,
   loadTradeLog, recordTradeOpen, recordTradeClose, pushTradeLogToGitHub, hasOpenTradeLogEntry,
   loadPaperBalance, adjustPaperBalance,
+  priceDecimals,
 } from './job-state.js';
 
 // ── Post-fill level resync — anchors entryPrice/stop/t1/t2 to the price
@@ -70,7 +71,7 @@ function recalcLevelsFromFill(fillPrice, shock = 1, signalPrice = null, stopPctO
   const p = parseFloat(fillPrice) || 0;
   if (!p) return null;
   const atr = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp  = p < 10 ? 4 : 2;
+  const dp  = priceDecimals(p);
   // stopPctOverride (added for the ST5/ST15 overextended-buy override, see
   // ST_ALLOW_OVEREXTENDED_BUY below) lets a caller widen the stop for a
   // specific buy without touching the global STOP_LOSS_PCT everyone else
@@ -1959,7 +1960,7 @@ const EARLY_STOP_LOSS_PCT  = process.env.EARLY_STOP_LOSS_PCT ? parseFloat(proces
 
 export async function executeEarlyBuyP0({
   candidates, market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
-  utc, cooldowns, marketState = {},
+  utc, cooldowns, marketState = {}, guardSizeMult = 1,
 }) {
   let changed = false;
   if (!candidates?.length) return { changed };
@@ -2002,7 +2003,7 @@ export async function executeEarlyBuyP0({
       effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
       fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'EARLY BUY P0',
     });
-    const usdSize = parseFloat((totalUsd * (EARLY_SIZE_PCT / 100)).toFixed(2));
+    const usdSize = parseFloat((totalUsd * (EARLY_SIZE_PCT / 100) * (guardSizeMult > 0 && guardSizeMult < 1 ? guardSizeMult : 1)).toFixed(2));
     if (usdSize <= 0)                                            { skip('zero_balance'); continue; }
     if (ST_MIN_BUY_USD > 0 && usdSize < ST_MIN_BUY_USD)          { skip('below_min_size', { usdSize, minUsd: ST_MIN_BUY_USD }); continue; }
 
@@ -2173,7 +2174,8 @@ export async function adoptManualHoldings({ positions, market, evaluateSymbol, c
     // check in this codebase (MEXC_MIN_SELL_NOTIONAL_USDT, default $1).
     const estNotionalPreAdopt = bal.free * (entry.price || 0);
     if (entry.price > 0 && estNotionalPreAdopt < MIN_SELL_NOTIONAL_USDT) {
-      logAudit('adoption_skipped_dust', { sym, base, free: bal.free, estNotional: estNotionalPreAdopt });
+      // console only: logging this every cycle filled ~half of audit.json with identical rows
+      console.log(`  \u00b7 adoption skipped (dust) ${base}: ${bal.free} \u2248 $${estNotionalPreAdopt.toFixed(2)}`);
       continue; // silent, no Telegram alert — this is expected/routine, not worth a message every cycle
     }
 

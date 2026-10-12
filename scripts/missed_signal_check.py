@@ -181,7 +181,10 @@ def main():
 
     events = load_events(args.audit)
     if not events:
-        sys.exit("No skipped/taken ST events found in the audit file(s).")
+        print("No skipped/taken ST events found in the audit file(s) - nothing to replay.")
+        print("Normal when the market guard paused buys, or the audit window is short. Not an error.")
+        print("Tip: pass several saved audit snapshots with repeated --audit to widen the window.")
+        sys.exit(0)
     minutes = int(args.hours * 60)
     print(f"{len(events)} events | stop {args.stop}% | T1 {args.t1}% | horizon {args.hours}h | fee {args.fee}%")
     skipped, taken, failed = [], [], 0

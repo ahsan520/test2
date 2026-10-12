@@ -19,7 +19,7 @@ import { calcConviction, getSetupMode } from './leaderboard-scanner.js';
 import { buildSymKey, cooldownKey } from './exchange-registry.js';
 
 import {
-  logAudit, pushPositionsToGitHub, SKIP_SETUPS, TERMINAL_EVICT_MS,
+  logAudit, pushPositionsToGitHub, SKIP_SETUPS, TERMINAL_EVICT_MS, priceDecimals,
   TRADE_MODE, TRADE_USD_SIZE, TRADE_MAX_LIVE,
   DRY_RUN, TG_ENABLED,
   MEXC_API_KEY, MEXC_API_SECRET,
@@ -217,7 +217,7 @@ function calcEntryLevels(price, shock) {
   const p = parseFloat(price) || 0;
   if (!p) return null;
   const atr   = p * 0.015 * Math.max(1, shock * 0.5);
-  const dp    = p < 10 ? 4 : 2;
+  const dp    = priceDecimals(p);
   // Entry = current price, no chase markup. Every buy is a MEXC MARKET
   // order (fills near-instantly at whatever price is live) — the old
   // +0.4% markup never changed what got paid, it just inflated the
@@ -554,14 +554,23 @@ async function main() {
     if (EARLY_MODE === 'live') {
       const cands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit });
       if (cands.length) {
-        const earlyRes = await executeEarlyBuyP0({
-          candidates: cands, market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
-          utc: new Date().toUTCString().slice(17, 22) + ' UTC',
-          cooldowns: earlyCooldowns, marketState,
-        });
-        if (earlyRes.changed) {
-          savePositions(positions);
-          await pushPositionsToGitHub(positions);
+        // P0 runs before the main guard step, so apply the SAME market guard here. Early Buy is the most
+        // speculative tier: it needs the full guard to allow buys (BTC 4H regime, circuit breaker, panic,
+        // blackout) - no Alpha Exception - and it inherits the guard's size multiplier.
+        const earlyGuard = runAllBuyGuards(market, positions, marketState);
+        if (!earlyGuard.canBuy || earlyGuard.hardBlocked || earlyGuard.closeAll) {
+          logAudit('early_buy_blocked_by_guard', { pairs: cands.map(c => c.pair), reasons: earlyGuard.reasons });
+          console.log(`  \u26d4  EARLY BUY (P0): ${cands.length} candidate(s) held back by market guard \u2014 ${earlyGuard.reasons.join('; ') || 'canBuy=false'}`);
+        } else {
+          const earlyRes = await executeEarlyBuyP0({
+            candidates: cands, market, positions, tradeState, effectiveTradeMode, effectiveMaxLive,
+            utc: new Date().toUTCString().slice(17, 22) + ' UTC',
+            cooldowns: earlyCooldowns, marketState, guardSizeMult: earlyGuard.sizeMult,
+          });
+          if (earlyRes.changed) {
+            savePositions(positions);
+            await pushPositionsToGitHub(positions);
+          }
         }
       }
     } else {

@@ -71,8 +71,10 @@ function logAudit(action, details = {}) {
     if (!Array.isArray(logs)) logs = [];
   } catch {}
   logs.push(entry);
-  const cutoff = Date.now() - 60 * 60 * 1000;
-  logs = logs.filter(e => new Date(e.timestamp).getTime() >= cutoff);
+  // Count cap (not a 1-hour window): a 1-hour window meant audit.json never held enough history for
+  // missed_signal_check, and job-state.js already uses a count cap. Heavy fetch results kept for newest 6 only.
+  if (logs.length > 2500) logs = logs.slice(logs.length - 2500);
+  { let seen = 0; for (let i = logs.length - 1; i >= 0; i--) if (logs[i].action === 'fetch_complete' && logs[i].results && ++seen > 6) delete logs[i].results; }
   fs.writeFileSync(AUDIT_PATH, JSON.stringify(logs, null, 2));
 }
 
