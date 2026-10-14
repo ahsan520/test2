@@ -34,8 +34,14 @@ const ST15_MAX_BEAR_ATR = num('EARLY_ST15_MAX_BEAR_ATR', '2.5');   // 15m Supert
 const MAX_CHG24   = num('EARLY_MAX_CHG24', '12');                   // skip coins already up more than this % on the day (0 disables)
 const LOG_MAX_FAILED = num('EARLY_LOG_MAX_FAILED', '2');   // audit-log strict passes and coins failing at most this many clauses
 const BAD_SIGNAL  = ['falling knife', 'weak', 'avoid'];
+// OI momentum (market-state.json symbols[pair].oiMomentum.trend: ACCELERATING | FLAT | FADING). P0 is a pre-spike
+// accumulation entry, so it must not buy while OI momentum is FADING. NOTE: oiMomentum is a funding-rate proxy
+// (proxy:true) - this codebase does not fetch raw open interest. Set EARLY_REQUIRE_OI_MOMENTUM=false to disable.
+// Missing market-state / symbol / trend = clause passes (same "skip silently" convention as the other market-state gates).
+const OI_MOM_REQUIRE = (process.env.EARLY_REQUIRE_OI_MOMENTUM ?? 'true').toLowerCase() !== 'false';
+const OI_MOM_BLOCK   = (process.env.EARLY_OI_MOMENTUM_BLOCK || 'FADING').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 
-export function evaluateEarlyBuy(entry) {
+export function evaluateEarlyBuy(entry, symbolState = null) {
   const d   = entry?.d || {};
   const st5 = entry?.supertrend5m || d.supertrend5m || null;
   const sig = String(entry?.signal || '').toLowerCase();
@@ -52,11 +58,14 @@ export function evaluateEarlyBuy(entry) {
   const st15Ok = st15 == null || !(st15Dir === 'BEAR' && st15Dist != null && st15Dist < -ST15_MAX_BEAR_ATR);
 
   const trig = String(entry?.triggerStatus || '').toUpperCase();
+  const oiMomTrend = String(symbolState?.oiMomentum?.trend || '').toUpperCase() || null;
   const clauses = {
     bullConf:     entry?.bullConf != null && entry.bullConf >= BULL_MIN && entry.bullConf <= BULL_MAX,
     shock:        parseFloat(d.shock) > SHOCK_MIN,
     cvdUp:        String(d.cvdTrend || '').toLowerCase() === 'up',
     oiOk:         OI_ACCEPT.includes(String(d.oiDiv || '').toUpperCase()),
+    // OI momentum must not be fading (market-state.json oiMomentum.trend).
+    oiMomentumOk: !OI_MOM_REQUIRE || oiMomTrend == null || !OI_MOM_BLOCK.includes(oiMomTrend),
     buyIntel:     (entry?.buyIntelPenalty ?? 0) <= MAX_PENALTY,
     whale:        (entry?.whale?.score ?? 0) >= WHALE_MIN,
     signalSafe:   !BAD_SIGNAL.some(w => sig.includes(w)),
@@ -74,7 +83,8 @@ export function evaluateEarlyBuy(entry) {
     pass: failed.length === 0, failed, clauses, stage,
     snap: {
       price: entry?.price ?? null, conv: entry?.conv ?? null, bullConf: entry?.bullConf ?? null,
-      shock: d.shock ?? null, cvd: d.cvdTrend ?? null, oiDiv: d.oiDiv ?? null, whale: entry?.whale?.score ?? null,
+      shock: d.shock ?? null, cvd: d.cvdTrend ?? null, oiDiv: d.oiDiv ?? null,
+      oiMomTrend, oiMomentum: symbolState?.oiMomentum?.momentum ?? null, whale: entry?.whale?.score ?? null,
       buyIntelPenalty: entry?.buyIntelPenalty ?? null, r15: d.r15 ?? null, signal: entry?.signal ?? null,
       trigger: entry?.triggerStatus ?? null, entryState: entry?.entryState ?? null,
       st5Dir: st5?.direction ?? null, st5DistATR: dist ?? null, chg24: entry?.chg ?? null,
@@ -88,7 +98,7 @@ export function evaluateEarlyBuy(entry) {
 // cooldown - the caller does (collectEarlyBuyAlerts for alert mode, executeEarlyBuyP0 for live mode).
 export const earlyCooldownKey = pair => `lb_early_${pair}`;
 
-export function collectEarlyBuyCandidates({ entries, cooldowns, positions = {}, logAudit = () => {}, now = Date.now() }) {
+export function collectEarlyBuyCandidates({ entries, cooldowns, positions = {}, logAudit = () => {}, now = Date.now(), marketState = null }) {
   if (EARLY_MODE === 'off') return [];
   const heldBases = new Set(Object.values(positions)
     .filter(p => p && !p.liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(p.status))
@@ -96,7 +106,7 @@ export function collectEarlyBuyCandidates({ entries, cooldowns, positions = {}, 
   const out = [];
   for (const [pair, entry] of entries) {
     if (entry.assetType !== 'crypto' || entry.marketClosed) continue;
-    const r = evaluateEarlyBuy(entry);
+    const r = evaluateEarlyBuy(entry, marketState?.symbols?.[pair] ?? null);
     if (r.pass || r.failed.length <= LOG_MAX_FAILED) {
       const lk = `lb_early_log_${pair}`;
       if (now - (cooldowns[lk] || 0) >= 60 * 60000) {
@@ -119,13 +129,13 @@ export function formatEarlyBuyLine({ pair, result: r }) {
   const s = r.snap, base = String(pair).replace(/^BINANCE:/, '').replace(/USDT$/, '');
   return [
     `🟡 *${base}* — $${s.price}  \`P0\` · \`EARLY_BUY\`  [${r.stage}: ST5 ${s.st5Dir} ${s.st5DistATR} ATR · ST15 ${s.st15Dir} ${s.st15DistATR} ATR]`,
-    `  BullConf ${s.bullConf}/10 · shock ${s.shock}x · CVD ${s.cvd} · OI ${s.oiDiv} · whale ${s.whale} · RSI15 ${s.r15}`,
+    `  BullConf ${s.bullConf}/10 · shock ${s.shock}x · CVD ${s.cvd} · OI ${s.oiDiv} · OImom ${s.oiMomTrend ?? 'n/a'} · whale ${s.whale} · RSI15 ${s.r15}`,
     `  Signal ${s.signal} · trigger ${s.trigger} · conv ${s.conv} · buy-intel penalty ${s.buyIntelPenalty}`,
   ].join('\n');
 }
 
 // Alert-mode wrapper (unchanged contract): lines for passing coins, marks the alert cooldown. Caller sends.
-export function collectEarlyBuyAlerts({ entries, cooldowns, positions = {}, logAudit = () => {}, now = Date.now() }) {
-  const cands = collectEarlyBuyCandidates({ entries, cooldowns, positions, logAudit, now });
+export function collectEarlyBuyAlerts({ entries, cooldowns, positions = {}, logAudit = () => {}, now = Date.now(), marketState = null }) {
+  const cands = collectEarlyBuyCandidates({ entries, cooldowns, positions, logAudit, now, marketState });
   return cands.map(c => { cooldowns[earlyCooldownKey(c.pair)] = now; return formatEarlyBuyLine(c); });
 }

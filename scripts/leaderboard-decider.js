@@ -552,7 +552,7 @@ async function main() {
   if (EARLY_MODE !== 'off' && !dataIsStale) {
     const earlyCooldowns = loadCooldowns();
     if (EARLY_MODE === 'live') {
-      const cands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit });
+      const cands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
       if (cands.length) {
         // P0 runs before the main guard step, so apply the SAME market guard here. Early Buy is the most
         // speculative tier: it needs the full guard to allow buys (BTC 4H regime, circuit breaker, panic,
@@ -574,7 +574,7 @@ async function main() {
         }
       }
     } else {
-      const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns: earlyCooldowns, positions, logAudit });
+      const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
       if (earlyLines.length) {
         await sendTelegram([
           `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
