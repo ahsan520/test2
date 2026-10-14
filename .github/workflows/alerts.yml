@@ -371,8 +371,8 @@ jobs:
           # EARLY BUY (P0 pre-spike, top tier: P0 Early Buy > P1 5m ST > P2 15m ST > P3 scan/MOM WATCH).
           # EARLY_BUY_MODE: off | alert (Telegram+audit only, default) | live (also buys, reduced size, never rotates). See scripts/early-buy.js.
           EARLY_BUY_MODE:                 ${{ vars.EARLY_BUY_MODE || 'alert' }}
-          EARLY_SHOCK_MIN:                ${{ vars.EARLY_SHOCK_MIN || '1.0' }}
-          EARLY_BULLCONF_MIN:             ${{ vars.EARLY_BULLCONF_MIN || '3' }}
+          EARLY_SHOCK_MIN:                ${{ vars.EARLY_SHOCK_MIN || '.8' }}
+          EARLY_BULLCONF_MIN:             ${{ vars.EARLY_BULLCONF_MIN || '1' }}
           EARLY_BULLCONF_MAX:             ${{ vars.EARLY_BULLCONF_MAX || '7' }}
           EARLY_WHALE_MIN:                ${{ vars.EARLY_WHALE_MIN || '60' }}
           EARLY_MAX_RSI15:                ${{ vars.EARLY_MAX_RSI15 || '68' }}
