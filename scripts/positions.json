@@ -35,7 +35,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792020964167
+      "evaluatedAt": 1792021265998
     }
   },
   "TSX:HOU.TO": {
@@ -108,9 +108,9 @@
     "t2": 585.35,
     "score": 3,
     "spikeScore": 1.5707030982785433,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1792021265998,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "st5_priority_v1",
     "scoreSource": "st5_cross",
     "st5EventId": "ST5-XMR-20261014T205000Z",
@@ -122,7 +122,10 @@
       "qty": 0.472,
       "fillPrice": 552.2174231177095,
       "buyOrderId": "C02__739162321611280384036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__739200071345557504036",
+      "exitFillPrice": 550.9326271186442,
+      "closedAt": 1792021267200
     },
     "entrySnapshot": {
       "at": 1792012266939,
@@ -154,24 +157,24 @@
     "entryTriggerStatus": "FAILED",
     "entryStateAtBuy": "ST5_CROSS_UP",
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 69 ≥ 50 (stale+flat nudge applied, +15)",
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 46 below 50 threshold",
       "fallingKnifeScore": 53,
-      "thesisDrop": 47,
+      "thesisDrop": 25,
       "confidenceDecay": 29,
-      "exitProbability": 69,
-      "dynamicPositionRisk": 69,
+      "exitProbability": 46,
+      "dynamicPositionRisk": 46,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792020964167
+      "evaluatedAt": 1792021265998
     },
     "highestPnLSeen": 0.52,
     "lowestPnLSeen": -0.32,
-    "lastR15": 48.9,
+    "lastR15": 47.7,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.52% below 0.8% floor — not evaluated yet",
@@ -179,9 +182,11 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792020964167
+      "evaluatedAt": 1792021265998
     },
     "piPartialLevel": 2,
-    "piReduceAlertedAt": 1792020964167
+    "piReduceAlertedAt": 1792020964167,
+    "exitPrice": 550.46,
+    "statusChangedAt": 1792021265998
   }
 }
