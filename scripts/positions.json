@@ -114,24 +114,24 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 32 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 7,
-      "thesisDrop": -1,
-      "confidenceDecay": 14,
-      "exitProbability": 32,
-      "dynamicPositionRisk": 32,
+      "action": "REDUCE_50",
+      "reason": "dynamicPositionRisk 71 ≥ 70 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "fallingKnifeScore": 50,
+      "thesisDrop": 40,
+      "confidenceDecay": 43,
+      "exitProbability": 71,
+      "dynamicPositionRisk": 71,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 5
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792109162856
+      "evaluatedAt": 1792109466751
     },
     "highestPnLSeen": 0.21,
     "lowestPnLSeen": -0.65,
-    "lastR15": 65.3,
+    "lastR15": 62.4,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.21% below 0.8% floor — not evaluated yet",
@@ -139,9 +139,9 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792109162856
+      "evaluatedAt": 1792109466751
     },
     "piPartialLevel": 2,
-    "piReduceAlertedAt": 1792106580036
+    "piReduceAlertedAt": 1792109466751
   }
 }
