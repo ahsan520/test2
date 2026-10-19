@@ -15,9 +15,9 @@
     "t2": 1.3933,
     "score": 7,
     "spikeScore": 0.9124451879569612,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1792397463303,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "approach",
@@ -28,7 +28,10 @@
       "qty": 573.145717,
       "fillPrice": 1.3144,
       "buyOrderId": "C02__740750237097676800036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__740777957076692992036",
+      "exitFillPrice": 1.3108,
+      "closedAt": 1792397464483
     },
     "entrySnapshot": {
       "at": 1792390855539,
@@ -60,20 +63,20 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
-      "action": "REDUCE_25",
-      "reason": "dynamicPositionRisk 56 ≥ 50 (breakout-fail boost +18 applied — price back below entry breakout level)",
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 81 → current 18 (drop 63 > 60) — price also back below entry breakout level",
       "fallingKnifeScore": 33,
-      "thesisDrop": 59,
+      "thesisDrop": 63,
       "confidenceDecay": 43,
-      "exitProbability": 56,
-      "dynamicPositionRisk": 56,
+      "exitProbability": 58,
+      "dynamicPositionRisk": 58,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792397150548
+      "evaluatedAt": 1792397463303
     },
     "piPartialLevel": 1,
     "highestPnLSeen": 0.39,
@@ -88,7 +91,9 @@
       "giveBack": null,
       "evaluatedAt": 1792397150548
     },
-    "piReduceAlertedAt": 1792396857144
+    "piReduceAlertedAt": 1792396857144,
+    "exitPrice": 1.3111,
+    "statusChangedAt": 1792397463303
   },
   "BINANCE:LINKUSDT": {
     "sym": "BINANCE:LINKUSDT",
@@ -152,23 +157,23 @@
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 43 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
-      "fallingKnifeScore": 45,
+      "reason": "dynamicPositionRisk 37 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "fallingKnifeScore": 33,
       "thesisDrop": 11,
       "confidenceDecay": 33,
-      "exitProbability": 43,
-      "dynamicPositionRisk": 43,
+      "exitProbability": 37,
+      "dynamicPositionRisk": 37,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792397150548
+      "evaluatedAt": 1792397463303
     },
     "highestPnLSeen": 0.63,
-    "lowestPnLSeen": 0.01,
-    "lastR15": 56,
+    "lowestPnLSeen": -0.14,
+    "lastR15": 52.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.63% below 0.8% floor — not evaluated yet",
@@ -176,7 +181,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792397150548
+      "evaluatedAt": 1792397463303
     }
   }
 }
