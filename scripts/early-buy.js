@@ -69,7 +69,7 @@ export function evaluateEarlyBuy(entry, symbolState = null) {
     buyIntel:     (entry?.buyIntelPenalty ?? 0) <= MAX_PENALTY,
     whale:        (entry?.whale?.score ?? 0) >= WHALE_MIN,
     signalSafe:   !BAD_SIGNAL.some(w => sig.includes(w)),
-    trigger:      trig === 'TRIGGERING' || trig === 'BREAKOUT' || String(entry?.entryState || '').toUpperCase() === 'RETEST',
+    trigger:      trig === 'SETUP' || trig === 'TRIGGERING' || trig === 'BREAKOUT' || String(entry?.entryState || '').toUpperCase() === 'RETEST',
     preCross:     stage !== null,
     notOverheated: d.r15 == null || d.r15 < MAX_RSI15,
     // 15m gate not overextended / not a falling knife. Uses the LIVE 15m Supertrend (event status is history).
