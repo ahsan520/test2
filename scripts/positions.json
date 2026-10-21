@@ -35,7 +35,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792588850446
+      "evaluatedAt": 1792589152240
     }
   },
   "TSX:HOU.TO": {
@@ -81,9 +81,9 @@
     "t2": 1.9816,
     "score": 7,
     "spikeScore": 1.8523615284030543,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1792589152240,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "approach",
@@ -94,7 +94,11 @@
       "qty": 219.81,
       "fillPrice": 1.869452709157909,
       "buyOrderId": "C02__741536647597703169036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__741581960916172800036",
+      "exitFillPrice": 1.8850874885844748,
+      "closedAt": 1792589153913,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1792578350437,
@@ -127,32 +131,34 @@
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 5 below 50 threshold",
-      "fallingKnifeScore": 3,
-      "thesisDrop": 13,
-      "confidenceDecay": 25,
-      "exitProbability": 5,
-      "dynamicPositionRisk": 5,
+      "reason": "dynamicPositionRisk 28 below 50 threshold",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 32,
+      "confidenceDecay": 38,
+      "exitProbability": 28,
+      "dynamicPositionRisk": 28,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792588850446
+      "evaluatedAt": 1792589152240
     },
     "highestPnLSeen": 1.9,
     "lowestPnLSeen": 0.35,
-    "lastR15": 65.2,
+    "lastR15": 58.5,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.43% below tier A+ give-back 1.50% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.90% fell 0.80% to +1.10% (≥ 0.66% trail)",
       "highestPnLSeen": 1.9,
-      "drawdownFromPeak": 0.42999999999999994,
-      "tier": "A+",
-      "giveBack": 1.5,
-      "evaluatedAt": 1792588850446
+      "drawdownFromPeak": 0.7999999999999998,
+      "tier": "TRAIL",
+      "giveBack": 0.6649999999999999,
+      "evaluatedAt": 1792589152240
     },
-    "prevPnLPct": 1.47
+    "prevPnLPct": 1.1,
+    "exitPrice": 1.89,
+    "statusChangedAt": 1792589152240
   }
 }
