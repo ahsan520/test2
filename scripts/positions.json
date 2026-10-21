@@ -35,7 +35,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792569947137
+      "evaluatedAt": 1792570247167
     }
   },
   "TSX:HOU.TO": {
@@ -101,7 +101,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792569947137
+      "evaluatedAt": 1792570247167
     }
   },
   "BINANCE:DOGEUSDT": {
@@ -166,23 +166,23 @@
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
       "action": "HOLD",
-      "reason": "dynamicPositionRisk 16 below 50 threshold (breakout-fail boost +18 applied, still below threshold)",
+      "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 3,
-      "thesisDrop": 0,
+      "thesisDrop": -9,
       "confidenceDecay": 14,
-      "exitProbability": 16,
-      "dynamicPositionRisk": 16,
+      "exitProbability": 0,
+      "dynamicPositionRisk": 0,
       "recovery": {
-        "recovering": false,
-        "sustainedMin": 0
+        "recovering": true,
+        "sustainedMin": 5
       },
-      "breakoutFailed": true,
+      "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792569947137
+      "evaluatedAt": 1792570247167
     },
     "highestPnLSeen": 0.69,
     "lowestPnLSeen": -0.31,
-    "lastR15": 56,
+    "lastR15": 57.1,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.69% below 0.8% floor — not evaluated yet",
@@ -190,7 +190,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792569947137
+      "evaluatedAt": 1792570247167
     },
     "piPartialLevel": 1,
     "piReduceAlertedAt": 1792566346742
@@ -211,9 +211,9 @@
     "t2": 0.90755,
     "score": 5,
     "spikeScore": 3.2350295106030065,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1792570247167,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "approach",
@@ -224,7 +224,11 @@
       "qty": 348.56,
       "fillPrice": 0.8272603827174662,
       "buyOrderId": "C02__741478760867319808036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__741502664621056000036",
+      "exitFillPrice": 0.8362610024099152,
+      "closedAt": 1792570248151,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1792564549103,
@@ -259,7 +263,7 @@
       "action": "HOLD",
       "reason": "dynamicPositionRisk 0 below 50 threshold",
       "fallingKnifeScore": 0,
-      "thesisDrop": 2,
+      "thesisDrop": -4,
       "confidenceDecay": 13,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
@@ -269,20 +273,22 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792569947137
+      "evaluatedAt": 1792570247167
     },
     "highestPnLSeen": 1.96,
     "lowestPnLSeen": -0.04,
-    "lastR15": 60.9,
+    "lastR15": 58.1,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.65% below tier A+ give-back 1.50% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.96% fell 0.88% to +1.08% (≥ 0.69% trail)",
       "highestPnLSeen": 1.96,
-      "drawdownFromPeak": 0.6499999999999999,
-      "tier": "A+",
-      "giveBack": 1.5,
-      "evaluatedAt": 1792569947137
+      "drawdownFromPeak": 0.8799999999999999,
+      "tier": "TRAIL",
+      "giveBack": 0.6859999999999999,
+      "evaluatedAt": 1792570247167
     },
-    "prevPnLPct": 1.31
+    "prevPnLPct": 1.08,
+    "exitPrice": 0.8362,
+    "statusChangedAt": 1792570247167
   }
 }
