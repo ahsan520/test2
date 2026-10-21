@@ -44,7 +44,7 @@
     "spikeScore": 0.46774980004020583,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "tp1_hit",
     "source": "headless_v11.0",
     "scoreSource": "latest",
     "recommended": true,
@@ -64,7 +64,9 @@
       "giveBack": 1.5,
       "evaluatedAt": 1792590646625
     },
-    "prevPnLPct": 2.63
+    "prevPnLPct": 2.63,
+    "exitPrice": 11.4,
+    "statusChangedAt": 1792590785949
   },
   "NASDAQ:ZS": {
     "sym": "NASDAQ:ZS",
@@ -92,18 +94,18 @@
     "histWinRate": 0.38461538461538464,
     "histSample": 13,
     "caution": false,
-    "highestPnLSeen": 0.85,
+    "highestPnLSeen": 1.12,
     "lowestPnLSeen": 0.85,
-    "lastR15": 54.3,
-    "prevPnLPct": 0.85,
+    "lastR15": 54.7,
+    "prevPnLPct": 1.12,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.00% below tier B give-back 0.70% (regime-widened)",
-      "highestPnLSeen": 0.85,
+      "reason": "drawdown 0.00% below tier A give-back 1.00% (regime-widened)",
+      "highestPnLSeen": 1.12,
       "drawdownFromPeak": 0,
-      "tier": "B",
-      "giveBack": 0.7,
-      "evaluatedAt": 1792590646625
+      "tier": "A",
+      "giveBack": 1,
+      "evaluatedAt": 1792590785949
     }
   },
   "BINANCE:GALAUSDT": {
@@ -165,6 +167,34 @@
       "breakoutLevel": 0.002001
     },
     "entryTriggerStatus": "SETUP",
-    "entryStateAtBuy": "EARLY_BUY_P0"
+    "entryStateAtBuy": "EARLY_BUY_P0",
+    "lastPI": {
+      "action": "HOLD",
+      "reason": "dynamicPositionRisk 3 below 50 threshold",
+      "fallingKnifeScore": 3,
+      "thesisDrop": 14,
+      "confidenceDecay": 14,
+      "exitProbability": 3,
+      "dynamicPositionRisk": 3,
+      "recovery": {
+        "recovering": true,
+        "sustainedMin": 7
+      },
+      "breakoutFailed": false,
+      "noSnapshotFallback": false,
+      "evaluatedAt": 1792590785949
+    },
+    "highestPnLSeen": -0.05,
+    "lowestPnLSeen": -0.05,
+    "lastR15": 57.6,
+    "lastProfitIntel": {
+      "action": "HOLD",
+      "reason": "peak -0.05% below 0.8% floor — not evaluated yet",
+      "highestPnLSeen": -0.05,
+      "drawdownFromPeak": 0,
+      "tier": null,
+      "giveBack": null,
+      "evaluatedAt": 1792590785949
+    }
   }
 }
