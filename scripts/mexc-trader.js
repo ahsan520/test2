@@ -1953,6 +1953,8 @@ export async function executeST5PriorityRotation({
 //     live cap, falling-knife + RSI-overextension checks, slippage guard, minimum buy size
 // The position is then watched by the normal stop / T1 / T2 monitor like every other position.
 const EARLY_SIZE_PCT       = parseFloat(process.env.EARLY_BUY_SIZE_PCT || '40');
+// Setup-path entries (SETUP trigger, pre-confirmation) are sized down; see early-buy.js SETUP PATH.
+const EARLY_SETUP_SIZE_MULT = parseFloat(process.env.EARLY_SETUP_SIZE_MULT || '0.5');
 const EARLY_MAX_OPEN       = parseInt(process.env.EARLY_MAX_OPEN || '2', 10);
 const EARLY_MAX_PER_CYCLE  = parseInt(process.env.EARLY_MAX_PER_CYCLE || '1', 10);
 const EARLY_BLOCK_RISK_OFF = (process.env.EARLY_BLOCK_RISK_OFF ?? 'true') === 'true';
@@ -2003,7 +2005,7 @@ export async function executeEarlyBuyP0({
       effectiveTradeMode, effectiveSizeMode: ST_PRIORITY_SIZE_MODE, effectiveSizePct: ST_PRIORITY_SIZE_PCT,
       fallbackUsdSize: ST5_PRIORITY_USD_SIZE, label: 'EARLY BUY P0',
     });
-    const usdSize = parseFloat((totalUsd * (EARLY_SIZE_PCT / 100) * (guardSizeMult > 0 && guardSizeMult < 1 ? guardSizeMult : 1)).toFixed(2));
+    const usdSize = parseFloat((totalUsd * (EARLY_SIZE_PCT / 100) * (result.setupPath ? EARLY_SETUP_SIZE_MULT : 1) * (guardSizeMult > 0 && guardSizeMult < 1 ? guardSizeMult : 1)).toFixed(2));
     if (usdSize <= 0)                                            { skip('zero_balance'); continue; }
     if (ST_MIN_BUY_USD > 0 && usdSize < ST_MIN_BUY_USD)          { skip('below_min_size', { usdSize, minUsd: ST_MIN_BUY_USD }); continue; }
 
@@ -2022,12 +2024,13 @@ export async function executeEarlyBuyP0({
       source: 'early_buy_p0_v1',
       scoreSource: 'early_buy',
       earlyStage: result.stage,
+      earlySetupPath: !!result.setupPath,
     });
     const timing = fillPrice => ({
       eventId: null, entryDelayMin: null, crossClose: null, fillVsCrossPct: null, zone: null,
       distanceATR: snap.st5DistATR ?? null, retestBuy: result.stage === 'retest', earlyStage: result.stage,
     });
-    const ctx = () => ({ ...buildEntryContext({ entry, market, marketState }), earlyBuy: true, earlyStage: result.stage, earlyClauses: result.clauses });
+    const ctx = () => ({ ...buildEntryContext({ entry, market, marketState }), earlyBuy: true, earlyStage: result.stage, earlySetupPath: !!result.setupPath, earlyClauses: result.clauses });
 
     positions[sym] = mkPos();
     cooldowns[earlyCooldownKey(pair)] = now;

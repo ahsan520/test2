@@ -42,7 +42,7 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 import { checkEntryQuality } from './entry-quality-check.js';
 import { evaluateSTTiming } from './st-timing-engine.js';
 
-import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, EARLY_MODE } from './early-buy.js';
+import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, formatEarlyBuyLine, getEarlyBuyLastScan, earlyCooldownKey, EARLY_MODE, EARLY_SETUP_MODE } from './early-buy.js';
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
 // Off by default; each threshold is independently overridable via repo
@@ -551,8 +551,28 @@ async function main() {
   // ══════════════════════════════════════════════════════
   if (EARLY_MODE !== 'off' && !dataIsStale) {
     const earlyCooldowns = loadCooldowns();
+    // One line per cycle so a silent P0 is visible in the Actions log: scanned / passing / closest misses.
+    const logEarlyScan = () => {
+      const sc = getEarlyBuyLastScan();
+      const near = sc.closest.map(x => `${x.pair.replace('USDT', '')}[${x.failed.join(',')}]`).join(' \u00b7 ');
+      console.log(`  \ud83c\udf31  EARLY BUY (P0, ${EARLY_MODE}): ${sc.evaluated} crypto evaluated, ${sc.passed} pass${near ? ' \u2014 closest: ' + near : ''}`);
+    };
     if (EARLY_MODE === 'live') {
-      const cands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
+      const allCands = collectEarlyBuyCandidates({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
+      logEarlyScan();
+      // Setup-path candidates (SETUP trigger, pre-confirmation) only execute when EARLY_SETUP_MODE=live;
+      // otherwise they are Telegram-alert only, so the setup relaxations can be observed before they trade.
+      const setupAlerts = EARLY_SETUP_MODE === 'live' ? [] : allCands.filter(c => c.result.setupPath);
+      const cands = EARLY_SETUP_MODE === 'live' ? allCands : allCands.filter(c => !c.result.setupPath);
+      if (setupAlerts.length) {
+        const nowTs = Date.now();
+        for (const c of setupAlerts) earlyCooldowns[earlyCooldownKey(c.pair)] = nowTs;
+        await sendTelegram([
+          `\ud83d\udfe1 *Alpha Terminal \u2014 EARLY BUY (P0 setup, alert only)*`,
+          `Pre-confirmation SETUP: approaching the 5m Supertrend with CVD up and whales buying. Not auto-bought (EARLY_SETUP_MODE=${EARLY_SETUP_MODE}).`,
+          '', setupAlerts.map(formatEarlyBuyLine).join('\n\n'),
+        ].join('\n'));
+      }
       if (cands.length) {
         // P0 runs before the main guard step, so apply the SAME market guard here. Early Buy is the most
         // speculative tier: it needs the full guard to allow buys (BTC 4H regime, circuit breaker, panic,
@@ -575,6 +595,7 @@ async function main() {
       }
     } else {
       const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
+      logEarlyScan();
       if (earlyLines.length) {
         await sendTelegram([
           `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
