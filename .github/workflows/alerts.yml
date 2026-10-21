@@ -389,7 +389,14 @@ jobs:
           EARLY_BLOCK_RISK_OFF:           ${{ vars.EARLY_BLOCK_RISK_OFF || 'true' }}
           EARLY_STOP_LOSS_PCT:            ${{ vars.EARLY_STOP_LOSS_PCT || '' }}
           EARLY_COOLDOWN_MIN:             ${{ vars.EARLY_COOLDOWN_MIN || '60' }}
-          EARLY_LOG_MAX_FAILED:           ${{ vars.EARLY_LOG_MAX_FAILED || '2' }}
+          EARLY_LOG_MAX_FAILED:           ${{ vars.EARLY_LOG_MAX_FAILED || '3' }}
+          # Setup path: SETUP trigger at the approach stage (pre-confirmation). EARLY_SETUP_MODE: off | alert (default,
+          # Telegram+audit only even when EARLY_BUY_MODE=live) | live (also buys, at EARLY_SETUP_SIZE_MULT x early size).
+          EARLY_SETUP_MODE:               ${{ vars.EARLY_SETUP_MODE || 'alert' }}
+          EARLY_SETUP_TRIGGER_MIN:        ${{ vars.EARLY_SETUP_TRIGGER_MIN || '0' }}
+          EARLY_SETUP_SHOCK_MIN:          ${{ vars.EARLY_SETUP_SHOCK_MIN || '0' }}
+          EARLY_SETUP_MAX_PENALTY:        ${{ vars.EARLY_SETUP_MAX_PENALTY || '2' }}
+          EARLY_SETUP_SIZE_MULT:          ${{ vars.EARLY_SETUP_SIZE_MULT || '0.5' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
           # 2026-09-05) — BUY_SCOUT_ENABLE defaults to 'false' in code, so
           # the whole scout-entry feature has been silently off this whole
