@@ -35,7 +35,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792576849426
+      "evaluatedAt": 1792577153474
     }
   },
   "TSX:HOU.TO": {
@@ -101,7 +101,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1792576849426
+      "evaluatedAt": 1792577153474
     }
   },
   "BINANCE:DOGEUSDT": {
@@ -218,9 +218,9 @@
     "t2": 1.0926,
     "score": 7,
     "spikeScore": 1.723954264990209,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1792577153474,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "retest",
@@ -231,7 +231,10 @@
       "qty": 280.83,
       "fillPrice": 1.0308,
       "buyOrderId": "C02__741502685752000512036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__741531632040615936036",
+      "exitFillPrice": 1.0279,
+      "closedAt": 1792577154570
     },
     "entrySnapshot": {
       "at": 1792570253211,
@@ -263,20 +266,20 @@
     "entryTriggerStatus": "SETUP",
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 36 below 50 threshold",
-      "fallingKnifeScore": 45,
-      "thesisDrop": 39,
-      "confidenceDecay": 38,
-      "exitProbability": 36,
-      "dynamicPositionRisk": 36,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 83 → current 21 (drop 62 > 60)",
+      "fallingKnifeScore": 60,
+      "thesisDrop": 62,
+      "confidenceDecay": 50,
+      "exitProbability": 53,
+      "dynamicPositionRisk": 53,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1792576849426
+      "evaluatedAt": 1792577153474
     },
     "highestPnLSeen": 0.61,
     "lowestPnLSeen": -0.18,
@@ -289,6 +292,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1792576849426
-    }
+    },
+    "exitPrice": 1.028,
+    "statusChangedAt": 1792577153474
   }
 }
