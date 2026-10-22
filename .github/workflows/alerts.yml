@@ -333,7 +333,7 @@ jobs:
           # ST_MAX_DISTANCE_PCT, ST_ROTATION_COOLDOWN_MIN, ST_EQUAL_ALLOCATE,
           # ST_FAILED_SELL_QUARANTINE_MIN, ST5_ENABLE, ST15_ENABLE,
           # ST5_PRIORITY_USD_SIZE, ST15_PRIORITY_USD_SIZE,
-          # ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT) are wired into this
+          # ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT is now wired below) are wired into this
           # workflow at all (found 2026-09-06) — the whole P1/P2 system has
           # been running purely on mexc-trader.js's hardcoded defaults this
           # entire time, with no way to tune any of it via a repo Variable.
@@ -342,6 +342,9 @@ jobs:
           # Off by default — see mexc-trader.js's ST_PRIORITY_BLOCK_RISK_OFF
           # comment for what this does once enabled.
           ST_PRIORITY_BLOCK_RISK_OFF:   ${{ vars.ST_PRIORITY_BLOCK_RISK_OFF || 'false' }}
+          # Minimum profit before an ST5 PRIORITY / ST15 PRIORITY / EARLY BUY P0 position may be rotated OUT to fund a new priority buy.
+          # Wired 2026-10-22 (repo Variable was .5 but the var was never passed through, so mexc-trader.js ran on its default of 1).
+          ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT: ${{ vars.ST_PRIORITY_ROTATION_OUT_MIN_PROFIT_PCT || '.5' }}
           # Overextended-buy override (2026-09-14, mexc-trader.js) — off by
           # default, same zero-behavior-change pattern as the rest of this
           # block. See the comment above ST_ALLOW_OVEREXTENDED_BUY in
