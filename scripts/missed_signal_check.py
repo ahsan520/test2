@@ -19,11 +19,14 @@ Assumptions (all printed): entry = open of the 1m candle at the audit timestamp
 STOP (conservative); no slippage beyond --fee; no profit-protection/lock logic
 (so winners are scored at T1 or at the horizon, losers at the stop).
 """
-import argparse, json, ssl, sys, time, urllib.request, urllib.error
+import argparse, bisect, json, ssl, sys, time, urllib.request, urllib.error
 from collections import defaultdict
 from datetime import datetime, timezone
 
 ENDPOINTS = ["https://data-api.binance.vision", "https://api.binance.com", "https://api1.binance.com"]
+# Binance delisted XMR (2024-02-20): its endpoints answer 200 with no/frozen candles, so these symbols are routed to Kraken
+# (same unconditional routing the bot uses in leaderboard-scanner.js / alert-runner.js / mexc-trader.js).
+KRAKEN_PAIR = {"XMRUSDT": "XMRUSD"}
 
 # audit actions that mean "the bot did NOT buy this cross"
 SKIP_ACTIONS = {
@@ -65,13 +68,19 @@ def load_events(paths):
                 sym += "USDT"
             if a == "early_buy_candidate":              # label by how close it was to a full pass
                 failed = r.get("failed") or []
-                a = "early_strict" if r.get("strict") else (f"early_miss:{failed[0]}" if len(failed) == 1 else f"early_miss:{len(failed)} clauses")
+                if r.get("strict"):
+                    a = "early_strict"
+                elif r.get("setupPath"):
+                    a = "early_setup"       # passed via the setup-path relaxations (failed = the strict clauses it waived); NOT a miss
+                else:
+                    a = f"early_miss:{failed[0]}" if len(failed) == 1 else f"early_miss:{len(failed)} clauses"
             kind = "taken" if a in TAKEN_ACTIONS else "skipped"
             key = (kind, r.get("id") or (sym, a, r["timestamp"][:13]))
             ts = parse_ts(r["timestamp"])
             cur = by_key.get(key)
             if cur is None:
-                cur = by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts, "spike": False}
+                cur = by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts, "spike": False,
+                                     "signal": r.get("signal"), "failed": r.get("failed") or []}
             else:
                 cur["ts"] = min(cur["ts"], ts)                       # decision moment = earliest
                 if ts >= cur["_last"]:
@@ -84,6 +93,29 @@ def load_events(paths):
         if e.pop("spike", False) and e["action"] in SKIP_ACTIONS:
             e["action"] += " [spike-pass]"      # skipped crosses the spike exception WOULD have allowed
     return sorted(out, key=lambda e: e["ts"])
+
+
+def load_guard(paths):
+    """(sorted timestamps, canBuy flags) from the bot's own market_guard audit rows - lets every event be tagged with whether
+    the guard (BTC 4H regime etc.) was allowing buys at that moment."""
+    pts = []
+    for p in paths:
+        with open(p) as fh:
+            rows = json.load(fh)
+        rows = rows if isinstance(rows, list) else rows.get("entries", rows.get("events", []))
+        for r in rows:
+            if r.get("action") == "market_guard" and r.get("timestamp"):
+                pts.append((parse_ts(r["timestamp"]), bool(r.get("canBuy")) and not r.get("closeAll")))
+    pts.sort()
+    return [t for t, _ in pts], [c for _, c in pts]
+
+
+def guard_state(guard, ts, max_age_min=15):
+    times, flags = guard
+    i = bisect.bisect_right(times, ts) - 1
+    if i < 0 or ts - times[i] > max_age_min * 60000:
+        return "guard-unknown"
+    return "guard-open" if flags[i] else "guard-blocked"
 
 
 SSL_CTX = None   # set from --ca-bundle / --insecure in main()
@@ -107,7 +139,29 @@ def _is_cert_error(e):
     return isinstance(reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(e)
 
 
+def fetch_kraken(symbol, start_ms, minutes):
+    """1m candles from Kraken. Kraken only serves its most recent ~720 candles (~12h), so older events come back empty."""
+    url = f"https://api.kraken.com/0/public/OHLC?pair={KRAKEN_PAIR[symbol]}&interval=1&since={int(start_ms / 1000) - 60}"
+    try:
+        with urllib.request.urlopen(url, timeout=15, context=SSL_CTX) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, ssl.SSLError) as e:
+        if _is_cert_error(e):
+            sys.exit(SSL_HINT)
+        raise RuntimeError(f"kraken failed for {symbol}: {e}")
+    if data.get("error"):
+        raise RuntimeError(f"kraken {symbol}: {', '.join(data['error'])}")
+    res = data.get("result", {})
+    key = next((k for k in res if k != "last"), None)
+    rows = (res.get(key) or [])[:-1]                      # last frame is the still-forming candle
+    out = [{"t": int(r[0]) * 1000, "o": float(r[1]), "h": float(r[2]), "l": float(r[3]), "c": float(r[4])}
+           for r in rows if int(r[0]) * 1000 >= start_ms]
+    return out[:minutes + 1]
+
+
 def fetch_klines(symbol, start_ms, minutes):
+    if symbol in KRAKEN_PAIR:
+        return fetch_kraken(symbol, start_ms, minutes)
     last = None
     for base in ENDPOINTS:
         url = f"{base}/api/v3/klines?symbol={symbol}&interval=1m&startTime={start_ms}&limit={minutes + 1}"
@@ -140,12 +194,13 @@ def simulate(candles, stop_pct, t1_pct, fee_pct):
     return {"exit": "timeout", "pnl": (last / entry - 1) * 100 - fee_pct, "mfe": mfe, "mae": mae, "minutes": len(candles) - 1}
 
 
-def summarize(rows, title):
+def summarize(rows, title, key=None):
+    key = key or (lambda r: r["action"])
     print(f"\n{title}")
     print(f"  {'group':34} {'n':>3} {'avg%':>6} {'win%':>5} {'T1':>3} {'stop':>4} {'t/o':>3} {'avgMFE':>7} {'avgMAE':>7}")
     groups = defaultdict(list)
     for r in rows:
-        groups[r["action"]].append(r)
+        groups[key(r)].append(r)
     groups["ALL"] = rows
     for g, rs in sorted(groups.items(), key=lambda kv: (kv[0] == "ALL", kv[0])):
         n = len(rs)
@@ -154,6 +209,18 @@ def summarize(rows, title):
         c = lambda e: sum(r["exit"] == e for r in rs)
         print(f"  {g:34} {n:>3} {avg:>6.2f} {win:>5.0f} {c('T1'):>3} {c('stop'):>4} {c('timeout'):>3} "
               f"{sum(r['mfe'] for r in rs)/n:>7.2f} {sum(r['mae'] for r in rs)/n:>7.2f}")
+
+
+def sensitivity(rows, fee, stops=(0.75, 1.0, 1.5), t1s=(1.0, 1.5, 2.0, 3.0)):
+    """Same candles, different exits: shows whether the stop/T1 pair - not the entry signal - is what is losing."""
+    print("\nExit sensitivity on the SAME skipped entries (avg% / win%) - rows = stop %, cols = T1 %")
+    print("  " + f"{'stop':>6} " + " ".join(f"{'T1 ' + str(t):>13}" for t in t1s))
+    for sp in stops:
+        cells = []
+        for t in t1s:
+            res = [simulate(r["candles"], sp, t, fee)["pnl"] for r in rows]
+            cells.append(f"{sum(res) / len(res):>6.2f}/{100 * sum(x > 0 for x in res) / len(res):>3.0f}%")
+        print(f"  {sp:>6} " + " ".join(f"{c:>13}" for c in cells))
 
 
 def main():
@@ -180,6 +247,7 @@ def main():
             sys.exit(f"Could not load --ca-bundle {args.ca_bundle}: {e}")
 
     events = load_events(args.audit)
+    guard = load_guard(args.audit)
     if not events:
         print("No skipped/taken ST events found in the audit file(s) - nothing to replay.")
         print("Normal when the market guard paused buys, or the audit window is short. Not an error.")
@@ -199,7 +267,8 @@ def main():
             continue
         want = max(1, min(minutes, int(age_min)))        # never ask for candles that don't exist yet
         try:
-            res = simulate(fetch_klines(ev["symbol"], ev["ts"], want), args.stop, args.t1, args.fee)
+            candles = fetch_klines(ev["symbol"], ev["ts"], want)
+            res = simulate(candles, args.stop, args.t1, args.fee)
         except RuntimeError as e:
             failed += 1
             print(f"  ! {ev['symbol']} {ev['action']}: {e}", file=sys.stderr)
@@ -207,7 +276,7 @@ def main():
         if not res:
             no_data.append((ev, when))
             continue
-        row = {**ev, **res, "partial": partial}
+        row = {**ev, **res, "partial": partial, "candles": candles, "guard": guard_state(guard, ev["ts"])}
         (taken if ev["action"] in TAKEN_ACTIONS else skipped).append(row)
 
     print(f"\nEvents found: {len(events)} | scored: {len(skipped) + len(taken)} | "
@@ -216,7 +285,8 @@ def main():
         print(f"  - {ev['symbol']:10} {when} UTC {ev['action']:26} only {age:.0f} min old (needs {minutes}); "
               f"re-run later or add --partial")
     for ev, when in no_data:
-        print(f"  - {ev['symbol']:10} {when} UTC {ev['action']:26} Binance returned no candles for that time")
+        src = "Kraken (only keeps ~12h of 1m candles)" if ev["symbol"] in KRAKEN_PAIR else "Binance"
+        print(f"  - {ev['symbol']:10} {when} UTC {ev['action']:26} {src} returned no candles for that time")
     if any(r.get("partial") for r in skipped + taken):
         print("  (rows marked partial used a window that had not finished — treat those results as provisional)")
     if failed:
@@ -225,6 +295,21 @@ def main():
         summarize(skipped, "SKIPPED crosses — what buying anyway would have done")
     if taken:
         summarize(taken, "TAKEN crosses (same rules, for comparison)")
+    if skipped:
+        summarize(skipped, "SKIPPED crosses by market-guard state at the time (from the bot's own market_guard rows)", key=lambda r: r["guard"])
+        if any(r.get("signal") for r in skipped):
+            summarize([r for r in skipped if r.get("signal")], "EARLY-BUY candidates by signal label (is the signalSafe clause right to block them?)",
+                      key=lambda r: str(r["signal"]))
+            clause = defaultdict(list)
+            for r in skipped:
+                for c in r.get("failed") or []:
+                    clause[c].append(r)
+            if clause:
+                print("\nEarly-buy candidates grouped by each clause they FAILED (a clause is earning its keep if buying through it loses)")
+                print(f"  {'clause failed':34} {'n':>3} {'avg%':>6} {'win%':>5}")
+                for c, rs in sorted(clause.items(), key=lambda kv: -len(kv[1])):
+                    print(f"  {c:34} {len(rs):>3} {sum(r['pnl'] for r in rs) / len(rs):>6.2f} {100 * sum(r['pnl'] > 0 for r in rs) / len(rs):>5.0f}")
+        sensitivity(skipped, args.fee)
     best = sorted(skipped, key=lambda r: -r["mfe"])[:5]
     if best:
         print("\nBiggest misses (highest favourable move before the window ended):")
@@ -232,6 +317,7 @@ def main():
             when = datetime.fromtimestamp(r["ts"] / 1000, timezone.utc).strftime("%m-%d %H:%M")
             print(f"  {r['symbol']:10} {when} UTC  {r['action']:28} MFE +{r['mfe']:.2f}%  MAE {r['mae']:.2f}%  -> {r['exit']}")
     print("\nRead it as a guide, not proof: small samples, one entry price, no trailing/profit-protection exits.")
+    print("Crypto majors move together: several events in the same hour are ONE market move, not independent samples.")
 
 
 if __name__ == "__main__":

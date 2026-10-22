@@ -24,8 +24,8 @@
 // it, and it would admit SETUP at any stage), so a coin that FAILS the strict clauses is re-evaluated with these
 // relaxations only:
 //   * trigger  - SETUP is accepted only at stage 'approach' (ST5 still BEAR, within EARLY_APPROACH_ATR below the
-//                line), with CVD up and triggerScore >= EARLY_SETUP_TRIGGER_MIN
-//   * shock    - floor drops to EARLY_SETUP_SHOCK_MIN (default 0: accumulation precedes the volume spike)
+//                line), with CVD up and triggerScore >= EARLY_SETUP_TRIGGER_MIN (default 1, same as alerts.yml)
+//   * shock    - floor drops to EARLY_SETUP_SHOCK_MIN (default 0.5, same as alerts.yml: some volume must still be turning up)
 //   * buyIntel - penalty up to EARLY_SETUP_MAX_PENALTY (default 2: an approach below the ST line is by definition
 //                below the recent high, which is what the "active breakdown" penalty flags)
 // Every other clause (bullConf, CVD, OI, OI momentum, whale, signalSafe, RSI, ST15, pending cross, 24h run) is unchanged.
@@ -49,10 +49,16 @@ const ST15_MAX_BEAR_ATR = num('EARLY_ST15_MAX_BEAR_ATR', '2.5');   // 15m Supert
 const MAX_CHG24   = num('EARLY_MAX_CHG24', '12');                   // skip coins already up more than this % on the day (0 disables)
 const LOG_MAX_FAILED = num('EARLY_LOG_MAX_FAILED', '3');   // audit-log strict passes and coins failing at most this many clauses
 const BAD_SIGNAL  = ['falling knife', 'weak', 'avoid'];
+// Alert-mode controls. The live path already respects the market guard (BTC 4H regime etc.); the alert path did not, so
+// shadow alerts fired on days the bot itself would refuse to buy. EARLY_ALERT_RESPECT_GUARD=true (default) suppresses the
+// Telegram message when the guard blocks buys (audit + shadow scoring continue). EARLY_MAX_ALERTS_PER_CYCLE caps one message
+// - majors move together, so 3-5 simultaneous setups are one bet, not five (0 = no cap).
+export const EARLY_ALERT_RESPECT_GUARD = (process.env.EARLY_ALERT_RESPECT_GUARD ?? 'true').toLowerCase() !== 'false';
+const MAX_ALERTS_PER_CYCLE = num('EARLY_MAX_ALERTS_PER_CYCLE', '2');
 // Setup path (see header). EARLY_SETUP_MODE: off | alert | live.
 export const EARLY_SETUP_MODE = (process.env.EARLY_SETUP_MODE || 'alert').toLowerCase();
-const SETUP_TRIGGER_MIN = num('EARLY_SETUP_TRIGGER_MIN', '0');
-const SETUP_SHOCK_MIN   = num('EARLY_SETUP_SHOCK_MIN', '0');
+const SETUP_TRIGGER_MIN = num('EARLY_SETUP_TRIGGER_MIN', '1');   // defaults match alerts.yml so an unwired var cannot silently loosen the gate
+const SETUP_SHOCK_MIN   = num('EARLY_SETUP_SHOCK_MIN', '0.5');
 const SETUP_MAX_PENALTY = num('EARLY_SETUP_MAX_PENALTY', '2');
 // OI momentum (market-state.json symbols[pair].oiMomentum.trend: ACCELERATING | FLAT | FADING). P0 is a pre-spike
 // accumulation entry, so it must not buy while OI momentum is FADING. NOTE: oiMomentum is a funding-rate proxy
@@ -183,6 +189,7 @@ export function formatEarlyBuyLine({ pair, result: r }) {
 
 // Alert-mode wrapper (unchanged contract): lines for passing coins, marks the alert cooldown. Caller sends.
 export function collectEarlyBuyAlerts({ entries, cooldowns, positions = {}, logAudit = () => {}, now = Date.now(), marketState = null }) {
-  const cands = collectEarlyBuyCandidates({ entries, cooldowns, positions, logAudit, now, marketState });
+  let cands = collectEarlyBuyCandidates({ entries, cooldowns, positions, logAudit, now, marketState });
+  if (MAX_ALERTS_PER_CYCLE > 0) cands = cands.slice(0, MAX_ALERTS_PER_CYCLE);   // already sorted strongest-first; the rest stay off cooldown
   return cands.map(c => { cooldowns[earlyCooldownKey(c.pair)] = now; return formatEarlyBuyLine(c); });
 }

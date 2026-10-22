@@ -42,7 +42,7 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 import { checkEntryQuality } from './entry-quality-check.js';
 import { evaluateSTTiming } from './st-timing-engine.js';
 
-import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, formatEarlyBuyLine, getEarlyBuyLastScan, earlyCooldownKey, EARLY_MODE, EARLY_SETUP_MODE } from './early-buy.js';
+import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, formatEarlyBuyLine, getEarlyBuyLastScan, earlyCooldownKey, EARLY_MODE, EARLY_SETUP_MODE, EARLY_ALERT_RESPECT_GUARD } from './early-buy.js';
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
 // Off by default; each threshold is independently overridable via repo
@@ -597,11 +597,18 @@ async function main() {
       const earlyLines = collectEarlyBuyAlerts({ entries, cooldowns: earlyCooldowns, positions, logAudit, marketState });
       logEarlyScan();
       if (earlyLines.length) {
-        await sendTelegram([
-          `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
-          `Alert only, no auto-buy. Pre-cross setup: flow and volume are turning up before the Supertrend confirms.`,
-          '', earlyLines.join('\n\n'),
-        ].join('\n'));
+        // Same guard live mode applies: an alert for a buy the bot would refuse is noise (and pollutes shadow review).
+        const alertGuard = EARLY_ALERT_RESPECT_GUARD ? runAllBuyGuards(market, positions, marketState) : null;
+        if (alertGuard && (!alertGuard.canBuy || alertGuard.hardBlocked || alertGuard.closeAll)) {
+          logAudit('early_buy_alert_suppressed_by_guard', { count: earlyLines.length, reasons: alertGuard.reasons });
+          console.log(`  \u26d4  EARLY BUY (P0 shadow): ${earlyLines.length} alert(s) suppressed by market guard \u2014 ${alertGuard.reasons.join('; ') || 'canBuy=false'}`);
+        } else {
+          await sendTelegram([
+            `🟡 *Alpha Terminal — EARLY BUY (P0, shadow)*`,
+            `Alert only, no auto-buy. Pre-cross setup: flow and volume are turning up before the Supertrend confirms.`,
+            '', earlyLines.join('\n\n'),
+          ].join('\n'));
+        }
       }
     }
     saveCooldowns(earlyCooldowns);
