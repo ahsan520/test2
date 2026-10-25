@@ -385,6 +385,8 @@ jobs:
           EARLY_OI_ACCEPT:                ${{ vars.EARLY_OI_ACCEPT || 'CONFIRM,NEUTRAL,DIP BUY' }}
           EARLY_ST15_MAX_BEAR_ATR:        ${{ vars.EARLY_ST15_MAX_BEAR_ATR || '2.5' }}
           EARLY_MAX_CHG24:                ${{ vars.EARLY_MAX_CHG24 || '12' }}
+          # Signal labels that never qualify for P0 (comma list). WATCH added after the 10-24/25 replay (n=22, -0.71%, 18% win).
+          EARLY_BAD_SIGNALS:              ${{ vars.EARLY_BAD_SIGNALS || 'falling knife,weak,avoid,watch' }}
           # Live-execution controls (only used when EARLY_BUY_MODE=live)
           EARLY_BUY_SIZE_PCT:             ${{ vars.EARLY_BUY_SIZE_PCT || '40' }}
           EARLY_MAX_OPEN:                 ${{ vars.EARLY_MAX_OPEN || '2' }}
