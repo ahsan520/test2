@@ -111,7 +111,10 @@ async function handleZeroBalanceStrike(pos, closeResult, closeLabel, telegramAle
   if (strikes > 1 && !shouldAlertOnce(`zero_balance_${pos.base}`)) {
     telegramAlerts.pop(); // drop the just-pushed duplicate from closeLiveOrder
   }
-  return { changed: false };
+  // The strike counter was just incremented on pos.liveOrder. Report changed:true so the decider saves positions.json;
+  // with changed:false the increment was lost every run (each job starts from the saved file), the counter never
+  // reached the limit and the same LIVE SELL SKIPPED alert looped for hours (DOGE, 2026-10-25: 48 skips over ~4.5h).
+  return { changed: true };
 }
 
 // ── Sell Intelligence age gate (dev-team "Buy Priority / Rotation / Sell
