@@ -48,7 +48,10 @@ const OI_ACCEPT   = (process.env.EARLY_REQUIRE_OI_CONFIRM === 'true') ? ['CONFIR
 const ST15_MAX_BEAR_ATR = num('EARLY_ST15_MAX_BEAR_ATR', '2.5');   // 15m Supertrend may be BEAR, but not deeper than this many ATR below its line
 const MAX_CHG24   = num('EARLY_MAX_CHG24', '12');                   // skip coins already up more than this % on the day (0 disables)
 const LOG_MAX_FAILED = num('EARLY_LOG_MAX_FAILED', '3');   // audit-log strict passes and coins failing at most this many clauses
-const BAD_SIGNAL  = ['falling knife', 'weak', 'avoid'];
+// Signal labels that never qualify. WATCH is "interesting, not confirmed - do not buy" in signal-evaluator.js, and the
+// 2026-10-24/25 replay of skipped events agreed: WATCH n=22 avg -0.71% / 18% win (15 stopped), the worst label by far.
+// Override with EARLY_BAD_SIGNALS (comma list, lowercase substrings) to retest.
+const BAD_SIGNAL  = (process.env.EARLY_BAD_SIGNALS || 'falling knife,weak,avoid,watch').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
 // Alert-mode controls. The live path already respects the market guard (BTC 4H regime etc.); the alert path did not, so
 // shadow alerts fired on days the bot itself would refuse to buy. EARLY_ALERT_RESPECT_GUARD=true (default) suppresses the
 // Telegram message when the guard blocks buys (audit + shadow scoring continue). EARLY_MAX_ALERTS_PER_CYCLE caps one message

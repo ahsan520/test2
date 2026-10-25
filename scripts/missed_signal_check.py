@@ -66,8 +66,11 @@ def load_events(paths):
             sym = sym.split(":")[-1].upper()            # "BINANCE:RENDERUSDT" -> "RENDERUSDT"
             if not sym.endswith("USDT"):
                 sym += "USDT"
+            early = None
             if a == "early_buy_candidate":              # label by how close it was to a full pass
                 failed = r.get("failed") or []
+                early = {"path": "strict-pass" if r.get("strict") else "setup-pass" if r.get("setupPath") else "near-miss",
+                         "trigger": str(r.get("trigger") or "n/a").upper(), "stage": r.get("stage") or "no-stage"}
                 if r.get("strict"):
                     a = "early_strict"
                 elif r.get("setupPath"):
@@ -81,6 +84,8 @@ def load_events(paths):
             if cur is None:
                 cur = by_key[key] = {"action": a, "symbol": sym, "ts": ts, "id": r.get("id"), "_last": ts, "spike": False,
                                      "signal": r.get("signal"), "failed": r.get("failed") or []}
+                if early:
+                    cur.update(early)                                # first-seen path/trigger/stage (decision moment)
             else:
                 cur["ts"] = min(cur["ts"], ts)                       # decision moment = earliest
                 if ts >= cur["_last"]:
@@ -223,6 +228,43 @@ def sensitivity(rows, fee, stops=(0.75, 1.0, 1.5), t1s=(1.0, 1.5, 2.0, 3.0)):
         print(f"  {sp:>6} " + " ".join(f"{c:>13}" for c in cells))
 
 
+# Promotion bar for letting SETUP-approach alerts graduate beyond alert-only (see early-buy.js header).
+SETUP_MIN_N, SETUP_MIN_WIN, SETUP_MIN_AVG = 50, 55.0, 0.0
+
+
+def dedupe(rows, window_min):
+    """Keep the first event per symbol per window: repeated alerts on one coin are one bet, not independent samples."""
+    last, out = {}, []
+    for r in sorted(rows, key=lambda r: r["ts"]):
+        if r["symbol"] in last and r["ts"] - last[r["symbol"]] < window_min * 60000:
+            continue
+        last[r["symbol"]] = r["ts"]
+        out.append(r)
+    return out
+
+
+def setup_report(skipped, window_min):
+    """Early-buy candidates split by path and by trigger status / stage, raw and de-duplicated, plus a promotion verdict."""
+    early = [r for r in skipped if r.get("path")]
+    if not early:
+        return
+    for label, rows in ((f"raw ({len(early)} rows)", early), (f"de-duplicated, 1 per symbol per {window_min:g} min", dedupe(early, window_min))):
+        summarize(rows, f"EARLY-BUY by path - {label}", key=lambda r: r["path"])
+        summarize(rows, f"EARLY-BUY by trigger status / stage - {label}", key=lambda r: f"{r['trigger']} / {r['stage']}")
+    setup = [r for r in dedupe(early, window_min) if r["trigger"] == "SETUP" and r["stage"] == "approach"]
+    print("\nSETUP-approach promotion check (de-duplicated):")
+    if not setup:
+        print("  no SETUP / approach events in this window")
+        return
+    n = len(setup)
+    avg = sum(r["pnl"] for r in setup) / n
+    win = 100 * sum(r["pnl"] > 0 for r in setup) / n
+    ok = n >= SETUP_MIN_N and win >= SETUP_MIN_WIN and avg > SETUP_MIN_AVG
+    print(f"  n={n} (need {SETUP_MIN_N}) | win {win:.0f}% (need {SETUP_MIN_WIN:.0f}%) | avg {avg:.2f}% (need > {SETUP_MIN_AVG:g}%)")
+    print("  VERDICT: " + ("meets the bar - review before widening it, still check by regime" if ok else
+                           "does NOT meet the bar - keep EARLY_SETUP_MODE=alert"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--audit", action="append", required=True, help="audit.json (repeatable)")
@@ -232,6 +274,8 @@ def main():
     ap.add_argument("--fee", type=float, default=0.1, help="round-trip fee %% (check your MEXC tier)")
     ap.add_argument("--ca-bundle", help="PEM file with extra trusted root certificates (corporate proxy)")
     ap.add_argument("--insecure", action="store_true", help="disable TLS certificate checking (public data only; see hint)")
+    ap.add_argument("--dedupe-min", type=float, default=180.0,
+                    help="window (minutes, default = the 3h horizon) for the de-duplicated early-buy split: first event per symbol per window. The audit logger already caps rows at 1 per symbol per 60 min, so 60 changes nothing")
     ap.add_argument("--partial", action="store_true",
                     help="also score events whose window is still open, using the candles available so far (marked partial)")
     args = ap.parse_args()
@@ -309,6 +353,7 @@ def main():
                 print(f"  {'clause failed':34} {'n':>3} {'avg%':>6} {'win%':>5}")
                 for c, rs in sorted(clause.items(), key=lambda kv: -len(kv[1])):
                     print(f"  {c:34} {len(rs):>3} {sum(r['pnl'] for r in rs) / len(rs):>6.2f} {100 * sum(r['pnl'] > 0 for r in rs) / len(rs):>5.0f}")
+        setup_report(skipped, args.dedupe_min)
         sensitivity(skipped, args.fee)
     best = sorted(skipped, key=lambda r: -r["mfe"])[:5]
     if best:
