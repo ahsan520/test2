@@ -1956,6 +1956,8 @@ const EARLY_SIZE_PCT       = parseFloat(process.env.EARLY_BUY_SIZE_PCT || '40');
 // Setup-path entries (SETUP trigger, pre-confirmation) are sized down; see early-buy.js SETUP PATH.
 const EARLY_SETUP_SIZE_MULT = parseFloat(process.env.EARLY_SETUP_SIZE_MULT || '0.5');
 const EARLY_MAX_OPEN       = parseInt(process.env.EARLY_MAX_OPEN || '2', 10);
+// Cap on open setup-path positions (counted inside EARLY_MAX_OPEN too). Keeps pre-confirmation entries from taking both early slots.
+const EARLY_SETUP_MAX_OPEN = parseInt(process.env.EARLY_SETUP_MAX_OPEN || '1', 10);
 const EARLY_MAX_PER_CYCLE  = parseInt(process.env.EARLY_MAX_PER_CYCLE || '1', 10);
 const EARLY_BLOCK_RISK_OFF = (process.env.EARLY_BLOCK_RISK_OFF ?? 'true') === 'true';
 const EARLY_STOP_LOSS_PCT  = process.env.EARLY_STOP_LOSS_PCT ? parseFloat(process.env.EARLY_STOP_LOSS_PCT) : null; // null = global STOP_LOSS_PCT
@@ -1971,6 +1973,7 @@ export async function executeEarlyBuyP0({
 
   const isOpenEarly = p => p.setup === 'EARLY BUY P0' && !p.liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(p.status);
   let openEarly = Object.values(positions).filter(isOpenEarly).length;
+  let openEarlySetup = Object.values(positions).filter(p => isOpenEarly(p) && p.earlySetupPath).length;
   let placed = 0;
 
   for (const { pair, entry, result } of candidates) {
@@ -1986,6 +1989,7 @@ export async function executeEarlyBuyP0({
     if (isNoTradeSymbol(pair))                                   { skip('no_trade_symbol'); continue; }
     if (effectiveTradeMode === 'live' && (!MEXC_API_KEY || !MEXC_API_SECRET)) { skip('missing_api_credentials'); continue; }
     if (openEarly >= EARLY_MAX_OPEN)                             { skip('max_open_early', { openEarly, max: EARLY_MAX_OPEN }); continue; }
+    if (result.setupPath && openEarlySetup >= EARLY_SETUP_MAX_OPEN) { skip('max_open_early_setup', { openEarlySetup, max: EARLY_SETUP_MAX_OPEN }); continue; }
     if (Object.values(positions).some(p => p.base === base && p.assetType === 'crypto' && !p.liveOrder?.closedAt && !['stopped', 'tp2_hit'].includes(p.status))) {
       skip('already_held'); continue;
     }
@@ -2048,8 +2052,8 @@ export async function executeEarlyBuyP0({
       recordTradeOpen(positions[sym], { mode: 'paper', orderId: positions[sym].liveOrder.buyOrderId, qty, fillPrice, usdSize, timing: { ...timing(fillPrice), ctx: ctx() } });
       await pushTradeLogToGitHub(loadTradeLog());
       if (ST_PRIORITY_SIZE_MODE === 'percent') adjustPaperBalance(-usdSize);
-      changed = true; placed++; openEarly++;
-      await sendTelegram(`📝 *EARLY BUY (P0) PAPER BUY* — ${base} $${usdSize} USDT @ ~$${fillPrice.toFixed(6)}  [${result.stage}]\n  _Paper mode — no real order placed._`);
+      changed = true; placed++; openEarly++; if (result.setupPath) openEarlySetup++;
+      await sendTelegram(`📝 *EARLY BUY (P0${result.setupPath ? ' SETUP' : ''}) PAPER BUY* — ${base} $${usdSize} USDT @ ~$${fillPrice.toFixed(6)}  [${result.stage}]\n  _Paper mode — no real order placed._`);
       continue;
     }
 
@@ -2074,11 +2078,11 @@ export async function executeEarlyBuyP0({
       logAudit('early_buy_live_buy', { sym, usdSize, qty: buy.executedQty, fillPrice: buy.fillPrice, orderId: buy.orderId, stage: result.stage });
       recordTradeOpen(positions[sym], { mode: 'live', orderId: buy.orderId, qty: buy.executedQty, fillPrice: buy.fillPrice, usdSize, timing: { ...timing(buy.fillPrice), ctx: ctx() } });
       await pushTradeLogToGitHub(loadTradeLog());
-      changed = true; placed++; openEarly++;
+      changed = true; placed++; openEarly++; if (result.setupPath) openEarlySetup++;
       await sendTelegram(
-        `🟡 *EARLY BUY (P0) LIVE BUY* — ${base} — ${utc}\n` +
+        `🟡 *EARLY BUY (P0${result.setupPath ? ' SETUP' : ''}) LIVE BUY* — ${base} — ${utc}\n` +
         `  MEXC MARKET BUY: ${buy.executedQty}${buy.estimated ? ' (estimated)' : ''} @ $${buy.fillPrice.toFixed(6)}\n` +
-        `  Size: $${usdSize} USDT (${EARLY_SIZE_PCT}% of priority size)  Order ID: \`${buy.orderId}\`\n` +
+        `  Size: $${usdSize} USDT (${EARLY_SIZE_PCT}%${result.setupPath ? ' x ' + EARLY_SETUP_SIZE_MULT + ' setup' : ''} of priority size)  Order ID: \`${buy.orderId}\`\n` +
         `  Pre-cross [${result.stage}]: ST5 ${snap.st5Dir} ${snap.st5DistATR} ATR · BullConf ${snap.bullConf}/10 · whale ${snap.whale} · CVD ${snap.cvd} · OI ${snap.oiDiv}\n` +
         `  🛡 Watched by the normal stop/T1/T2 monitor from here on.\n` +
         `  _Send /pause to halt further auto-buys_`

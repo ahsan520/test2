@@ -32,6 +32,7 @@
 // A candidate that only passes via these relaxations is tagged setupPath:true. In 'alert' mode it is Telegram + audit
 // only; in 'live' mode it is bought at EARLY_SETUP_SIZE_MULT of the normal early size (see mexc-trader.js).
 // ═════════════════════════════════════════════════════════════════
+import { checkFallingKnife } from './st-timing-engine.js';
 const num = (n, d) => parseFloat(process.env[n] ?? d);
 
 export const EARLY_MODE        = (process.env.EARLY_BUY_MODE || 'alert').toLowerCase();   // off | alert | live
@@ -90,19 +91,28 @@ function buildClauses(entry, symbolState, relaxed) {
   const cvdUp = String(d.cvdTrend || '').toLowerCase() === 'up';
   const trigConfirmed = trig === 'TRIGGERING' || trig === 'BREAKOUT' || String(entry?.entryState || '').toUpperCase() === 'RETEST';
   // Relaxed (setup path) only: SETUP at the approach stage with CVD up and a minimum trigger score.
-  const setupTrigOk = relaxed && trig === 'SETUP' && stage === 'approach' && cvdUp && (entry?.triggerScore ?? 0) >= SETUP_TRIGGER_MIN;
+  const setupTrigOk = relaxed && trig === 'SETUP' && !trigConfirmed && stage === 'approach' && cvdUp && (entry?.triggerScore ?? 0) >= SETUP_TRIGGER_MIN;
+  // The shock / buy-intel relaxations belong to the SETUP lane ONLY. Previously they applied to every coin on the relaxed
+  // pass, so a TRIGGERING coin with shock 0.6 or penalty 2 was admitted and tagged setupPath (replay: TRIGGERING/approach
+  // is the worst bucket, 7% win). A confirmed-trigger coin is now judged on the strict thresholds even on the relaxed pass.
+  const setupLane = setupTrigOk;
+  // Same falling-knife test mexc-trader.js executeEarlyBuyP0 runs at execution (ST5+ST15 both BEAR, strongly negative ST5 slope).
+  // An approach is ST5 BEAR by definition, so without this a setup with ST15 BEAR alerts/passes here and is then skipped at
+  // execution (burning the cooldown). Setup lane only; the strict path is unchanged.
+  const setupNoKnife = !setupLane || !(entry?.supertrend5m && entry?.supertrend15m) || !checkFallingKnife(entry, entry.supertrend5m, entry.supertrend15m).isFallingKnife;
   const oiMomTrend = String(symbolState?.oiMomentum?.trend || '').toUpperCase() || null;
   const clauses = {
     bullConf:     entry?.bullConf != null && entry.bullConf >= BULL_MIN && entry.bullConf <= BULL_MAX,
-    shock:        parseFloat(d.shock) > (relaxed ? Math.min(SHOCK_MIN, SETUP_SHOCK_MIN) : SHOCK_MIN),
+    shock:        parseFloat(d.shock) > (setupLane ? Math.min(SHOCK_MIN, SETUP_SHOCK_MIN) : SHOCK_MIN),
     cvdUp,
     oiOk:         OI_ACCEPT.includes(String(d.oiDiv || '').toUpperCase()),
     // OI momentum must not be fading (market-state.json oiMomentum.trend).
     oiMomentumOk: !OI_MOM_REQUIRE || oiMomTrend == null || !OI_MOM_BLOCK.includes(oiMomTrend),
-    buyIntel:     (entry?.buyIntelPenalty ?? 0) <= (relaxed ? Math.max(MAX_PENALTY, SETUP_MAX_PENALTY) : MAX_PENALTY),
+    buyIntel:     (entry?.buyIntelPenalty ?? 0) <= (setupLane ? Math.max(MAX_PENALTY, SETUP_MAX_PENALTY) : MAX_PENALTY),
     whale:        (entry?.whale?.score ?? 0) >= WHALE_MIN,
     signalSafe:   !BAD_SIGNAL.some(w => sig.includes(w)),
     trigger:      trigConfirmed || setupTrigOk,
+    setupNoKnife,
     preCross:     stage !== null,
     notOverheated: d.r15 == null || d.r15 < MAX_RSI15,
     // 15m gate not overextended / not a falling knife. Uses the LIVE 15m Supertrend (event status is history).
@@ -177,7 +187,8 @@ export function collectEarlyBuyCandidates({ entries, cooldowns, positions = {}, 
   lastScan.passed = out.length;
   lastScan.closest = scanned.filter(x => !x.pass).sort((a, b) => a.failed.length - b.failed.length).slice(0, 3);
   // Strongest first: whale score, then BullConf (so a limited number of slots goes to the best setup).
-  out.sort((a, b) => (b.result.snap.whale ?? 0) - (a.result.snap.whale ?? 0) || (b.result.snap.bullConf ?? 0) - (a.result.snap.bullConf ?? 0));
+  // Strict passes outrank setup-path ones (EARLY_MAX_PER_CYCLE usually leaves one slot).
+  out.sort((a, b) => (a.result.setupPath ? 1 : 0) - (b.result.setupPath ? 1 : 0) || (b.result.snap.whale ?? 0) - (a.result.snap.whale ?? 0) || (b.result.snap.bullConf ?? 0) - (a.result.snap.bullConf ?? 0));
   return out;
 }
 
