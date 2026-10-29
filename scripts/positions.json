@@ -42,9 +42,9 @@
     "t2": 1.3727,
     "score": -2,
     "spikeScore": 0.5332958611543578,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1793287856255,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -56,7 +56,11 @@
       "fillPrice": 1.2950365415862872,
       "buyOrderId": "MANUAL_ADOPTED_1793271177570",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__744512535415185408036",
+      "exitFillPrice": 1.3051,
+      "closedAt": 1793287857456,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -70,21 +74,23 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1793287552998
+      "evaluatedAt": 1793287856255
     },
     "highestPnLSeen": 1.31,
     "lowestPnLSeen": -0.63,
-    "lastR15": 61.3,
+    "lastR15": 58.8,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.41% below tier A give-back 1.00% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.31% fell 0.57% to +0.74% (≥ 0.50% trail)",
       "highestPnLSeen": 1.31,
-      "drawdownFromPeak": 0.41000000000000003,
-      "tier": "A",
-      "giveBack": 1,
-      "evaluatedAt": 1793287552998
+      "drawdownFromPeak": 0.5700000000000001,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1793287856255
     },
-    "prevPnLPct": 0.9
+    "prevPnLPct": 0.74,
+    "exitPrice": 1.3046,
+    "statusChangedAt": 1793287856255
   },
   "NASDAQ:AAPL": {
     "sym": "NASDAQ:AAPL",
@@ -114,7 +120,7 @@
     "caution": false,
     "highestPnLSeen": 0.14,
     "lowestPnLSeen": -0.4,
-    "lastR15": 65.1,
+    "lastR15": 65.2,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.8% floor — not evaluated yet",
@@ -122,7 +128,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1793287552998
+      "evaluatedAt": 1793287856255
     }
   },
   "NYSE:GE": {
@@ -153,17 +159,17 @@
     "caution": false,
     "highestPnLSeen": 2.87,
     "lowestPnLSeen": -0.15,
-    "lastR15": 56.9,
+    "lastR15": 56.8,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.10% below tier A+ give-back 1.50% (regime-widened)",
+      "reason": "drawdown 0.16% below tier A+ give-back 1.50% (regime-widened)",
       "highestPnLSeen": 2.87,
-      "drawdownFromPeak": 0.10000000000000009,
+      "drawdownFromPeak": 0.16000000000000014,
       "tier": "A+",
       "giveBack": 1.5,
-      "evaluatedAt": 1793287552998
+      "evaluatedAt": 1793287856255
     },
-    "prevPnLPct": 2.77
+    "prevPnLPct": 2.71
   },
   "NASDAQ:SIMO": {
     "sym": "NASDAQ:SIMO",
@@ -191,17 +197,17 @@
     "histWinRate": 0.2,
     "histSample": 5,
     "caution": true,
-    "highestPnLSeen": 0.38,
+    "highestPnLSeen": 0.62,
     "lowestPnLSeen": -0.47,
-    "lastR15": 39.9,
+    "lastR15": 40.1,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak 0.38% below 0.8% floor — not evaluated yet",
-      "highestPnLSeen": 0.38,
+      "reason": "peak 0.62% below 0.8% floor — not evaluated yet",
+      "highestPnLSeen": 0.62,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1793287552998
+      "evaluatedAt": 1793287856255
     }
   }
 }
