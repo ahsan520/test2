@@ -60,17 +60,17 @@
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold (recovery detected, risk softened)",
+      "reason": "no entry snapshot — falling-knife-only score 0 below 75 threshold",
       "fallingKnifeScore": 0,
       "exitProbability": 0,
       "dynamicPositionRisk": 0,
       "recovery": {
         "recovering": true,
-        "sustainedMin": 10
+        "sustainedMin": 8
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1793283351257
+      "evaluatedAt": 1793283655983
     },
     "highestPnLSeen": -0.07,
     "lowestPnLSeen": -0.63,
@@ -82,7 +82,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1793283351257
+      "evaluatedAt": 1793283655983
     }
   },
   "NASDAQ:AAPL": {
@@ -113,7 +113,7 @@
     "caution": false,
     "highestPnLSeen": 0.14,
     "lowestPnLSeen": -0.4,
-    "lastR15": 66.2,
+    "lastR15": 66,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.14% below 0.8% floor — not evaluated yet",
@@ -121,7 +121,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1793283351257
+      "evaluatedAt": 1793283655983
     }
   },
   "NYSE:GE": {
@@ -150,61 +150,19 @@
     "histWinRate": 0.5,
     "histSample": 2,
     "caution": false,
-    "highestPnLSeen": 1.61,
+    "highestPnLSeen": 1.85,
     "lowestPnLSeen": -0.15,
-    "lastR15": 54.3,
+    "lastR15": 54.9,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "drawdown 0.00% below tier A+ give-back 0.75%",
-      "highestPnLSeen": 1.61,
+      "highestPnLSeen": 1.85,
       "drawdownFromPeak": 0,
       "tier": "A+",
       "giveBack": 0.75,
-      "evaluatedAt": 1793283351257
+      "evaluatedAt": 1793283655983
     },
-    "prevPnLPct": 1.61
-  },
-  "NASDAQ:CRWD": {
-    "sym": "NASDAQ:CRWD",
-    "base": "NASDAQ:CRWD",
-    "assetType": "stock",
-    "exchangePrefix": "NASDAQ",
-    "session": "open",
-    "setup": "BREAKOUT",
-    "dir": "bull",
-    "alertedAt": 1793281981315,
-    "holdLockUntil": 1793283181315,
-    "entryPrice": 263.11,
-    "stop": 259.82,
-    "t1": 271,
-    "t2": 278.89,
-    "score": 6,
-    "spikeScore": 0.22247560556558543,
-    "exitAlertedAt": 1793283055214,
-    "tier1AlertedAt": null,
-    "status": "exiting",
-    "source": "headless_v11.0",
-    "scoreSource": "peak",
-    "recommended": true,
-    "rankScore": 0.491,
-    "histWinRate": 0.5,
-    "histSample": 6,
-    "caution": false,
-    "highestPnLSeen": 1.69,
-    "lowestPnLSeen": 0.63,
-    "lastR15": 49,
-    "prevPnLPct": 0.63,
-    "lastProfitIntel": {
-      "action": "EXIT",
-      "reason": "Profit Protection Triggered: trailing stop — peak +1.69% fell 1.06% to +0.63% (≥ 0.59% trail)",
-      "highestPnLSeen": 1.69,
-      "drawdownFromPeak": 1.06,
-      "tier": "TRAIL",
-      "giveBack": 0.5914999999999999,
-      "evaluatedAt": 1793283055214
-    },
-    "exitPrice": 264.755,
-    "statusChangedAt": 1793283055214
+    "prevPnLPct": 1.85
   },
   "NASDAQ:PANW": {
     "sym": "NASDAQ:PANW",
@@ -224,13 +182,15 @@
     "spikeScore": 0.3133839363847354,
     "exitAlertedAt": null,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "stopped",
     "source": "headless_v11.0",
     "scoreSource": "peak",
     "recommended": true,
     "rankScore": 0.574,
     "histWinRate": 0.6666666666666666,
     "histSample": 6,
-    "caution": false
+    "caution": false,
+    "exitPrice": 382.66,
+    "statusChangedAt": 1793283655983
   }
 }
