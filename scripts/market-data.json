@@ -1,5 +1,5 @@
 {
-  "fetchedAt": 1793380225213,
+  "fetchedAt": 1793380382369,
   "staleAfterMinutes": 30,
   "global": {
     "btcChg15m": null,
@@ -11,43 +11,43 @@
     "btcOiDiv": "NEUTRAL",
     "btcCvdTrend": "down",
     "btcTriggerOk": false,
-    "btcChg24h": -4.747,
+    "btcChg24h": -4.739,
     "btcBull4hCount": 0,
-    "updatedAt": 1793380225213
+    "updatedAt": 1793380382369
   },
   "symbols": {
     "AAVEUSDT": {
       "pair": "AAVEUSDT",
-      "price": 125.05,
-      "chg": -7.315,
-      "conv": -6,
-      "rawConv": -3,
-      "buyIntelPenalty": 3,
+      "price": 125,
+      "chg": -7.407,
+      "conv": -13,
+      "rawConv": -7,
+      "buyIntelPenalty": 6,
       "setup": {
-        "label": "CAP BUY",
-        "emoji": "💥"
+        "label": "SHORT SETUP",
+        "emoji": "🔻"
       },
       "assetType": "crypto",
       "exchangePrefix": "BINANCE",
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 125.05,
-        "chg": -7.315,
-        "chg4h": -0.636,
-        "shock": 0.689109569158153,
-        "r15": 46.6,
-        "r1h": 40.8,
+        "p": 125,
+        "chg": -7.407,
+        "chg4h": -0.675,
+        "shock": 0.8121397168622937,
+        "r15": 46.4,
+        "r1h": 40.7,
         "r4h": 39.6,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
-        "cvdTrend": "up",
-        "cvdStrength": 0.016,
-        "obi": -0.9425466030077637,
-        "fr": -0.014843787648450001,
+        "cvdTrend": "down",
+        "cvdStrength": 0.024,
+        "obi": -25.352960856473743,
+        "fr": -0.014903536642409999,
         "oiDiv": "NEUTRAL",
-        "conv": -6,
+        "conv": -13,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -95,14 +95,15 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -3,
-        "adjustedConv": -6,
-        "buyIntelPenalty": 3,
+        "rawConv": -7,
+        "adjustedConv": -13,
+        "buyIntelPenalty": 6,
         "buyIntel": {
-          "penalty": 3,
+          "penalty": 6,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "2.43% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal) · whale 23/100 < 40 (low confidence)",
+            "2.47% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -118,13 +119,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 0,
-            "reason": null
+            "penalty": 3,
+            "reason": "bullConf 2/10 < 3 (thin signal) · whale 23/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "2.43% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 2.427,
+            "reason": "2.47% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 2.466,
             "recentHigh": 128.16
           },
           "tod": {
@@ -135,7 +136,7 @@
         },
         "trigger": {
           "triggerStatus": "SETUP",
-          "triggerScore": 45,
+          "triggerScore": 25,
           "breakoutConfirmed": false,
           "breakoutLevel": 128.16,
           "volumeExpansion": true,
@@ -145,7 +146,6 @@
           "risingStreak": 0,
           "triggerReasons": [
             "5m volume ≥ 1.3x recent average",
-            "CVD trend up",
             "BTC short-term trigger NOT confirmed"
           ]
         }
@@ -153,12 +153,11 @@
       "signal": "FALLING KNIFE",
       "entryState": "HIGH SHOCK",
       "triggerStatus": "SETUP",
-      "triggerScore": 45,
+      "triggerScore": 25,
       "breakoutConfirmed": false,
       "breakoutLevel": 128.16,
       "triggerReasons": [
         "5m volume ≥ 1.3x recent average",
-        "CVD trend up",
         "BTC short-term trigger NOT confirmed"
       ],
       "btcTriggerOk": false,
@@ -247,70 +246,70 @@
           "extensionZone": "EXHAUSTED"
         }
       },
-      "bullConf": 4,
+      "bullConf": 2,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
         "aboveEma": false,
         "oiRising": false,
-        "cvdRising": true,
+        "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": true,
         "obiBidHeavy": false,
         "rsiNotOb": true,
-        "whaleScore60": true
+        "whaleScore60": false
       },
       "whale": {
-        "score": 70,
-        "zone": "Smart Money Buy",
-        "emoji": "💚"
+        "score": 23,
+        "zone": "Distribution",
+        "emoji": "🟠"
       },
       "capBuy": {
-        "isCapBuy": true,
-        "capScore": 4
+        "isCapBuy": false,
+        "capScore": 2
       },
-      "flow": "Mixed Flow",
+      "flow": "Institutional↓",
       "grade": "D",
-      "successProb": 44,
-      "archetype": "Mean Reversion",
-      "peakShock": 0.689109569158153,
-      "peakObi": -0.9425466030077637,
-      "peakSince": 1793380230506,
+      "successProb": 20,
+      "archetype": "Developing",
+      "peakShock": 0.8121397168622937,
+      "peakObi": -25.352960856473743,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "APTUSDT": {
       "pair": "APTUSDT",
-      "price": 0.6278,
-      "chg": -8.988,
-      "conv": -7,
-      "rawConv": -4,
-      "buyIntelPenalty": 3,
+      "price": 0.6279,
+      "chg": -8.921,
+      "conv": -13,
+      "rawConv": -8,
+      "buyIntelPenalty": 5,
       "setup": {
-        "label": "WATCHING",
-        "emoji": "⏳"
+        "label": "SHORT SETUP",
+        "emoji": "🔻"
       },
       "assetType": "crypto",
       "exchangePrefix": "BINANCE",
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.6278,
-        "chg": -8.988,
-        "chg4h": -0.032,
-        "shock": 0.515318669478341,
-        "r15": 50.7,
-        "r1h": 40.4,
+        "p": 0.6279,
+        "chg": -8.921,
+        "chg4h": -0.016,
+        "shock": 0.7298642819297441,
+        "r15": 50.8,
+        "r1h": 40.5,
         "r4h": 36.1,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.36,
-        "obi": 20.402758374606332,
-        "fr": -0.00534525464138,
+        "cvdStrength": 0.344,
+        "obi": -21.45089274272934,
+        "fr": -0.00540052314007,
         "oiDiv": "NEUTRAL",
-        "conv": -7,
+        "conv": -13,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -365,14 +364,14 @@
             "widthATR": 2.017
           }
         },
-        "rawConv": -4,
-        "adjustedConv": -7,
-        "buyIntelPenalty": 3,
+        "rawConv": -8,
+        "adjustedConv": -13,
+        "buyIntelPenalty": 5,
         "buyIntel": {
-          "penalty": 3,
+          "penalty": 5,
           "reasons": [
-            "whale 37/100 < 40 (low confidence)",
-            "2.35% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)",
+            "2.33% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -388,13 +387,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 1,
-            "reason": "whale 37/100 < 40 (low confidence)"
+            "penalty": 3,
+            "reason": "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "2.35% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 2.349,
+            "reason": "2.33% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 2.333,
             "recentHigh": 0.6429
           },
           "tod": {
@@ -520,7 +519,7 @@
           "extensionZone": "EXHAUSTED"
         }
       },
-      "bullConf": 3,
+      "bullConf": 2,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
@@ -529,35 +528,35 @@
         "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": true,
-        "obiBidHeavy": true,
+        "obiBidHeavy": false,
         "rsiNotOb": true,
         "whaleScore60": false
       },
       "whale": {
-        "score": 37,
-        "zone": "Distribution",
-        "emoji": "🟠"
+        "score": 15,
+        "zone": "Heavy Dist",
+        "emoji": "🔴"
       },
       "capBuy": {
         "isCapBuy": false,
         "capScore": 1
       },
-      "flow": "Mixed Flow",
+      "flow": "Institutional↓",
       "grade": "D",
-      "successProb": 28,
+      "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.515318669478341,
-      "peakObi": 20.402758374606332,
-      "peakSince": 1793380230506,
+      "peakShock": 0.7298642819297441,
+      "peakObi": -21.45089274272934,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "AVAXUSDT": {
       "pair": "AVAXUSDT",
-      "price": 8.374,
-      "chg": -6.31,
-      "conv": -4,
-      "rawConv": -2,
+      "price": 8.387,
+      "chg": -6.133,
+      "conv": -3,
+      "rawConv": -1,
       "buyIntelPenalty": 2,
       "setup": {
         "label": "WATCHING",
@@ -568,22 +567,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 8.374,
-        "chg": -6.31,
-        "chg4h": 0.179,
-        "shock": 0.6156598083603325,
-        "r15": 50.4,
-        "r1h": 42,
-        "r4h": 38.4,
+        "p": 8.387,
+        "chg": -6.133,
+        "chg4h": 0.323,
+        "shock": 0.724687820807462,
+        "r15": 51.5,
+        "r1h": 42.7,
+        "r4h": 38.8,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 1.126,
-        "obi": 12.860805073704778,
-        "fr": -0.00390234891943,
+        "cvdStrength": 1.27,
+        "obi": 12.179264641277673,
+        "fr": -0.0037637643731000003,
         "oiDiv": "NEUTRAL",
-        "conv": -4,
+        "conv": -3,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -631,14 +630,14 @@
             "widthATR": 2.446
           }
         },
-        "rawConv": -2,
-        "adjustedConv": -4,
+        "rawConv": -1,
+        "adjustedConv": -3,
         "buyIntelPenalty": 2,
         "buyIntel": {
           "penalty": 2,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "0.81% below the 10-period high — price already rolled over from a recent top"
+            "0.65% below the 10-period high — price already rolled over from a recent top"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -659,8 +658,8 @@
           },
           "pullback": {
             "penalty": 1,
-            "reason": "0.81% below the 10-period high — price already rolled over from a recent top",
-            "pullbackPct": 0.805,
+            "reason": "0.65% below the 10-period high — price already rolled over from a recent top",
+            "pullbackPct": 0.652,
             "recentHigh": 8.442
           },
           "tod": {
@@ -795,7 +794,7 @@
         "whaleScore60": true
       },
       "whale": {
-        "score": 70,
+        "score": 78,
         "zone": "Smart Money Buy",
         "emoji": "💚"
       },
@@ -805,18 +804,18 @@
       },
       "flow": "Mixed Flow",
       "grade": "C",
-      "successProb": 56,
+      "successProb": 58,
       "archetype": "Mean Reversion",
-      "peakShock": 0.6156598083603325,
-      "peakObi": 12.860805073704778,
-      "peakSince": 1793380230506,
+      "peakShock": 0.724687820807462,
+      "peakObi": 12.179264641277673,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "BTCUSDT": {
       "pair": "BTCUSDT",
-      "price": 77229.94,
-      "chg": -4.747,
+      "price": 77229.96,
+      "chg": -4.739,
       "conv": -7,
       "rawConv": -3,
       "buyIntelPenalty": 4,
@@ -829,19 +828,19 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 77229.94,
-        "chg": -4.747,
-        "chg4h": -0.492,
-        "shock": 0.49418660532195563,
-        "r15": 43.7,
-        "r1h": 37.2,
+        "p": 77229.96,
+        "chg": -4.739,
+        "chg4h": -0.505,
+        "shock": 0.6217061799443393,
+        "r15": 43.5,
+        "r1h": 37.1,
         "r4h": 33.5,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.343,
-        "obi": 90.13334069513844,
+        "cvdStrength": 0.356,
+        "obi": 87.5599119529803,
         "fr": 0.01,
         "oiDiv": "NEUTRAL",
         "conv": -7,
@@ -1081,19 +1080,19 @@
       "grade": "D",
       "successProb": 23,
       "archetype": "Developing",
-      "peakShock": 0.49418660532195563,
-      "peakObi": 90.13334069513844,
-      "peakSince": 1793380230506,
+      "peakShock": 0.6217061799443393,
+      "peakObi": 87.5599119529803,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "DOGEUSDT": {
       "pair": "DOGEUSDT",
-      "price": 0.07564,
-      "chg": -5.544,
-      "conv": -14,
-      "rawConv": -8,
-      "buyIntelPenalty": 6,
+      "price": 0.0757,
+      "chg": -5.505,
+      "conv": -8,
+      "rawConv": -5,
+      "buyIntelPenalty": 3,
       "setup": {
         "label": "SHORT SETUP",
         "emoji": "🔻"
@@ -1103,22 +1102,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.07564,
-        "chg": -5.544,
-        "chg4h": -0.303,
-        "shock": 0.48783689341096265,
-        "r15": 47.9,
-        "r1h": 40.3,
-        "r4h": 40.1,
+        "p": 0.0757,
+        "chg": -5.505,
+        "chg4h": -0.224,
+        "shock": 0.5598392266386417,
+        "r15": 48.9,
+        "r1h": 40.9,
+        "r4h": 40.3,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
-        "cvdTrend": "down",
-        "cvdStrength": 0.052,
-        "obi": -29.713397387111335,
-        "fr": 0.00785258517157,
+        "cvdTrend": "up",
+        "cvdStrength": 0.028,
+        "obi": -17.965078551321042,
+        "fr": 0.00797765338762,
         "oiDiv": "NEUTRAL",
-        "conv": -14,
+        "conv": -8,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -1159,15 +1158,14 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -8,
-        "adjustedConv": -14,
-        "buyIntelPenalty": 6,
+        "rawConv": -5,
+        "adjustedConv": -8,
+        "buyIntelPenalty": 3,
         "buyIntel": {
-          "penalty": 6,
+          "penalty": 3,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "bullConf 2/10 < 3 (thin signal) · whale 7/100 < 40 (low confidence)",
-            "1.36% below the 10-period high — buying into an active breakdown, not a dip"
+            "1.28% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -1183,13 +1181,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 3,
-            "reason": "bullConf 2/10 < 3 (thin signal) · whale 7/100 < 40 (low confidence)"
+            "penalty": 0,
+            "reason": null
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.36% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.356,
+            "reason": "1.28% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.278,
             "recentHigh": 0.07668
           },
           "tod": {
@@ -1200,7 +1198,7 @@
         },
         "trigger": {
           "triggerStatus": "SETUP",
-          "triggerScore": 0,
+          "triggerScore": 20,
           "breakoutConfirmed": false,
           "breakoutLevel": 0.07668,
           "volumeExpansion": false,
@@ -1209,6 +1207,7 @@
           "momentumBurstActive": false,
           "risingStreak": 0,
           "triggerReasons": [
+            "CVD trend up",
             "BTC short-term trigger NOT confirmed"
           ]
         }
@@ -1216,10 +1215,11 @@
       "signal": "FALLING KNIFE",
       "entryState": "HIGH SHOCK",
       "triggerStatus": "SETUP",
-      "triggerScore": 0,
+      "triggerScore": 20,
       "breakoutConfirmed": false,
       "breakoutLevel": 0.07668,
       "triggerReasons": [
+        "CVD trend up",
         "BTC short-term trigger NOT confirmed"
       ],
       "btcTriggerOk": false,
@@ -1301,13 +1301,13 @@
           "extensionZone": "VERY_EXTENDED"
         }
       },
-      "bullConf": 2,
+      "bullConf": 3,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
         "aboveEma": false,
         "oiRising": false,
-        "cvdRising": false,
+        "cvdRising": true,
         "volExpansion": false,
         "fundingHealthy": true,
         "obiBidHeavy": false,
@@ -1315,28 +1315,28 @@
         "whaleScore60": false
       },
       "whale": {
-        "score": 7,
-        "zone": "Heavy Dist",
-        "emoji": "🔴"
+        "score": 54,
+        "zone": "Neutral",
+        "emoji": "⚪"
       },
       "capBuy": {
         "isCapBuy": false,
-        "capScore": 0
+        "capScore": 2
       },
-      "flow": "Institutional↓",
+      "flow": "Mixed Flow",
       "grade": "D",
-      "successProb": 20,
+      "successProb": 33,
       "archetype": "Developing",
-      "peakShock": 0.48783689341096265,
-      "peakObi": -29.713397387111335,
-      "peakSince": 1793380230506,
+      "peakShock": 0.5598392266386417,
+      "peakObi": -17.965078551321042,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "ETHUSDT": {
       "pair": "ETHUSDT",
-      "price": 2240.15,
-      "chg": -4.82,
+      "price": 2242.85,
+      "chg": -4.692,
       "conv": -2,
       "rawConv": -1,
       "buyIntelPenalty": 1,
@@ -1349,20 +1349,20 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 2240.15,
-        "chg": -4.82,
-        "chg4h": 0.573,
-        "shock": 0.7650431159850792,
-        "r15": 53.7,
-        "r1h": 43.5,
-        "r4h": 35.5,
+        "p": 2242.85,
+        "chg": -4.692,
+        "chg4h": 0.692,
+        "shock": 0.9117006794054956,
+        "r15": 55.2,
+        "r1h": 44.4,
+        "r4h": 36.2,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.576,
-        "obi": 78.09915701281682,
-        "fr": -0.00443860414247,
+        "cvdStrength": 0.694,
+        "obi": 96.6417086445513,
+        "fr": -0.0044420648260799995,
         "oiDiv": "NEUTRAL",
         "conv": -2,
         "supertrend15m": {
@@ -1418,7 +1418,7 @@
         "buyIntel": {
           "penalty": 1,
           "reasons": [
-            "0.99% below the 10-period high — price already rolled over from a recent top"
+            "0.87% below the 10-period high — price already rolled over from a recent top"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -1439,8 +1439,8 @@
           },
           "pullback": {
             "penalty": 1,
-            "reason": "0.99% below the 10-period high — price already rolled over from a recent top",
-            "pullbackPct": 0.987,
+            "reason": "0.87% below the 10-period high — price already rolled over from a recent top",
+            "pullbackPct": 0.868,
             "recentHigh": 2262.49
           },
           "tod": {
@@ -1587,16 +1587,16 @@
       "grade": "B",
       "successProb": 64,
       "archetype": "Mean Reversion",
-      "peakShock": 0.7650431159850792,
-      "peakObi": 78.09915701281682,
-      "peakSince": 1793380230506,
+      "peakShock": 0.9117006794054956,
+      "peakObi": 96.6417086445513,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "FETUSDT": {
       "pair": "FETUSDT",
       "price": 0.166,
-      "chg": -8.841,
+      "chg": -8.791,
       "conv": -6,
       "rawConv": -3,
       "buyIntelPenalty": 3,
@@ -1610,9 +1610,9 @@
       "marketClosed": false,
       "d": {
         "p": 0.166,
-        "chg": -8.841,
+        "chg": -8.791,
         "chg4h": -0.539,
-        "shock": 0.5700703813562306,
+        "shock": 0.7154561868315293,
         "r15": 53,
         "r1h": 40.7,
         "r4h": 39.7,
@@ -1621,7 +1621,7 @@
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
         "cvdStrength": 0.188,
-        "obi": 14.670303171985061,
+        "obi": 11.293912027206378,
         "fr": 0.005,
         "oiDiv": "NEUTRAL",
         "conv": -6,
@@ -1850,7 +1850,7 @@
         "whaleScore60": true
       },
       "whale": {
-        "score": 70,
+        "score": 78,
         "zone": "Smart Money Buy",
         "emoji": "💚"
       },
@@ -1860,21 +1860,21 @@
       },
       "flow": "Mixed Flow",
       "grade": "C",
-      "successProb": 51,
+      "successProb": 53,
       "archetype": "Developing",
-      "peakShock": 0.5700703813562306,
-      "peakObi": 14.670303171985061,
-      "peakSince": 1793380230506,
+      "peakShock": 0.7154561868315293,
+      "peakObi": 11.293912027206378,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "GALAUSDT": {
       "pair": "GALAUSDT",
-      "price": 0.001691,
-      "chg": -5.899,
-      "conv": -9,
-      "rawConv": -5,
-      "buyIntelPenalty": 4,
+      "price": 0.00169,
+      "chg": -5.797,
+      "conv": -13,
+      "rawConv": -6,
+      "buyIntelPenalty": 7,
       "setup": {
         "label": "SHORT SETUP",
         "emoji": "🔻"
@@ -1884,22 +1884,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.001691,
-        "chg": -5.899,
-        "chg4h": -0.646,
-        "shock": 0.265915711077531,
-        "r15": 53.7,
-        "r1h": 47.8,
-        "r4h": 44.2,
+        "p": 0.00169,
+        "chg": -5.797,
+        "chg4h": -0.705,
+        "shock": 0.3102289618415445,
+        "r15": 53.2,
+        "r1h": 47.6,
+        "r4h": 44.1,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
-        "cvdTrend": "up",
-        "cvdStrength": 0.006,
-        "obi": -8.186265131295919,
+        "cvdTrend": "down",
+        "cvdStrength": 0.053,
+        "obi": 2.659180008100336,
         "fr": 0.01,
         "oiDiv": "NEUTRAL",
-        "conv": -9,
+        "conv": -13,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -1954,14 +1954,15 @@
             "widthATR": 1.767
           }
         },
-        "rawConv": -5,
-        "adjustedConv": -9,
-        "buyIntelPenalty": 4,
+        "rawConv": -6,
+        "adjustedConv": -13,
+        "buyIntelPenalty": 7,
         "buyIntel": {
-          "penalty": 4,
+          "penalty": 7,
           "reasons": [
             "3 straight red candles — still actively falling, not a stabilized dip",
-            "1.74% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal) · whale 22/100 < 40 (low confidence)",
+            "1.80% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -1977,13 +1978,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 0,
-            "reason": null
+            "penalty": 3,
+            "reason": "bullConf 2/10 < 3 (thin signal) · whale 22/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.74% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.743,
+            "reason": "1.80% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.801,
             "recentHigh": 0.001721
           },
           "tod": {
@@ -1994,7 +1995,7 @@
         },
         "trigger": {
           "triggerStatus": "SETUP",
-          "triggerScore": 20,
+          "triggerScore": 0,
           "breakoutConfirmed": false,
           "breakoutLevel": 0.001721,
           "volumeExpansion": false,
@@ -2003,7 +2004,6 @@
           "momentumBurstActive": false,
           "risingStreak": 1,
           "triggerReasons": [
-            "CVD trend up",
             "BTC short-term trigger NOT confirmed"
           ]
         }
@@ -2011,11 +2011,10 @@
       "signal": "FALLING KNIFE",
       "entryState": "HIGH SHOCK",
       "triggerStatus": "SETUP",
-      "triggerScore": 20,
+      "triggerScore": 0,
       "breakoutConfirmed": false,
       "breakoutLevel": 0.001721,
       "triggerReasons": [
-        "CVD trend up",
         "BTC short-term trigger NOT confirmed"
       ],
       "btcTriggerOk": false,
@@ -2111,13 +2110,13 @@
           "extensionZone": "VERY_EXTENDED"
         }
       },
-      "bullConf": 3,
+      "bullConf": 2,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
         "aboveEma": false,
         "oiRising": false,
-        "cvdRising": true,
+        "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": true,
         "obiBidHeavy": false,
@@ -2125,30 +2124,30 @@
         "whaleScore60": false
       },
       "whale": {
-        "score": 54,
-        "zone": "Neutral",
-        "emoji": "⚪"
+        "score": 22,
+        "zone": "Distribution",
+        "emoji": "🟠"
       },
       "capBuy": {
         "isCapBuy": false,
-        "capScore": 2
+        "capScore": 0
       },
-      "flow": "Mixed Flow",
+      "flow": "Institutional↓",
       "grade": "D",
-      "successProb": 28,
+      "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.265915711077531,
-      "peakObi": -8.186265131295919,
-      "peakSince": 1793380230506,
+      "peakShock": 0.3102289618415445,
+      "peakObi": 2.659180008100336,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "IMXUSDT": {
       "pair": "IMXUSDT",
-      "price": 0.1209,
-      "chg": -14.011,
-      "conv": -6,
-      "rawConv": -2,
+      "price": 0.1212,
+      "chg": -13.737,
+      "conv": -7,
+      "rawConv": -3,
       "buyIntelPenalty": 4,
       "setup": {
         "label": "CAP BUY",
@@ -2159,22 +2158,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.1209,
-        "chg": -14.011,
-        "chg4h": -0.739,
-        "shock": 0.5600951342158997,
-        "r15": 52.4,
-        "r1h": 41,
-        "r4h": 36.1,
+        "p": 0.1212,
+        "chg": -13.737,
+        "chg4h": -0.493,
+        "shock": 0.819514837344381,
+        "r15": 54.2,
+        "r1h": 41.7,
+        "r4h": 36.4,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.507,
-        "obi": 27.202010403804866,
+        "cvdStrength": 0.755,
+        "obi": 17.402955374947922,
         "fr": 0.005,
         "oiDiv": "NEUTRAL",
-        "conv": -6,
+        "conv": -7,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -2222,14 +2221,14 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -2,
-        "adjustedConv": -6,
+        "rawConv": -3,
+        "adjustedConv": -7,
         "buyIntelPenalty": 4,
         "buyIntel": {
           "penalty": 4,
           "reasons": [
             "3 straight red candles — still actively falling, not a stabilized dip",
-            "2.34% below the 10-period high — buying into an active breakdown, not a dip"
+            "2.10% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -2250,8 +2249,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "2.34% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 2.342,
+            "reason": "2.10% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 2.1,
             "recentHigh": 0.1238
           },
           "tod": {
@@ -2386,7 +2385,7 @@
         "whaleScore60": true
       },
       "whale": {
-        "score": 77,
+        "score": 78,
         "zone": "Smart Money Buy",
         "emoji": "💚"
       },
@@ -2396,20 +2395,20 @@
       },
       "flow": "Mixed Flow",
       "grade": "D",
-      "successProb": 47,
+      "successProb": 48,
       "archetype": "Developing",
-      "peakShock": 0.5600951342158997,
-      "peakObi": 27.202010403804866,
-      "peakSince": 1793380230506,
+      "peakShock": 0.819514837344381,
+      "peakObi": 17.402955374947922,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "LINKUSDT": {
       "pair": "LINKUSDT",
-      "price": 11.208,
-      "chg": -5.346,
-      "conv": -2,
-      "rawConv": -1,
+      "price": 11.216,
+      "chg": -5.222,
+      "conv": -1,
+      "rawConv": 0,
       "buyIntelPenalty": 1,
       "setup": {
         "label": "WATCHING",
@@ -2420,22 +2419,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 11.208,
-        "chg": -5.346,
-        "chg4h": 1.338,
-        "shock": 0.493549295984748,
-        "r15": 57.8,
-        "r1h": 48.2,
-        "r4h": 45.7,
+        "p": 11.216,
+        "chg": -5.222,
+        "chg4h": 1.41,
+        "shock": 0.6124391111940334,
+        "r15": 58.3,
+        "r1h": 48.5,
+        "r4h": 45.9,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 1.4,
-        "obi": 14.334904575125615,
-        "fr": -0.00522224584307,
+        "cvdStrength": 1.471,
+        "obi": 50.64117532377519,
+        "fr": -0.00543714606855,
         "oiDiv": "NEUTRAL",
-        "conv": -2,
+        "conv": -1,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -2483,13 +2482,13 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -1,
-        "adjustedConv": -2,
+        "rawConv": 0,
+        "adjustedConv": -1,
         "buyIntelPenalty": 1,
         "buyIntel": {
           "penalty": 1,
           "reasons": [
-            "0.78% below the 10-period high — price already rolled over from a recent top"
+            "0.71% below the 10-period high — price already rolled over from a recent top"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -2510,8 +2509,8 @@
           },
           "pullback": {
             "penalty": 1,
-            "reason": "0.78% below the 10-period high — price already rolled over from a recent top",
-            "pullbackPct": 0.779,
+            "reason": "0.71% below the 10-period high — price already rolled over from a recent top",
+            "pullbackPct": 0.708,
             "recentHigh": 11.296
           },
           "tod": {
@@ -2646,7 +2645,7 @@
         "whaleScore60": true
       },
       "whale": {
-        "score": 70,
+        "score": 77,
         "zone": "Smart Money Buy",
         "emoji": "💚"
       },
@@ -2655,19 +2654,19 @@
         "capScore": 2
       },
       "flow": "Mixed Flow",
-      "grade": "C",
-      "successProb": 61,
+      "grade": "B",
+      "successProb": 62,
       "archetype": "Mean Reversion",
-      "peakShock": 0.493549295984748,
-      "peakObi": 14.334904575125615,
-      "peakSince": 1793380230506,
+      "peakShock": 0.6124391111940334,
+      "peakObi": 50.64117532377519,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NEARUSDT": {
       "pair": "NEARUSDT",
-      "price": 4.282,
-      "chg": -6.445,
+      "price": 4.274,
+      "chg": -6.6,
       "conv": -8,
       "rawConv": -4,
       "buyIntelPenalty": 4,
@@ -2680,19 +2679,19 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 4.282,
-        "chg": -6.445,
-        "chg4h": -1.017,
-        "shock": 0.918550592347427,
-        "r15": 45.8,
-        "r1h": 45.2,
-        "r4h": 42.7,
+        "p": 4.274,
+        "chg": -6.6,
+        "chg4h": -1.202,
+        "shock": 1.4022792886614288,
+        "r15": 44.9,
+        "r1h": 44.6,
+        "r4h": 42.4,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.272,
-        "obi": 64.93504788708728,
+        "cvdStrength": 0.459,
+        "obi": 34.16529971889655,
         "fr": 0.01,
         "oiDiv": "NEUTRAL",
         "conv": -8,
@@ -2750,7 +2749,7 @@
           "penalty": 4,
           "reasons": [
             "3 straight red candles — still actively falling, not a stabilized dip",
-            "3.43% below the 10-period high — buying into an active breakdown, not a dip"
+            "3.61% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -2771,8 +2770,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "3.43% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 3.428,
+            "reason": "3.61% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 3.608,
             "recentHigh": 4.434
           },
           "tod": {
@@ -2891,21 +2890,21 @@
           "extensionZone": "EXHAUSTED"
         }
       },
-      "bullConf": 3,
+      "bullConf": 4,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
         "aboveEma": false,
         "oiRising": false,
         "cvdRising": false,
-        "volExpansion": false,
+        "volExpansion": true,
         "fundingHealthy": true,
         "obiBidHeavy": true,
         "rsiNotOb": true,
         "whaleScore60": false
       },
       "whale": {
-        "score": 45,
+        "score": 50,
         "zone": "Neutral",
         "emoji": "⚪"
       },
@@ -2915,18 +2914,18 @@
       },
       "flow": "Mixed Flow",
       "grade": "D",
-      "successProb": 25,
+      "successProb": 34,
       "archetype": "Developing",
-      "peakShock": 0.918550592347427,
-      "peakObi": 64.93504788708728,
-      "peakSince": 1793380230506,
+      "peakShock": 1.4022792886614288,
+      "peakObi": 34.16529971889655,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "RENDERUSDT": {
       "pair": "RENDERUSDT",
-      "price": 1.551,
-      "chg": -8.225,
+      "price": 1.553,
+      "chg": -7.943,
       "conv": -6,
       "rawConv": -3,
       "buyIntelPenalty": 3,
@@ -2939,19 +2938,19 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 1.551,
-        "chg": -8.225,
-        "chg4h": -0.129,
-        "shock": 0.33252170854454205,
-        "r15": 46.2,
-        "r1h": 38.4,
-        "r4h": 36.3,
+        "p": 1.553,
+        "chg": -7.943,
+        "chg4h": 0,
+        "shock": 0.6740608125142407,
+        "r15": 47.2,
+        "r1h": 38.9,
+        "r4h": 36.5,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.456,
-        "obi": 16.134518255880227,
+        "cvdStrength": 0.584,
+        "obi": 7.9711433591042695,
         "fr": 0.005,
         "oiDiv": "NEUTRAL",
         "conv": -6,
@@ -3009,7 +3008,7 @@
           "penalty": 3,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "1.77% below the 10-period high — buying into an active breakdown, not a dip"
+            "1.65% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -3030,8 +3029,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.77% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.773,
+            "reason": "1.65% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.647,
             "recentHigh": 1.579
           },
           "tod": {
@@ -3152,7 +3151,7 @@
           "extensionZone": "EXTENDED"
         }
       },
-      "bullConf": 5,
+      "bullConf": 4,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
@@ -3161,7 +3160,7 @@
         "cvdRising": true,
         "volExpansion": false,
         "fundingHealthy": true,
-        "obiBidHeavy": true,
+        "obiBidHeavy": false,
         "rsiNotOb": true,
         "whaleScore60": true
       },
@@ -3175,19 +3174,19 @@
         "capScore": 3
       },
       "flow": "Mixed Flow",
-      "grade": "C",
-      "successProb": 51,
+      "grade": "D",
+      "successProb": 44,
       "archetype": "Developing",
-      "peakShock": 0.33252170854454205,
-      "peakObi": 16.134518255880227,
-      "peakSince": 1793380230506,
+      "peakShock": 0.6740608125142407,
+      "peakObi": 7.9711433591042695,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "SOLUSDT": {
       "pair": "SOLUSDT",
-      "price": 94.77,
-      "chg": -6.887,
+      "price": 94.86,
+      "chg": -6.762,
       "conv": -7,
       "rawConv": -4,
       "buyIntelPenalty": 3,
@@ -3200,20 +3199,20 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 94.77,
-        "chg": -6.887,
-        "chg4h": -0.126,
-        "shock": 0.5091653792043142,
-        "r15": 40.4,
-        "r1h": 35.5,
-        "r4h": 33.6,
+        "p": 94.86,
+        "chg": -6.762,
+        "chg4h": -0.032,
+        "shock": 0.6364462855869971,
+        "r15": 41.2,
+        "r1h": 35.8,
+        "r4h": 33.8,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.309,
-        "obi": -18.675442274462277,
-        "fr": 0.00664487898479,
+        "cvdStrength": 0.404,
+        "obi": -8.580982298035329,
+        "fr": 0.00657582469294,
         "oiDiv": "NEUTRAL",
         "conv": -7,
         "supertrend15m": {
@@ -3270,7 +3269,7 @@
           "penalty": 3,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "1.18% below the 10-period high — buying into an active breakdown, not a dip"
+            "1.08% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -3291,8 +3290,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.18% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.178,
+            "reason": "1.08% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.084,
             "recentHigh": 95.9
           },
           "tod": {
@@ -3439,18 +3438,18 @@
       "grade": "D",
       "successProb": 33,
       "archetype": "Developing",
-      "peakShock": 0.5091653792043142,
-      "peakObi": -18.675442274462277,
-      "peakSince": 1793380230506,
+      "peakShock": 0.6364462855869971,
+      "peakObi": -8.580982298035329,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "SUIUSDT": {
       "pair": "SUIUSDT",
-      "price": 0.8914,
-      "chg": -5.652,
-      "conv": -4,
-      "rawConv": -1,
+      "price": 0.8902,
+      "chg": -5.729,
+      "conv": -6,
+      "rawConv": -3,
       "buyIntelPenalty": 3,
       "setup": {
         "label": "WATCHING",
@@ -3461,22 +3460,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.8914,
-        "chg": -5.652,
-        "chg4h": 0.214,
-        "shock": 0.665430147676382,
-        "r15": 52.2,
-        "r1h": 45.4,
-        "r4h": 42.3,
+        "p": 0.8902,
+        "chg": -5.729,
+        "chg4h": 0.079,
+        "shock": 0.9031339524299006,
+        "r15": 50.9,
+        "r1h": 44.8,
+        "r4h": 41.9,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.532,
-        "obi": 32.69422573905539,
-        "fr": -0.00658441902401,
+        "cvdStrength": 0.397,
+        "obi": 2.6459233049006317,
+        "fr": -0.006688924959220001,
         "oiDiv": "NEUTRAL",
-        "conv": -4,
+        "conv": -6,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -3524,14 +3523,14 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -1,
-        "adjustedConv": -4,
+        "rawConv": -3,
+        "adjustedConv": -6,
         "buyIntelPenalty": 3,
         "buyIntel": {
           "penalty": 3,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "1.94% below the 10-period high — buying into an active breakdown, not a dip"
+            "2.07% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -3552,8 +3551,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.94% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.936,
+            "reason": "2.07% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 2.068,
             "recentHigh": 0.909
           },
           "tod": {
@@ -3674,7 +3673,7 @@
           "extensionZone": "EXTENDED"
         }
       },
-      "bullConf": 5,
+      "bullConf": 4,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
@@ -3683,12 +3682,12 @@
         "cvdRising": true,
         "volExpansion": false,
         "fundingHealthy": true,
-        "obiBidHeavy": true,
+        "obiBidHeavy": false,
         "rsiNotOb": true,
         "whaleScore60": true
       },
       "whale": {
-        "score": 77,
+        "score": 70,
         "zone": "Smart Money Buy",
         "emoji": "💚"
       },
@@ -3697,19 +3696,19 @@
         "capScore": 2
       },
       "flow": "Mixed Flow",
-      "grade": "C",
-      "successProb": 52,
+      "grade": "D",
+      "successProb": 44,
       "archetype": "Mean Reversion",
-      "peakShock": 0.665430147676382,
-      "peakObi": 32.69422573905539,
-      "peakSince": 1793380230506,
+      "peakShock": 0.9031339524299006,
+      "peakObi": 2.6459233049006317,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "TAOUSDT": {
       "pair": "TAOUSDT",
-      "price": 233.9,
-      "chg": -8.597,
+      "price": 234,
+      "chg": -8.522,
       "conv": -6,
       "rawConv": -3,
       "buyIntelPenalty": 3,
@@ -3722,20 +3721,20 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 233.9,
-        "chg": -8.597,
-        "chg4h": -0.213,
-        "shock": 0.38161943242470947,
-        "r15": 50.4,
-        "r1h": 38,
-        "r4h": 36.3,
+        "p": 234,
+        "chg": -8.522,
+        "chg4h": -0.171,
+        "shock": 0.5699677122066089,
+        "r15": 50.8,
+        "r1h": 38.2,
+        "r4h": 36.4,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
-        "cvdStrength": 0.349,
-        "obi": 11.759269770999511,
-        "fr": 0.00108062452554,
+        "cvdStrength": 0.391,
+        "obi": 12.529356010233988,
+        "fr": 0.0009522230423499999,
         "oiDiv": "NEUTRAL",
         "conv": -6,
         "supertrend15m": {
@@ -3799,7 +3798,7 @@
           "penalty": 3,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "1.18% below the 10-period high — buying into an active breakdown, not a dip"
+            "1.14% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -3820,8 +3819,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.18% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.183,
+            "reason": "1.14% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.141,
             "recentHigh": 236.7
           },
           "tod": {
@@ -3975,18 +3974,18 @@
       "grade": "C",
       "successProb": 51,
       "archetype": "Developing",
-      "peakShock": 0.38161943242470947,
-      "peakObi": 11.759269770999511,
-      "peakSince": 1793380230506,
+      "peakShock": 0.5699677122066089,
+      "peakObi": 12.529356010233988,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "UNIUSDT": {
       "pair": "UNIUSDT",
       "price": 6.995,
-      "chg": -4.817,
-      "conv": -2,
-      "rawConv": 0,
+      "chg": -4.7,
+      "conv": 0,
+      "rawConv": 2,
       "buyIntelPenalty": 2,
       "setup": {
         "label": "WATCHING",
@@ -3998,9 +3997,9 @@
       "marketClosed": false,
       "d": {
         "p": 6.995,
-        "chg": -4.817,
+        "chg": -4.7,
         "chg4h": 0.532,
-        "shock": 0.4973229729937547,
+        "shock": 0.6203682842517265,
         "r15": 55.7,
         "r1h": 50.9,
         "r4h": 49.8,
@@ -4009,10 +4008,10 @@
         "biasDay": "LEAN BEAR",
         "cvdTrend": "up",
         "cvdStrength": 0.722,
-        "obi": -8.856837600794984,
-        "fr": 0.00864443816389,
+        "obi": 6.800090604028648,
+        "fr": 0.00871546445322,
         "oiDiv": "NEUTRAL",
-        "conv": -2,
+        "conv": 0,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -4060,8 +4059,8 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": 0,
-        "adjustedConv": -2,
+        "rawConv": 2,
+        "adjustedConv": 0,
         "buyIntelPenalty": 2,
         "buyIntel": {
           "penalty": 2,
@@ -4113,7 +4112,7 @@
           ]
         }
       },
-      "signal": "WEAK",
+      "signal": "WATCH",
       "entryState": "CHASING",
       "triggerStatus": "SETUP",
       "triggerScore": 20,
@@ -4209,7 +4208,7 @@
           "extensionZone": "EXHAUSTED"
         }
       },
-      "bullConf": 5,
+      "bullConf": 6,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": true,
@@ -4220,33 +4219,33 @@
         "fundingHealthy": true,
         "obiBidHeavy": false,
         "rsiNotOb": true,
-        "whaleScore60": false
+        "whaleScore60": true
       },
       "whale": {
-        "score": 54,
-        "zone": "Neutral",
-        "emoji": "⚪"
+        "score": 70,
+        "zone": "Smart Money Buy",
+        "emoji": "💚"
       },
       "capBuy": {
         "isCapBuy": false,
         "capScore": 2
       },
       "flow": "Mixed Flow",
-      "grade": "C",
-      "successProb": 52,
+      "grade": "B",
+      "successProb": 62,
       "archetype": "Developing",
-      "peakShock": 0.4973229729937547,
-      "peakObi": -8.856837600794984,
-      "peakSince": 1793380230506,
-      "bull4hCount": 4,
-      "updatedAt": 1793380225213
+      "peakShock": 0.6203682842517265,
+      "peakObi": 6.800090604028648,
+      "peakSince": 1793380387628,
+      "bull4hCount": 5,
+      "updatedAt": 1793380382369
     },
     "XLMUSDT": {
       "pair": "XLMUSDT",
-      "price": 0.1694,
-      "chg": -1.397,
-      "conv": -3,
-      "rawConv": 0,
+      "price": 0.1697,
+      "chg": -1.05,
+      "conv": -1,
+      "rawConv": 2,
       "buyIntelPenalty": 3,
       "setup": {
         "label": "WATCHING",
@@ -4257,22 +4256,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 0.1694,
-        "chg": -1.397,
-        "chg4h": -1.683,
-        "shock": 0.26913661273337197,
-        "r15": 55.7,
-        "r1h": 52.3,
-        "r4h": 49.9,
+        "p": 0.1697,
+        "chg": -1.05,
+        "chg4h": -1.509,
+        "shock": 0.3476922995712844,
+        "r15": 57.1,
+        "r1h": 53.1,
+        "r4h": 50.4,
         "emaTrend": "ABOVE",
         "bias4h": "LEAN BULL",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.339,
-        "obi": 2.8934151774416064,
-        "fr": -0.00767207116229,
+        "cvdStrength": 0.162,
+        "obi": 28.663441467394122,
+        "fr": -0.0076276462389,
         "oiDiv": "NEUTRAL",
-        "conv": -3,
+        "conv": -1,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -4327,14 +4326,14 @@
             "widthATR": 2.297
           }
         },
-        "rawConv": 0,
-        "adjustedConv": -3,
+        "rawConv": 2,
+        "adjustedConv": -1,
         "buyIntelPenalty": 3,
         "buyIntel": {
           "penalty": 3,
           "reasons": [
-            "whale 22/100 < 40 (low confidence)",
-            "1.74% below the 10-period high — buying into an active breakdown, not a dip"
+            "whale 37/100 < 40 (low confidence)",
+            "1.57% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -4351,12 +4350,12 @@
           },
           "quality": {
             "penalty": 1,
-            "reason": "whale 22/100 < 40 (low confidence)"
+            "reason": "whale 37/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.74% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.74,
+            "reason": "1.57% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.566,
             "recentHigh": 0.1724
           },
           "tod": {
@@ -4482,7 +4481,7 @@
           "extensionZone": "VERY_EXTENDED"
         }
       },
-      "bullConf": 4,
+      "bullConf": 5,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": true,
@@ -4491,12 +4490,12 @@
         "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": true,
-        "obiBidHeavy": false,
+        "obiBidHeavy": true,
         "rsiNotOb": true,
         "whaleScore60": false
       },
       "whale": {
-        "score": 22,
+        "score": 37,
         "zone": "Distribution",
         "emoji": "🟠"
       },
@@ -4504,48 +4503,48 @@
         "isCapBuy": false,
         "capScore": 0
       },
-      "flow": "Institutional↓",
+      "flow": "Mixed Flow",
       "grade": "D",
-      "successProb": 32,
+      "successProb": 42,
       "archetype": "Developing",
-      "peakShock": 0.26913661273337197,
-      "peakObi": 2.8934151774416064,
-      "peakSince": 1793380230506,
-      "bull4hCount": 35,
-      "updatedAt": 1793380225213
+      "peakShock": 0.3476922995712844,
+      "peakObi": 28.663441467394122,
+      "peakSince": 1793380387628,
+      "bull4hCount": 36,
+      "updatedAt": 1793380382369
     },
     "XMRUSDT": {
       "pair": "XMRUSDT",
-      "price": 592.1,
-      "chg": -1.7261410788381706,
-      "conv": -11,
-      "rawConv": -6,
-      "buyIntelPenalty": 5,
+      "price": 592.51,
+      "chg": -1.6580912863070556,
+      "conv": -8,
+      "rawConv": -4,
+      "buyIntelPenalty": 4,
       "setup": {
-        "label": "SHORT SETUP",
-        "emoji": "🔻"
+        "label": "WATCHING",
+        "emoji": "⏳"
       },
       "assetType": "crypto",
       "exchangePrefix": "BINANCE",
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 592.1,
-        "chg": -1.7261410788381706,
-        "chg4h": -1.257,
-        "shock": 1.034456504900688,
-        "r15": 48.5,
-        "r1h": 48.4,
-        "r4h": 46.8,
+        "p": 592.51,
+        "chg": -1.6580912863070556,
+        "chg4h": -1.189,
+        "shock": 1.0347832400492205,
+        "r15": 49,
+        "r1h": 48.6,
+        "r4h": 47,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 1.168,
-        "obi": -2.793927510296351,
+        "cvdStrength": 1.099,
+        "obi": 20.35342229534651,
         "fr": 0.014331665075,
         "oiDiv": "NEUTRAL",
-        "conv": -11,
+        "conv": -8,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -4593,14 +4592,14 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -6,
-        "adjustedConv": -11,
-        "buyIntelPenalty": 5,
+        "rawConv": -4,
+        "adjustedConv": -8,
+        "buyIntelPenalty": 4,
         "buyIntel": {
-          "penalty": 5,
+          "penalty": 4,
           "reasons": [
-            "bullConf 1/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)",
-            "1.49% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal)",
+            "1.42% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -4616,13 +4615,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 3,
-            "reason": "bullConf 1/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)"
+            "penalty": 2,
+            "reason": "bullConf 2/10 < 3 (thin signal)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.49% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.486,
+            "reason": "1.42% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.418,
             "recentHigh": 601.03
           },
           "tod": {
@@ -4741,7 +4740,7 @@
           "extensionZone": "EXTENDED"
         }
       },
-      "bullConf": 1,
+      "bullConf": 2,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
@@ -4750,61 +4749,61 @@
         "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": false,
-        "obiBidHeavy": false,
+        "obiBidHeavy": true,
         "rsiNotOb": true,
         "whaleScore60": false
       },
       "whale": {
-        "score": 30,
-        "zone": "Distribution",
-        "emoji": "🟠"
+        "score": 45,
+        "zone": "Neutral",
+        "emoji": "⚪"
       },
       "capBuy": {
         "isCapBuy": false,
         "capScore": 0
       },
-      "flow": "Institutional↓",
+      "flow": "Mixed Flow",
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 1.034456504900688,
-      "peakObi": -2.793927510296351,
-      "peakSince": 1793380230506,
+      "peakShock": 1.0347832400492205,
+      "peakObi": 20.35342229534651,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "XRPUSDT": {
       "pair": "XRPUSDT",
-      "price": 1.2456,
-      "chg": -3.985,
-      "conv": -8,
-      "rawConv": -4,
-      "buyIntelPenalty": 4,
+      "price": 1.2468,
+      "chg": -3.937,
+      "conv": -11,
+      "rawConv": -5,
+      "buyIntelPenalty": 6,
       "setup": {
-        "label": "WATCHING",
-        "emoji": "⏳"
+        "label": "SHORT SETUP",
+        "emoji": "🔻"
       },
       "assetType": "crypto",
       "exchangePrefix": "BINANCE",
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 1.2456,
-        "chg": -3.985,
-        "chg4h": -0.749,
-        "shock": 0.45649743327627734,
-        "r15": 47.4,
-        "r1h": 42.7,
-        "r4h": 36.6,
+        "p": 1.2468,
+        "chg": -3.937,
+        "chg4h": -0.645,
+        "shock": 0.5336291900360594,
+        "r15": 48.5,
+        "r1h": 43.2,
+        "r4h": 36.9,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.181,
-        "obi": 14.516833007031027,
-        "fr": -0.01477226798222,
+        "cvdStrength": 0.077,
+        "obi": 0.2186427659866256,
+        "fr": -0.01475520214477,
         "oiDiv": "NEUTRAL",
-        "conv": -8,
+        "conv": -11,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -4852,15 +4851,15 @@
             "widthATR": 1.684
           }
         },
-        "rawConv": -4,
-        "adjustedConv": -8,
-        "buyIntelPenalty": 4,
+        "rawConv": -5,
+        "adjustedConv": -11,
+        "buyIntelPenalty": 6,
         "buyIntel": {
-          "penalty": 4,
+          "penalty": 6,
           "reasons": [
             "2 straight red candles — momentum still pointing down",
-            "whale 38/100 < 40 (low confidence)",
-            "1.36% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)",
+            "1.27% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -4876,13 +4875,13 @@
             "reason": null
           },
           "quality": {
-            "penalty": 1,
-            "reason": "whale 38/100 < 40 (low confidence)"
+            "penalty": 3,
+            "reason": "bullConf 2/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "1.36% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 1.362,
+            "reason": "1.27% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 1.267,
             "recentHigh": 1.2628
           },
           "tod": {
@@ -5001,7 +5000,7 @@
           "extensionZone": "VERY_EXTENDED"
         }
       },
-      "bullConf": 3,
+      "bullConf": 2,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
@@ -5010,12 +5009,12 @@
         "cvdRising": false,
         "volExpansion": false,
         "fundingHealthy": true,
-        "obiBidHeavy": true,
+        "obiBidHeavy": false,
         "rsiNotOb": true,
         "whaleScore60": false
       },
       "whale": {
-        "score": 38,
+        "score": 30,
         "zone": "Distribution",
         "emoji": "🟠"
       },
@@ -5023,22 +5022,22 @@
         "isCapBuy": false,
         "capScore": 1
       },
-      "flow": "Mixed Flow",
+      "flow": "Institutional↓",
       "grade": "D",
-      "successProb": 24,
+      "successProb": 20,
       "archetype": "Short Squeeze",
-      "peakShock": 0.45649743327627734,
-      "peakObi": 14.516833007031027,
-      "peakSince": 1793380230506,
+      "peakShock": 0.5336291900360594,
+      "peakObi": 0.2186427659866256,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "ZECUSDT": {
       "pair": "ZECUSDT",
-      "price": 1230.46,
-      "chg": -8.624,
-      "conv": -10,
-      "rawConv": -5,
+      "price": 1228.35,
+      "chg": -9.011,
+      "conv": -12,
+      "rawConv": -7,
       "buyIntelPenalty": 5,
       "setup": {
         "label": "SHORT SETUP",
@@ -5049,22 +5048,22 @@
       "session": "24/7",
       "marketClosed": false,
       "d": {
-        "p": 1230.46,
-        "chg": -8.624,
-        "chg4h": 0.257,
-        "shock": 0.7410304923950921,
-        "r15": 44,
-        "r1h": 43.4,
-        "r4h": 45.7,
+        "p": 1228.35,
+        "chg": -9.011,
+        "chg4h": 0.099,
+        "shock": 0.8690411606660571,
+        "r15": 42.7,
+        "r1h": 42.9,
+        "r4h": 45.4,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
         "cvdTrend": "down",
-        "cvdStrength": 0.447,
-        "obi": 1.913095061545313,
+        "cvdStrength": 0.605,
+        "obi": -22.80570142535634,
         "fr": 0.01,
         "oiDiv": "NEUTRAL",
-        "conv": -10,
+        "conv": -12,
         "supertrend15m": {
           "period": 10,
           "multiplier": 3,
@@ -5105,14 +5104,14 @@
           "retest": false,
           "consolidation": null
         },
-        "rawConv": -5,
-        "adjustedConv": -10,
+        "rawConv": -7,
+        "adjustedConv": -12,
         "buyIntelPenalty": 5,
         "buyIntel": {
           "penalty": 5,
           "reasons": [
-            "bullConf 2/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)",
-            "2.45% below the 10-period high — buying into an active breakdown, not a dip"
+            "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)",
+            "2.61% below the 10-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -5129,12 +5128,12 @@
           },
           "quality": {
             "penalty": 3,
-            "reason": "bullConf 2/10 < 3 (thin signal) · whale 30/100 < 40 (low confidence)"
+            "reason": "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)"
           },
           "pullback": {
             "penalty": 2,
-            "reason": "2.45% below the 10-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 2.446,
+            "reason": "2.61% below the 10-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 2.613,
             "recentHigh": 1261.31
           },
           "tod": {
@@ -5260,9 +5259,9 @@
         "whaleScore60": false
       },
       "whale": {
-        "score": 30,
-        "zone": "Distribution",
-        "emoji": "🟠"
+        "score": 15,
+        "zone": "Heavy Dist",
+        "emoji": "🔴"
       },
       "capBuy": {
         "isCapBuy": false,
@@ -5272,11 +5271,11 @@
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.7410304923950921,
-      "peakObi": 1.913095061545313,
-      "peakSince": 1793380230506,
+      "peakShock": 0.8690411606660571,
+      "peakObi": -22.80570142535634,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "AGCC.TO": {
       "pair": "AGCC.TO",
@@ -5390,14 +5389,14 @@
       "archetype": "Developing",
       "peakShock": 1.5282119205298013,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "AMEX:EWY": {
       "pair": "AMEX:EWY",
-      "price": 152.14,
-      "chg": -5.99,
+      "price": 152.07,
+      "chg": -6.03,
       "conv": -4,
       "rawConv": -2,
       "buyIntelPenalty": 2,
@@ -5410,11 +5409,11 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 152.14,
-        "chg": -5.99,
-        "shock": 0.584366449156712,
+        "p": 152.07,
+        "chg": -6.03,
+        "shock": 0.5882602698844159,
         "r15": 29.3,
-        "r1h": 38,
+        "r1h": 37.9,
         "r4h": 39.6,
         "emaTrend": "BELOW",
         "bias4h": "NEUTRAL",
@@ -5430,7 +5429,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "8.58% below the 5-period high — buying into an active breakdown, not a dip"
+            "8.62% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 5,
@@ -5451,8 +5450,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "8.58% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 8.581,
+            "reason": "8.62% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 8.623,
             "recentHigh": 166.4199981689453
           },
           "tod": {
@@ -5502,16 +5501,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.584366449156712,
+      "peakShock": 0.5882602698844159,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 864,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 865,
+      "updatedAt": 1793380382369
     },
     "CBOE:SPCH": {
       "pair": "CBOE:SPCH",
-      "price": 7.885,
-      "chg": -9.47,
+      "price": 7.8671,
+      "chg": -9.68,
       "conv": -5,
       "rawConv": -3,
       "buyIntelPenalty": 2,
@@ -5524,12 +5523,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 7.885,
-        "chg": -9.47,
-        "shock": 0.7416943267352742,
+        "p": 7.8671,
+        "chg": -9.68,
+        "shock": 0.7464421422942057,
         "r15": 25.4,
-        "r1h": 37.9,
-        "r4h": 37.9,
+        "r1h": 37.8,
+        "r4h": 37.8,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
@@ -5544,7 +5543,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "18.29% below the 5-period high — buying into an active breakdown, not a dip"
+            "18.48% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -5565,8 +5564,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "18.29% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 18.29,
+            "reason": "18.48% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 18.476,
             "recentHigh": 9.649999618530273
           },
           "tod": {
@@ -5616,16 +5615,16 @@
       "grade": "D",
       "successProb": 38,
       "archetype": "Developing",
-      "peakShock": 0.7416943267352742,
+      "peakShock": 0.7464421422942057,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "ETHY.TO": {
       "pair": "ETHY.TO",
-      "price": 1.295,
-      "chg": -5.47,
+      "price": 1.3,
+      "chg": -5.11,
       "conv": -4,
       "rawConv": -2,
       "buyIntelPenalty": 2,
@@ -5638,12 +5637,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 1.295,
-        "chg": -5.47,
-        "shock": 1.1810262587328355,
-        "r15": 26.3,
-        "r1h": 29.5,
-        "r4h": 31.4,
+        "p": 1.3,
+        "chg": -5.11,
+        "shock": 1.392503011322573,
+        "r15": 26.5,
+        "r1h": 29.8,
+        "r4h": 31.7,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
@@ -5658,7 +5657,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "11.30% below the 5-period high — buying into an active breakdown, not a dip"
+            "10.96% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -5679,8 +5678,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "11.30% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 11.301,
+            "reason": "10.96% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 10.959,
             "recentHigh": 1.4600000381469727
           },
           "tod": {
@@ -5704,37 +5703,37 @@
       "st15Event": null,
       "supertrend5m": null,
       "st5Event": null,
-      "bullConf": 3,
+      "bullConf": 5,
       "bullChecks": {
         "dailyBiasBull": false,
         "bias4hBull": false,
         "aboveEma": false,
         "oiRising": false,
         "cvdRising": true,
-        "volExpansion": false,
+        "volExpansion": true,
         "fundingHealthy": true,
         "obiBidHeavy": false,
         "rsiNotOb": true,
-        "whaleScore60": false
+        "whaleScore60": true
       },
       "whale": {
-        "score": 55,
-        "zone": "Neutral",
-        "emoji": "⚪"
+        "score": 60,
+        "zone": "Smart Money Buy",
+        "emoji": "💚"
       },
       "capBuy": {
         "isCapBuy": false,
         "capScore": 0
       },
       "flow": "Mixed Flow",
-      "grade": "D",
-      "successProb": 38,
+      "grade": "C",
+      "successProb": 53,
       "archetype": "Developing",
-      "peakShock": 1.1810262587328355,
+      "peakShock": 1.392503011322573,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "GLCC.TO": {
       "pair": "GLCC.TO",
@@ -5846,14 +5845,14 @@
       "archetype": "Developing",
       "peakShock": 2.7031709844559586,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "HOU.TO": {
       "pair": "HOU.TO",
-      "price": 34.42,
-      "chg": 3.89,
+      "price": 34.46,
+      "chg": 4.02,
       "conv": 3,
       "rawConv": 5,
       "buyIntelPenalty": 2,
@@ -5866,12 +5865,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 34.42,
-        "chg": 3.89,
-        "shock": 0.9302155671296296,
+        "p": 34.46,
+        "chg": 4.02,
+        "shock": 0.931517650462963,
         "r15": 76.4,
-        "r1h": 66.6,
-        "r4h": 70.1,
+        "r1h": 66.7,
+        "r4h": 70.2,
         "emaTrend": "ABOVE",
         "bias4h": "BULL 4H",
         "biasDay": "LEAN BULL",
@@ -5909,7 +5908,7 @@
           "pullback": {
             "penalty": 0,
             "reason": null,
-            "pullbackPct": -2.167,
+            "pullbackPct": -2.286,
             "recentHigh": 33.689998626708984
           },
           "tod": {
@@ -5959,11 +5958,11 @@
       "grade": "A",
       "successProb": 74,
       "archetype": "Developing",
-      "peakShock": 0.9302155671296296,
+      "peakShock": 0.931517650462963,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 133,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 134,
+      "updatedAt": 1793380382369
     },
     "HTAE.TO": {
       "pair": "HTAE.TO",
@@ -5983,7 +5982,7 @@
       "d": {
         "p": 18.65,
         "chg": -5.21,
-        "shock": 1.5506024096385542,
+        "shock": 1.5671084337349397,
         "r15": 29.1,
         "r1h": 35.3,
         "r4h": 33.9,
@@ -6073,15 +6072,15 @@
       "grade": "C",
       "successProb": 53,
       "archetype": "Developing",
-      "peakShock": 1.5506024096385542,
+      "peakShock": 1.5671084337349397,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:AAPL": {
       "pair": "NASDAQ:AAPL",
-      "price": 346.8488,
+      "price": 346.86,
       "chg": -0.59,
       "conv": 5,
       "rawConv": 5,
@@ -6095,9 +6094,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 346.8488,
+        "p": 346.86,
         "chg": -0.59,
-        "shock": 0.5984928481357399,
+        "shock": 0.6030999619462621,
         "r15": 62.9,
         "r1h": 55.3,
         "r4h": 57.7,
@@ -6135,7 +6134,7 @@
           "pullback": {
             "penalty": 0,
             "reason": null,
-            "pullbackPct": 1.388,
+            "pullbackPct": 1.385,
             "recentHigh": 351.7300109863281
           },
           "tod": {
@@ -6185,16 +6184,16 @@
       "grade": "A+",
       "successProb": 90,
       "archetype": "Developing",
-      "peakShock": 0.5984928481357399,
+      "peakShock": 0.6030999619462621,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 327,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 328,
+      "updatedAt": 1793380382369
     },
     "NASDAQ:AMD": {
       "pair": "NASDAQ:AMD",
-      "price": 499.685,
-      "chg": -11.78,
+      "price": 498.43,
+      "chg": -12,
       "conv": -5,
       "rawConv": -3,
       "buyIntelPenalty": 2,
@@ -6207,12 +6206,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 499.685,
-        "chg": -11.78,
-        "shock": 1.0727070560886895,
-        "r15": 31.9,
-        "r1h": 36.3,
-        "r4h": 39,
+        "p": 498.43,
+        "chg": -12,
+        "shock": 1.0820531846386001,
+        "r15": 31.7,
+        "r1h": 36.1,
+        "r4h": 38.8,
         "emaTrend": "BELOW",
         "bias4h": "NEUTRAL",
         "biasDay": "LEAN BEAR",
@@ -6227,7 +6226,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "13.73% below the 5-period high — buying into an active breakdown, not a dip"
+            "13.94% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 5,
@@ -6248,8 +6247,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "13.73% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 13.725,
+            "reason": "13.94% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 13.942,
             "recentHigh": 579.1799926757812
           },
           "tod": {
@@ -6299,16 +6298,16 @@
       "grade": "D",
       "successProb": 38,
       "archetype": "Developing",
-      "peakShock": 1.0727070560886895,
+      "peakShock": 1.0820531846386001,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 1087,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 1088,
+      "updatedAt": 1793380382369
     },
     "NASDAQ:AMZN": {
       "pair": "NASDAQ:AMZN",
-      "price": 238.405,
-      "chg": -2.21,
+      "price": 238.37,
+      "chg": -2.22,
       "conv": -5,
       "rawConv": -3,
       "buyIntelPenalty": 2,
@@ -6321,9 +6320,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 238.405,
-        "chg": -2.21,
-        "shock": 1.4032525342082427,
+        "p": 238.37,
+        "chg": -2.22,
+        "shock": 1.408247425123768,
         "r15": 40.4,
         "r1h": 35,
         "r4h": 37.6,
@@ -6341,7 +6340,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "6.64% below the 5-period high — buying into an active breakdown, not a dip"
+            "6.65% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -6362,8 +6361,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "6.64% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 6.64,
+            "reason": "6.65% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 6.653,
             "recentHigh": 255.36000061035156
           },
           "tod": {
@@ -6413,16 +6412,16 @@
       "grade": "C",
       "successProb": 53,
       "archetype": "Developing",
-      "peakShock": 1.4032525342082427,
+      "peakShock": 1.408247425123768,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 60,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 61,
+      "updatedAt": 1793380382369
     },
     "NASDAQ:CRWD": {
       "pair": "NASDAQ:CRWD",
-      "price": 246.2999,
-      "chg": -5.69,
+      "price": 246.3926,
+      "chg": -5.65,
       "conv": -6,
       "rawConv": -4,
       "buyIntelPenalty": 2,
@@ -6435,12 +6434,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 246.2999,
-        "chg": -5.69,
-        "shock": 0.8016704422820002,
+        "p": 246.3926,
+        "chg": -5.65,
+        "shock": 0.8050571845221172,
         "r15": 39.3,
-        "r1h": 47.4,
-        "r4h": 48,
+        "r1h": 47.5,
+        "r4h": 48.1,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "NEUTRAL",
@@ -6455,7 +6454,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "9.55% below the 5-period high — buying into an active breakdown, not a dip"
+            "9.51% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -6476,8 +6475,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "9.55% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 9.545,
+            "reason": "9.51% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 9.511,
             "recentHigh": 272.2900085449219
           },
           "tod": {
@@ -6527,16 +6526,16 @@
       "grade": "D",
       "successProb": 38,
       "archetype": "Developing",
-      "peakShock": 0.8016704422820002,
+      "peakShock": 0.8050571845221172,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:DOCN": {
       "pair": "NASDAQ:DOCN",
-      "price": 87.33,
-      "chg": -12.64,
+      "price": 87.27,
+      "chg": -12.7,
       "conv": -10,
       "rawConv": -4,
       "buyIntelPenalty": 6,
@@ -6549,10 +6548,10 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 87.33,
-        "chg": -12.64,
-        "shock": 0.7064772632951918,
-        "r15": 26.2,
+        "p": 87.27,
+        "chg": -12.7,
+        "shock": 0.7118529673326615,
+        "r15": 26.1,
         "r1h": 27.6,
         "r4h": 32.7,
         "emaTrend": "BELOW",
@@ -6571,7 +6570,7 @@
           "reasons": [
             "2 straight red candles — momentum still pointing down",
             "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)",
-            "19.00% below the 5-period high — buying into an active breakdown, not a dip"
+            "19.06% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -6592,8 +6591,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "19.00% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 19.004,
+            "reason": "19.06% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 19.06,
             "recentHigh": 107.81999969482422
           },
           "tod": {
@@ -6643,16 +6642,16 @@
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.7064772632951918,
+      "peakShock": 0.7118529673326615,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:GOOG": {
       "pair": "NASDAQ:GOOG",
-      "price": 277.5507,
-      "chg": -1.69,
+      "price": 277.165,
+      "chg": -1.83,
       "conv": -4,
       "rawConv": -2,
       "buyIntelPenalty": 2,
@@ -6665,12 +6664,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 277.5507,
-        "chg": -1.69,
-        "shock": 0.6192653796505138,
-        "r15": 17.7,
+        "p": 277.165,
+        "chg": -1.83,
+        "shock": 0.6236850703709598,
+        "r15": 17.6,
         "r1h": 19.2,
-        "r4h": 21.2,
+        "r4h": 21.1,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
@@ -6685,7 +6684,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "14.11% below the 5-period high — buying into an active breakdown, not a dip"
+            "14.22% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -6706,8 +6705,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "14.11% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 14.106,
+            "reason": "14.22% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 14.225,
             "recentHigh": 323.1300048828125
           },
           "tod": {
@@ -6757,16 +6756,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.6192653796505138,
+      "peakShock": 0.6236850703709598,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:META": {
       "pair": "NASDAQ:META",
-      "price": 620.42,
-      "chg": -0.66,
+      "price": 620.06,
+      "chg": -0.71,
       "conv": -3,
       "rawConv": -1,
       "buyIntelPenalty": 2,
@@ -6779,12 +6778,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 620.42,
-        "chg": -0.66,
-        "shock": 0.3378921109525852,
-        "r15": 25.3,
+        "p": 620.06,
+        "chg": -0.71,
+        "shock": 0.3408947280891402,
+        "r15": 25.2,
         "r1h": 30.1,
-        "r4h": 34.5,
+        "r4h": 34.4,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
@@ -6799,7 +6798,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "4.26% below the 5-period high — buying into an active breakdown, not a dip"
+            "4.32% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -6820,8 +6819,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "4.26% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 4.262,
+            "reason": "4.32% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 4.318,
             "recentHigh": 648.0399780273438
           },
           "tod": {
@@ -6871,16 +6870,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.3378921109525852,
+      "peakShock": 0.3408947280891402,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:MRVL": {
       "pair": "NASDAQ:MRVL",
-      "price": 193.655,
-      "chg": -11.31,
+      "price": 193.5375,
+      "chg": -11.36,
       "conv": -4,
       "rawConv": -2,
       "buyIntelPenalty": 2,
@@ -6893,9 +6892,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 193.655,
-        "chg": -11.31,
-        "shock": 0.9514896582881831,
+        "p": 193.5375,
+        "chg": -11.36,
+        "shock": 0.9596830683344174,
         "r15": 29.3,
         "r1h": 32.2,
         "r4h": 33.5,
@@ -6913,7 +6912,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "23.66% below the 5-period high — buying into an active breakdown, not a dip"
+            "23.70% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -6934,8 +6933,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "23.66% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 23.656,
+            "reason": "23.70% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 23.702,
             "recentHigh": 253.66000366210938
           },
           "tod": {
@@ -6985,16 +6984,16 @@
       "grade": "D",
       "successProb": 38,
       "archetype": "Developing",
-      "peakShock": 0.9514896582881831,
+      "peakShock": 0.9596830683344174,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:MSFT": {
       "pair": "NASDAQ:MSFT",
-      "price": 521.6399,
-      "chg": -1.6,
+      "price": 521.31,
+      "chg": -1.67,
       "conv": -12,
       "rawConv": -6,
       "buyIntelPenalty": 6,
@@ -7007,12 +7006,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 521.6399,
-        "chg": -1.6,
-        "shock": 0.5165627841162838,
-        "r15": 46.5,
-        "r1h": 49.9,
-        "r4h": 48.9,
+        "p": 521.31,
+        "chg": -1.67,
+        "shock": 0.5202505441399767,
+        "r15": 46.4,
+        "r1h": 49.7,
+        "r4h": 48.7,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
         "biasDay": "LEAN BEAR",
@@ -7029,7 +7028,7 @@
           "reasons": [
             "3 straight red candles — still actively falling, not a stabilized dip",
             "bullConf 2/10 < 3 (thin signal) · whale 7/100 < 40 (low confidence)",
-            "3.63% below the 5-period high — price already rolled over from a recent top"
+            "3.69% below the 5-period high — price already rolled over from a recent top"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -7050,8 +7049,8 @@
           },
           "pullback": {
             "penalty": 1,
-            "reason": "3.63% below the 5-period high — price already rolled over from a recent top",
-            "pullbackPct": 3.63,
+            "reason": "3.69% below the 5-period high — price already rolled over from a recent top",
+            "pullbackPct": 3.691,
             "recentHigh": 541.2899780273438
           },
           "tod": {
@@ -7101,16 +7100,16 @@
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.5165627841162838,
+      "peakShock": 0.5202505441399767,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:MU": {
       "pair": "NASDAQ:MU",
-      "price": 876.75,
-      "chg": -6.16,
+      "price": 876.61,
+      "chg": -6.17,
       "conv": -6,
       "rawConv": -4,
       "buyIntelPenalty": 2,
@@ -7123,9 +7122,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 876.75,
-        "chg": -6.16,
-        "shock": 0.6166743978951629,
+        "p": 876.61,
+        "chg": -6.17,
+        "shock": 0.6208791337785873,
         "r15": 35.2,
         "r1h": 40.4,
         "r4h": 41.3,
@@ -7143,7 +7142,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "11.44% below the 5-period high — buying into an active breakdown, not a dip"
+            "11.45% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -7164,8 +7163,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "11.44% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 11.439,
+            "reason": "11.45% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 11.454,
             "recentHigh": 990
           },
           "tod": {
@@ -7215,16 +7214,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.6166743978951629,
+      "peakShock": 0.6208791337785873,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:NVDA": {
       "pair": "NASDAQ:NVDA",
-      "price": 203.32,
-      "chg": -4.84,
+      "price": 203.25,
+      "chg": -4.87,
       "conv": -11,
       "rawConv": -4,
       "buyIntelPenalty": 7,
@@ -7237,11 +7236,11 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 203.32,
-        "chg": -4.84,
-        "shock": 0.7894870260314456,
+        "p": 203.25,
+        "chg": -4.87,
+        "shock": 0.7988463768922787,
         "r15": 23.9,
-        "r1h": 33,
+        "r1h": 32.9,
         "r4h": 34.6,
         "emaTrend": "BELOW",
         "bias4h": "BEAR 4H",
@@ -7259,7 +7258,7 @@
           "reasons": [
             "3 straight red candles — still actively falling, not a stabilized dip",
             "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)",
-            "7.58% below the 5-period high — buying into an active breakdown, not a dip"
+            "7.61% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -7280,8 +7279,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "7.58% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 7.578,
+            "reason": "7.61% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 7.609,
             "recentHigh": 219.99000549316406
           },
           "tod": {
@@ -7331,16 +7330,16 @@
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.7894870260314456,
+      "peakShock": 0.7988463768922787,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:PANW": {
       "pair": "NASDAQ:PANW",
-      "price": 360.74,
-      "chg": -5.21,
+      "price": 360.49,
+      "chg": -5.28,
       "conv": -6,
       "rawConv": -4,
       "buyIntelPenalty": 2,
@@ -7353,12 +7352,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 360.74,
-        "chg": -5.21,
-        "shock": 0.5712180805032944,
+        "p": 360.49,
+        "chg": -5.28,
+        "shock": 0.5785667648041904,
         "r15": 38.8,
-        "r1h": 45.8,
-        "r4h": 45,
+        "r1h": 45.7,
+        "r4h": 44.9,
         "emaTrend": "BELOW",
         "bias4h": "LEAN BEAR",
         "biasDay": "NEUTRAL",
@@ -7373,7 +7372,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "11.34% below the 5-period high — buying into an active breakdown, not a dip"
+            "11.40% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -7394,8 +7393,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "11.34% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 11.34,
+            "reason": "11.40% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 11.401,
             "recentHigh": 406.8800048828125
           },
           "tod": {
@@ -7445,16 +7444,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.5712180805032944,
+      "peakShock": 0.5785667648041904,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NASDAQ:SIMO": {
       "pair": "NASDAQ:SIMO",
-      "price": 206.19,
-      "chg": -9.47,
+      "price": 206.46,
+      "chg": -9.35,
       "conv": -2,
       "rawConv": 0,
       "buyIntelPenalty": 2,
@@ -7467,10 +7466,10 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 206.19,
-        "chg": -9.47,
-        "shock": 0.5052445492044785,
-        "r15": 32.2,
+        "p": 206.46,
+        "chg": -9.35,
+        "shock": 0.5100810253388333,
+        "r15": 32.3,
         "r1h": 40.1,
         "r4h": 40.9,
         "emaTrend": "BELOW",
@@ -7487,7 +7486,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "13.05% below the 5-period high — buying into an active breakdown, not a dip"
+            "12.93% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 5,
@@ -7508,8 +7507,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "13.05% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 13.048,
+            "reason": "12.93% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 12.934,
             "recentHigh": 237.1300048828125
           },
           "tod": {
@@ -7559,16 +7558,16 @@
       "grade": "C",
       "successProb": 60,
       "archetype": "Developing",
-      "peakShock": 0.5052445492044785,
+      "peakShock": 0.5100810253388333,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 862,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 863,
+      "updatedAt": 1793380382369
     },
     "NASDAQ:ZS": {
       "pair": "NASDAQ:ZS",
-      "price": 233.85,
-      "chg": -5.64,
+      "price": 233.75,
+      "chg": -5.68,
       "conv": -4,
       "rawConv": -2,
       "buyIntelPenalty": 2,
@@ -7581,12 +7580,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 233.85,
-        "chg": -5.64,
-        "shock": 0.41246605644546147,
+        "p": 233.75,
+        "chg": -5.68,
+        "shock": 0.4155636918382914,
         "r15": 57.2,
-        "r1h": 53,
-        "r4h": 55,
+        "r1h": 52.9,
+        "r4h": 54.9,
         "emaTrend": "ABOVE",
         "bias4h": "LEAN BEAR",
         "biasDay": "LEAN BEAR",
@@ -7601,7 +7600,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "12.70% below the 5-period high — buying into an active breakdown, not a dip"
+            "12.74% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 1,
@@ -7622,8 +7621,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "12.70% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 12.701,
+            "reason": "12.74% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 12.738,
             "recentHigh": 267.8710021972656
           },
           "tod": {
@@ -7673,16 +7672,16 @@
       "grade": "D",
       "successProb": 43,
       "archetype": "Developing",
-      "peakShock": 0.41246605644546147,
+      "peakShock": 0.4155636918382914,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "NYSE:BE": {
       "pair": "NYSE:BE",
-      "price": 200.2,
-      "chg": -9.94,
+      "price": 199.78,
+      "chg": -10.13,
       "conv": -5,
       "rawConv": -3,
       "buyIntelPenalty": 2,
@@ -7695,12 +7694,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 200.2,
-        "chg": -9.94,
-        "shock": 0.5502870524725471,
-        "r15": 31.5,
-        "r1h": 38.2,
-        "r4h": 38.6,
+        "p": 199.78,
+        "chg": -10.13,
+        "shock": 0.5593333854108669,
+        "r15": 31.4,
+        "r1h": 38.1,
+        "r4h": 38.5,
         "emaTrend": "BELOW",
         "bias4h": "NEUTRAL",
         "biasDay": "LEAN BEAR",
@@ -7715,7 +7714,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "13.58% below the 5-period high — buying into an active breakdown, not a dip"
+            "13.76% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 4,
@@ -7736,8 +7735,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "13.58% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 13.582,
+            "reason": "13.76% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 13.763,
             "recentHigh": 231.6649932861328
           },
           "tod": {
@@ -7787,15 +7786,15 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.5502870524725471,
+      "peakShock": 0.5593333854108669,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 862,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 863,
+      "updatedAt": 1793380382369
     },
     "NYSE:GE": {
       "pair": "NYSE:GE",
-      "price": 303.5929,
+      "price": 303.595,
       "chg": -3.02,
       "conv": 2,
       "rawConv": 3,
@@ -7809,9 +7808,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 303.5929,
+        "p": 303.595,
         "chg": -3.02,
-        "shock": 0.2733106845997905,
+        "shock": 0.2747862243658421,
         "r15": 49.8,
         "r1h": 47.2,
         "r4h": 47.2,
@@ -7901,16 +7900,16 @@
       "grade": "A",
       "successProb": 79,
       "archetype": "Developing",
-      "peakShock": 0.2733106845997905,
+      "peakShock": 0.2747862243658421,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 1033,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 1034,
+      "updatedAt": 1793380382369
     },
     "NYSE:GEV": {
       "pair": "NYSE:GEV",
-      "price": 854.3,
-      "chg": -3.78,
+      "price": 854.9075,
+      "chg": -3.71,
       "conv": -5,
       "rawConv": -3,
       "buyIntelPenalty": 2,
@@ -7923,12 +7922,12 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 854.3,
-        "chg": -3.78,
-        "shock": 0.657848162475822,
+        "p": 854.9075,
+        "chg": -3.71,
+        "shock": 0.6620080423495877,
         "r15": 36.6,
         "r1h": 40.8,
-        "r4h": 40.4,
+        "r4h": 40.3,
         "emaTrend": "BELOW",
         "bias4h": "NEUTRAL",
         "biasDay": "NEUTRAL",
@@ -7943,7 +7942,7 @@
         "buyIntel": {
           "penalty": 2,
           "reasons": [
-            "6.62% below the 5-period high — buying into an active breakdown, not a dip"
+            "6.56% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 4,
@@ -7964,8 +7963,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "6.62% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 6.622,
+            "reason": "6.56% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 6.555,
             "recentHigh": 914.8800048828125
           },
           "tod": {
@@ -8015,16 +8014,16 @@
       "grade": "D",
       "successProb": 36,
       "archetype": "Developing",
-      "peakShock": 0.657848162475822,
+      "peakShock": 0.6620080423495877,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 833,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 834,
+      "updatedAt": 1793380382369
     },
     "NYSE:IONQ": {
       "pair": "NYSE:IONQ",
-      "price": 28.8286,
-      "chg": -9.12,
+      "price": 28.815,
+      "chg": -9.16,
       "conv": -10,
       "rawConv": -4,
       "buyIntelPenalty": 6,
@@ -8037,9 +8036,9 @@
       "session": "open",
       "marketClosed": false,
       "d": {
-        "p": 28.8286,
-        "chg": -9.12,
-        "shock": 0.7581722818070045,
+        "p": 28.815,
+        "chg": -9.16,
+        "shock": 0.7636420612504272,
         "r15": 25.1,
         "r1h": 32.7,
         "r4h": 32.9,
@@ -8059,7 +8058,7 @@
           "reasons": [
             "2 straight red candles — momentum still pointing down",
             "bullConf 2/10 < 3 (thin signal) · whale 15/100 < 40 (low confidence)",
-            "13.45% below the 5-period high — buying into an active breakdown, not a dip"
+            "13.49% below the 5-period high — buying into an active breakdown, not a dip"
           ],
           "freshness": {
             "consecutiveUp": 0,
@@ -8080,8 +8079,8 @@
           },
           "pullback": {
             "penalty": 2,
-            "reason": "13.45% below the 5-period high — buying into an active breakdown, not a dip",
-            "pullbackPct": 13.454,
+            "reason": "13.49% below the 5-period high — buying into an active breakdown, not a dip",
+            "pullbackPct": 13.494,
             "recentHigh": 33.310001373291016
           },
           "tod": {
@@ -8131,11 +8130,11 @@
       "grade": "D",
       "successProb": 20,
       "archetype": "Developing",
-      "peakShock": 0.7581722818070045,
+      "peakShock": 0.7636420612504272,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "TXF.TO": {
       "pair": "TXF.TO",
@@ -8155,7 +8154,7 @@
       "d": {
         "p": 23.98,
         "chg": -6.11,
-        "shock": 3.7421270903010035,
+        "shock": 3.7715585284280935,
         "r15": 25.9,
         "r1h": 33.2,
         "r4h": 33,
@@ -8245,11 +8244,11 @@
       "grade": "C",
       "successProb": 56,
       "archetype": "Developing",
-      "peakShock": 3.7421270903010035,
+      "peakShock": 3.7715585284280935,
       "peakObi": 0,
-      "peakSince": 1793380230506,
+      "peakSince": 1793380387628,
       "bull4hCount": 0,
-      "updatedAt": 1793380225213
+      "updatedAt": 1793380382369
     },
     "XDIV.TO": {
       "pair": "XDIV.TO",
@@ -8362,9 +8361,9 @@
       "archetype": "Developing",
       "peakShock": 0.5637112054884025,
       "peakObi": 0,
-      "peakSince": 1793380230506,
-      "bull4hCount": 252,
-      "updatedAt": 1793380225213
+      "peakSince": 1793380387628,
+      "bull4hCount": 253,
+      "updatedAt": 1793380382369
     }
   }
 }
