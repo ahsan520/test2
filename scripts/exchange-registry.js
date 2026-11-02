@@ -1,9 +1,10 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// exchange-registry.js — v1.0
+// exchange-registry.js — v1.1  (adds BLACKBULL: 24h CFD feed for WTI / Brent)
 // Single source of truth for exchange metadata used by the headless pipeline.
 //
 // Covers:
 //   BINANCE  — crypto, 24/7
+//   BLACKBULL — BlackBull Markets CFDs (WTI, Brent), treated as 24h; priced via Yahoo futures
 //   TSX      — Toronto Stock Exchange (.TO)
 //   NYSE     — New York Stock Exchange / NASDAQ (no suffix, or .NYSE)
 //   LSE      — London Stock Exchange (.L)
@@ -22,6 +23,8 @@
 //                  'yahoo'  = Yahoo Finance v8 chart API (needs crumb/cookie)
 //                  'stooq'  = stooq.com CSV (free, no auth, 15-min delay)
 //   stooqSuffix  — suffix to append when building Stooq symbol (lowercase)
+//   symbolMap    — optional { BARE: yahooTicker } for instruments whose broker symbol
+//                  differs from the Yahoo ticker (BLACKBULL:WTI → CL=F). Use toYahooSymbol().
 //
 // getMarketSession(sym) returns one of:
 //   '24/7'        — crypto, always tradeable
@@ -41,6 +44,17 @@ export const EXCHANGES = {
     sessions:    { regular: null }, // null = 24/7
     providers:   { price: ['binance'], extras: ['binance'] },
     stooqSuffix: null,
+  },
+  BLACKBULL: {
+    name:        'BlackBull Markets (CFD)',
+    suffixes:    [],                  // detected by explicit 'BLACKBULL:' prefix only
+    tz:          'UTC',
+    currency:    'USD',
+    sessions:    { regular: null },   // null = treated as 24/7 (same as BINANCE)
+    providers:   { price: ['yahoo'], extras: ['yahoo'] },
+    stooqSuffix: null,
+    // BlackBull has no public price API — price off the Yahoo front-month futures.
+    symbolMap:   { WTI: 'CL=F', BRENT: 'BZ=F' },
   },
   NASDAQ: {
     name:        'NASDAQ',
@@ -279,6 +293,18 @@ export function cooldownKey(sym, assetType) {
   const local = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
   const date  = `${local.getFullYear()}-${String(local.getMonth()+1).padStart(2,'0')}-${String(local.getDate()).padStart(2,'0')}`;
   return `lb_buy_${sym}_${date}`;
+}
+
+// ── Yahoo ticker conversion ───────────────────────────────────────────────────
+// Strips any exchange prefix; applies the exchange's symbolMap if it has one.
+//   BLACKBULL:WTI   → CL=F
+//   BLACKBULL:BRENT → BZ=F
+//   NASDAQ:NVDA     → NVDA        (unchanged behaviour for everything else)
+//   ETHY.TO         → ETHY.TO
+export function toYahooSymbol(sym) {
+  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+  const ex   = resolveExchange(sym);
+  return ex?.symbolMap?.[bare.toUpperCase()] ?? bare;
 }
 
 // ── Stooq symbol conversion ───────────────────────────────────────────────────

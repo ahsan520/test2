@@ -12,7 +12,7 @@
 import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { resolveExchange, toStooqSymbol, buildSymKey } from './exchange-registry.js';
+import { resolveExchange, toStooqSymbol, toYahooSymbol, buildSymKey } from './exchange-registry.js';
 import { evaluateBuyReadiness, evaluateStockBuyReadiness, calcSpikeTrigger } from './buy-intelligence.js';
 import { classifySignal, isBuyEligible } from './signal-evaluator.js';
 import { runAllBuyGuards, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
@@ -226,14 +226,14 @@ function yahooHeaders() {
 const _yahooQuoteCache = new Map(); // bare ticker -> quote fields
 
 export async function primeYahooQuotes(syms) {
-  const bareList = [...new Set(
-    syms.map(s => s.includes(':') ? s.split(':').slice(1).join(':') : s)
-  )];
+  // toYahooSymbol strips the exchange prefix and maps broker symbols
+  // (BLACKBULL:WTI → CL=F); identical to the old strip for every other symbol.
+  const bareList = [...new Set(syms.map(toYahooSymbol))];
   if (!bareList.length) return;
   const crumbSuffix = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
   try {
     const d = await fetchJSON(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${bareList.join(',')}${crumbSuffix}`,
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${bareList.map(encodeURIComponent).join(',')}${crumbSuffix}`,
       yahooHeaders()
     );
     const results = d?.quoteResponse?.result || [];
@@ -258,7 +258,7 @@ export async function primeYahooQuotes(syms) {
 // Live price/% for one symbol, or null if this ticker isn't in the cache
 // (batch fetch failed, or wasn't primed) — caller falls back to daily bars.
 function getLiveQuote(sym) {
-  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+  const bare = toYahooSymbol(sym);
   const q = _yahooQuoteCache.get(bare.toUpperCase());
   if (!q) return null;
   // Prefer the most "extended" session that actually has data: post > pre > regular.
@@ -306,10 +306,11 @@ async function fetchYahooBars(sym) {
   // Yahoo's chart API wants the bare ticker only — no exchange prefix
   // (NASDAQ:NVDA → NVDA). Suffix-based tickers (.TO, .L, .DE …) are passed
   // through unchanged since Yahoo expects those as-is.
-  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+  // (BLACKBULL:WTI → CL=F via the exchange's symbolMap.)
+  const bare = toYahooSymbol(sym);
   const crumbSuffix = yahooCrumb ? `&crumb=${encodeURIComponent(yahooCrumb)}` : '';
   const d = await fetchJSON(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${bare}?interval=1d&range=3mo&includePrePost=true${crumbSuffix}`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(bare)}?interval=1d&range=3mo&includePrePost=true${crumbSuffix}`,
     yahooHeaders()
   );
   const r  = d.chart.result[0];

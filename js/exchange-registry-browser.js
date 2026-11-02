@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// exchange-registry-browser.js — v1.0
+// exchange-registry-browser.js — v1.1 (adds BLACKBULL for WTI / Brent)
 // Browser-side version of exchange-registry.js (no ESM imports — plain JS).
 // Loaded as a <script> before app.js / api.js / watchlist-manager.js.
 //
@@ -10,12 +10,20 @@
 //   buildTVSymbol(sym)         — TradingView symbol string (e.g. TSX:ETHY, LSE:VOD)
 //   exchangeCurrency(sym)      — ISO currency for display (CAD, USD, GBP …)
 //   exchangeName(sym)          — human-readable exchange name
+//   toYahooTicker(sym)         — Yahoo ticker for symbols with a symbolMap (BLACKBULL:WTI → CL=F); else unchanged
 // ══════════════════════════════════════════════════════════════════════════════
 
 const EXCHANGES = {
   BINANCE: {
     name: 'Binance', suffixes: [], tz: 'UTC', currency: 'USD',
     sessions: { regular: null }, // null = 24/7
+  },
+  BLACKBULL: {
+    name: 'BlackBull Markets (CFD)', suffixes: [],
+    tz: 'UTC', currency: 'USD',
+    sessions: { regular: null }, // treated as 24/7
+    symbolMap: { WTI: 'CL=F', BRENT: 'BZ=F' },           // → Yahoo tickers
+    tvMap:     { WTI: 'TVC:USOIL', BRENT: 'TVC:UKOIL' }, // → TradingView chart symbols
   },
   NASDAQ: {
     name: 'NASDAQ', suffixes: [],
@@ -152,6 +160,12 @@ function buildTVSymbol(sym) {
   if (sym.includes('BINANCE:')) return sym; // already formatted
 
   const ex     = resolveExchange(sym);
+  // Instruments with an explicit TradingView mapping (BLACKBULL:WTI → TVC:USOIL)
+  if (ex?.tvMap) {
+    const b = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+    const mapped = ex.tvMap[b.toUpperCase()];
+    if (mapped) return mapped;
+  }
   const exKey  = Object.entries(EXCHANGES).find(([, v]) => v === ex)?.[0] ?? 'NYSE';
   let bare     = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
 
@@ -168,6 +182,15 @@ function buildTVSymbol(sym) {
 // ── Convenience helpers ───────────────────────────────────────────────────────
 function exchangeCurrency(sym) { return resolveExchange(sym)?.currency ?? 'USD'; }
 function exchangeName(sym)     { return resolveExchange(sym)?.name ?? 'Unknown'; }
+
+// Yahoo ticker for symbols whose exchange defines a symbolMap; any other symbol
+// is returned untouched so existing browser behaviour is unchanged.
+function toYahooTicker(sym) {
+  const ex = resolveExchange(sym);
+  if (!ex?.symbolMap) return sym;
+  const bare = sym.includes(':') ? sym.split(':').slice(1).join(':') : sym;
+  return ex.symbolMap[bare.toUpperCase()] ?? sym;
+}
 
 // ── marketStatus() compatibility shim ────────────────────────────────────────
 // Replaces the hardcoded marketStatus() in app.js with registry-backed version.

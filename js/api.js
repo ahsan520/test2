@@ -235,23 +235,24 @@ async function fetchStooqPrice(sym) {
 // Provider order mirrors exchange-registry (yahoo → stooq).
 // NSE (.NS) skips Stooq (patchy coverage).
 async function fetchStock(sym) {
+  const ySym = typeof toYahooTicker !== 'undefined' ? toYahooTicker(sym) : sym;
   // ── Yahoo primary ──
   try {
-    const d = await fetchProxy(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`);
+    const d = await fetchProxy(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ySym)}`);
     const q = d?.quoteResponse?.result?.[0];
     if (q?.regularMarketPrice != null && q?.regularMarketChangePercent != null) {
       return { p: q.regularMarketPrice, chg: q.regularMarketChangePercent };
     }
   } catch {}
   try {
-    const d = await fetchProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=2d`);
+    const d = await fetchProxy(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySym)}?interval=1d&range=2d`);
     const r = d.chart.result[0];
     const p = r.meta.regularMarketPrice ?? r.meta.previousClose;
     const prev = r.meta.previousClose ?? r.meta.chartPreviousClose;
     return { p, chg: prev ? ((p - prev) / prev) * 100 : 0 };
   } catch {}
   try {
-    const d = await fetchProxy(`https://query2.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`);
+    const d = await fetchProxy(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySym)}?interval=1d&range=5d`);
     const r = d.chart.result[0];
     const p = r.meta.regularMarketPrice ?? r.meta.previousClose;
     const prev = r.meta.previousClose ?? r.meta.chartPreviousClose;
@@ -275,9 +276,10 @@ async function fetchStock(sym) {
 // ── Stock extra data (OBI, CVD, MTF, biases) — Yahoo only ──
 // Stooq doesn't provide intraday data so extras degrade gracefully if Yahoo fails.
 async function fetchStockExtra(sym) {
+  const ySym = typeof toYahooTicker !== 'undefined' ? toYahooTicker(sym) : sym;
   const extra = { obi: null, cvd: null, mtf: [null, null, null], k4h: null, kDay: null, stockMeta: null };
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=3mo`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySym)}?interval=1d&range=3mo`;
     const d   = await fetchProxy(url);
     const r   = d.chart.result[0];
     const qi  = r.indicators.quote[0];

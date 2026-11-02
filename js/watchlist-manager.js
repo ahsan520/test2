@@ -172,6 +172,7 @@ function renderWatchlistManager() {
         <div class="wm-exchange-grid">
           ${[
             { key:'BINANCE', label:'Binance Crypto', note:'24/7 · Binance + Kraken fallback' },
+            { key:'BLACKBULL', label:'BlackBull (WTI/Brent)', note:'24h CFD · Yahoo futures (CL=F, BZ=F)' },
             { key:'TSX',     label:'TSX (.TO)',       note:'09:30–16:00 ET · Yahoo + Stooq' },
             { key:'NYSE',    label:'NYSE/NASDAQ',     note:'09:30–16:00 ET + AH · Yahoo + Stooq' },
             { key:'LSE',     label:'LSE (.L)',        note:'08:00–16:30 London · Yahoo + Stooq' },
