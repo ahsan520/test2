@@ -42,9 +42,9 @@
     "t2": 1.3871,
     "score": 7,
     "spikeScore": 1.4154222739336146,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1793835019534,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "approach",
@@ -56,7 +56,10 @@
       "qty": 402.57,
       "fillPrice": 1.3085607223588445,
       "buyOrderId": "C02__746788105746325504036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__746807504666566656036",
+      "exitFillPrice": 1.3072,
+      "closedAt": 1793835020660
     },
     "entrySnapshot": {
       "at": 1793830395574,
@@ -88,20 +91,20 @@
     "entryTriggerStatus": "TRIGGERING",
     "entryStateAtBuy": "EARLY_BUY_P0",
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 7 below 50 threshold (recovery detected, risk softened)",
-      "fallingKnifeScore": 0,
-      "thesisDrop": 37,
-      "confidenceDecay": 25,
-      "exitProbability": 12,
-      "dynamicPositionRisk": 7,
+      "action": "EXIT",
+      "reason": "Thesis invalidated: entry score 83 → current 15 (drop 68 > 60) — price also back below entry breakout level",
+      "fallingKnifeScore": 33,
+      "thesisDrop": 68,
+      "confidenceDecay": 38,
+      "exitProbability": 58,
+      "dynamicPositionRisk": 58,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 10
+        "recovering": false,
+        "sustainedMin": 0
       },
-      "breakoutFailed": false,
+      "breakoutFailed": true,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1793834716011
+      "evaluatedAt": 1793835019534
     },
     "highestPnLSeen": 0.52,
     "lowestPnLSeen": -0.09,
@@ -114,6 +117,8 @@
       "tier": null,
       "giveBack": null,
       "evaluatedAt": 1793834716011
-    }
+    },
+    "exitPrice": 1.3074,
+    "statusChangedAt": 1793835019534
   }
 }
