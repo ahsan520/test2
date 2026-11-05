@@ -1477,6 +1477,108 @@ function _renderMarketDataHeader() {
 }
 
 
+
+// ── Top-3 manual candidates ─────────────────────────────────────────────────
+// A ranked shortlist for buying BY HAND when the bot's alerts/gates stay quiet. Computed from the rows already
+// loaded for the table below (no extra fetch). It is a screening aid, not a bot signal and not advice.
+// Weighting follows the shadow replays (scripts/missed_signal_check.py, 2026-11-04, stop 1.0% / T1 3.0% / 3h):
+//   SETUP + still approaching the 5m Supertrend line was the best bucket (de-duplicated n=32, 62% win, +1.10% avg);
+//   a confirmed TRIGGERING coin that has already left the line was the worst (n=24, 17% win, -0.45% avg).
+// Not visible here: the bot's Entry Quality "TRIGGER_STALE" check (breakout age) - a RETEST row can still be stale.
+const _MD_TOP_N = 3;
+const _MD_MANUAL_STOP_PCT = 1.0;   // replay exit grid: stop 1.0 / T1 3.0 was the best combination (+0.40% avg)
+const _MD_MANUAL_T1_PCT   = 3.0;
+
+function _mdCandidateEval(e) {
+  const d = e.d || {};
+  const sig = String(e.signal || '').toUpperCase();
+  const st5 = e.supertrend5m || d.supertrend5m || null;
+  const dir = String(st5?.direction || '').toUpperCase();
+  const dist = st5?.distanceATR;
+  const approach = dir === 'BEAR' && dist != null && dist < 0 && dist >= -1.5;
+  const retest   = dir === 'BULL' && st5?.retest === true && dist != null && dist <= 1.5;
+  const shock = parseFloat(d.shock);
+  const whale = e.whale?.score ?? 0;
+  const cvdUp = String(d.cvdTrend || '').toLowerCase() === 'up';
+  const oiMom = String(_marketDataState.regime?.symbols?.[e.pair]?.oiMomentum?.trend || '').toUpperCase();
+  const pen = e.buyIntelPenalty ?? 0;
+  const r15 = d.r15;
+  const chg = e.chg != null ? parseFloat(e.chg) : null;
+  const trig = String(e.triggerStatus || '').toUpperCase();
+
+  // Hard exclusions: the bot's own no-go conditions. These coins never appear in the shortlist.
+  const out = [];
+  if (_marketDataState.positions?.[e.base]) out.push('held');
+  if (/WEAK|AVOID|FALLING KNIFE/.test(sig)) out.push(sig.toLowerCase());
+  if ((e.conv ?? -99) < 3) out.push('conv<3');
+  if (!cvdUp) out.push('CVD not up');
+  if (oiMom === 'FADING') out.push('OI fading');
+  if (r15 != null && r15 >= 68) out.push('RSI15 hot');
+  if (chg != null && chg >= 12) out.push('already +12% today');
+  if (pen >= 3) out.push('buy-intel penalty ' + pen);
+  if (whale < 40) out.push('whale<40');
+  if (e.marketClosed) out.push('market closed');
+
+  let score = 0;
+  if (approach) score += 25; else if (retest) score += 10;
+  else if (dist != null && dist > 2) score -= 10;                     // well above the line = already moved
+  if (trig === 'TRIGGERING' && !approach && !retest) score -= 10;      // worst replay bucket
+  score += Math.min(whale, 100) * 0.2;
+  score += e.bullConf >= 7 ? 10 : e.bullConf >= 5 ? 5 : 0;
+  score += shock >= 1.0 ? 12 : shock >= 0.5 ? 8 : shock < 0.3 ? -8 : 0;
+  score += /BULL/i.test(e.bias4h || e.d?.bias4h || '') ? 5 : 0;
+  score += oiMom === 'ACCELERATING' ? 5 : 0;
+  score -= pen * 4;
+  score += Math.min(Math.max(e.conv ?? 0, 0), 8);
+  if (String(e.entryState || '').toUpperCase() === 'CHASING') score -= 8;
+  if (e.hist?.sample >= 5 && e.hist.winRate != null && e.hist.winRate < 0.2) score -= 5;
+
+  // BUY-READY mirrors the early-buy setup-lane clauses; anything short of that is WATCH with what is missing.
+  const need = [];
+  if (!approach) need.push(retest ? 'retest only (check breakout age)' : 'not approaching the 5m line');
+  if (!(shock >= 0.5)) need.push('shock ' + (isNaN(shock) ? '—' : shock.toFixed(2)) + 'x < 0.5');
+  if (whale < 60) need.push('whale ' + whale + ' < 60');
+  if (!(e.bullConf >= 5)) need.push('BullConf ' + (e.bullConf ?? '—') + '/10');
+  if (pen > 2) need.push('penalty ' + pen);
+  return { e, excluded: out, score: Math.round(score), ready: need.length === 0, need, stage: approach ? 'approach' : retest ? 'retest' : null };
+}
+
+function renderMarketDataTopCandidates() {
+  const el = document.getElementById('market-data-top3');
+  if (!el) return;
+  const all = (_marketDataState.symbols || []).filter(x => x.assetType === 'crypto').map(_mdCandidateEval);
+  const picks = all.filter(x => !x.excluded.length).sort((a, b) => b.score - a.score).slice(0, _MD_TOP_N);
+  const ms = _marketDataState.regime || {};
+  const bs = ms.buyStatus?.status;
+  const regimeWarn = (ms.marketRegime === 'RISK_OFF' || (bs && bs !== 'OPEN'))
+    ? `<div style="color:var(--bear);margin-bottom:6px;">⚠ Market ${ms.marketRegime || ''} / buy status ${bs || '—'} — the bot's guard would block buys right now.</div>` : '';
+  const head = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;font-size:9px;letter-spacing:1px;">
+    <span style="color:var(--text-bright);">🎯 TOP ${_MD_TOP_N} MANUAL CANDIDATES <span style="color:var(--text-dim);">(crypto, not held, passes the bot's hard no-go filters)</span></span>
+    <span style="color:var(--text-dim);">${all.length - all.filter(x => x.excluded.length).length} of ${all.length} eligible</span></div>`;
+  if (!picks.length) {
+    el.innerHTML = head + regimeWarn + `<div style="font-size:9px;color:var(--text-dim);">No coin clears the basic filters right now — nothing worth buying by hand.</div>`;
+    return;
+  }
+  const cards = picks.map((x, i) => {
+    const e = x.e, d = e.d || {}, px = parseFloat(e.price);
+    const stop = px * (1 - _MD_MANUAL_STOP_PCT / 100), t1 = px * (1 + _MD_MANUAL_T1_PCT / 100);
+    const fmt = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
+    const tag = x.ready
+      ? `<span style="color:var(--bull);border:1px solid var(--bull);border-radius:3px;padding:0 5px;">BUY-READY</span>`
+      : `<span style="color:#ff8c00;border:1px solid #ff8c00;border-radius:3px;padding:0 5px;">WATCH</span>`;
+    return `<div style="flex:1;min-width:230px;border:1px solid var(--text-dim);border-radius:4px;padding:7px 9px;font-size:9px;line-height:1.6;">
+      <div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:11px;color:var(--text-bright);">#${i + 1} ${e.base}</b>${tag}</div>
+      <div style="color:var(--text-dim);">$${e.price} · ${e.signal || '—'} · conv ${e.conv ?? '—'} · score ${x.score}</div>
+      <div>${x.stage ? x.stage.toUpperCase() + ' · ' : ''}${e.triggerStatus || '—'} · BullConf ${e.bullConf ?? '—'}/10 · whale ${e.whale?.score ?? '—'}</div>
+      <div>shock <span style="color:${_mdColorShock(parseFloat(d.shock))}">${d.shock != null ? parseFloat(d.shock).toFixed(2) + 'x' : '—'}</span> · RSI15 ${d.r15 ?? '—'} · 24h ${e.chg != null ? (e.chg > 0 ? '+' : '') + parseFloat(e.chg).toFixed(1) + '%' : '—'}</div>
+      <div style="color:var(--text-dim);">Levels (replay best): stop $${fmt(stop)} (−${_MD_MANUAL_STOP_PCT}%) · T1 $${fmt(t1)} (+${_MD_MANUAL_T1_PCT}%) · ~3h hold</div>
+      ${x.need.length ? `<div style="color:#ff8c00;">Missing: ${x.need.join(' · ')}</div>` : `<div style="color:var(--bull);">All setup-lane checks pass</div>`}
+    </div>`;
+  }).join('');
+  el.innerHTML = head + regimeWarn + `<div style="display:flex;gap:8px;flex-wrap:wrap;">${cards}</div>
+    <div style="font-size:8px;color:var(--text-dim);margin-top:6px;">Manual-buy aid, not a bot signal or advice. Replay (2026-11-04): SETUP while approaching the 5m line did best (n=32, 62% win, +1.10% avg); small sample, one market move. Breakout-age (TRIGGER_STALE) is not shown here; size small, use the stop.</div>`;
+}
+
 function renderMarketData() {
   const tbody = document.getElementById('market-data-tbody');
   const stats = document.getElementById('market-data-stats');
@@ -1484,6 +1586,7 @@ function renderMarketData() {
 
   _renderMarketDataHeader();
   _renderMarketDataAssetFilter();
+  renderMarketDataTopCandidates();
 
   let rows = [...(_marketDataState.symbols || [])];
   if (_marketDataAssetFilter !== 'all') rows = rows.filter(r => r.assetType === _marketDataAssetFilter);
