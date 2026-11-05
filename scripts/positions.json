@@ -42,9 +42,9 @@
     "t2": 1.7126,
     "score": 7,
     "spikeScore": 0.8022498415100341,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1793851220524,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "early_buy_p0_v1",
     "scoreSource": "early_buy",
     "earlyStage": "approach",
@@ -52,11 +52,15 @@
     "liveOrder": {
       "mode": "live",
       "buyAt": 1793842819498,
-      "usdSize": 526.54,
-      "qty": 325.89,
+      "usdSize": 395.66,
+      "qty": 244.89,
       "fillPrice": 1.615681917211329,
       "buyOrderId": "C02__746840219113680896036",
-      "qtyEstimated": false
+      "qtyEstimated": false,
+      "sellOrderId": "C02__746875467000131584036",
+      "exitFillPrice": 1.6122630327868852,
+      "closedAt": 1793851224139,
+      "staleZeroBalanceStrikes": 0
     },
     "entrySnapshot": {
       "at": 1793842820349,
@@ -89,32 +93,35 @@
     "entryStateAtBuy": "EARLY_BUY_P0",
     "highestPnLSeen": 0.89,
     "lowestPnLSeen": -0.48,
-    "lastR15": 59.6,
+    "lastR15": 54.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.44% below tier B give-back 0.70% (regime-widened)",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +0.89% fell 0.93% to +-0.04% (≥ 0.50% trail)",
       "highestPnLSeen": 0.89,
-      "drawdownFromPeak": 0.44,
-      "tier": "B",
-      "giveBack": 0.7,
-      "evaluatedAt": 1793850925688
+      "drawdownFromPeak": 0.93,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1793851220524
     },
     "lastPI": {
-      "action": "HOLD",
-      "reason": "dynamicPositionRisk 0 below 50 threshold",
-      "fallingKnifeScore": 2,
-      "thesisDrop": -3,
-      "confidenceDecay": 0,
-      "exitProbability": 0,
-      "dynamicPositionRisk": 0,
+      "action": "REDUCE_25",
+      "reason": "dynamicPositionRisk 53 ≥ 50 (stale+flat nudge applied, +15)",
+      "fallingKnifeScore": 60,
+      "thesisDrop": 31,
+      "confidenceDecay": 29,
+      "exitProbability": 53,
+      "dynamicPositionRisk": 53,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": false,
-      "evaluatedAt": 1793850925688
+      "evaluatedAt": 1793851220524
     },
-    "prevPnLPct": 0.45
+    "prevPnLPct": -0.04,
+    "piPartialLevel": 1,
+    "exitPrice": 1.615,
+    "statusChangedAt": 1793851220524
   }
 }
