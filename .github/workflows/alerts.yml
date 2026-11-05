@@ -403,6 +403,11 @@ jobs:
           EARLY_SETUP_TRIGGER_MIN:        ${{ vars.EARLY_SETUP_TRIGGER_MIN || '1' }}
           EARLY_SETUP_SHOCK_MIN:          ${{ vars.EARLY_SETUP_SHOCK_MIN || '.5' }}
           EARLY_SETUP_MAX_PENALTY:        ${{ vars.EARLY_SETUP_MAX_PENALTY || '2' }}
+          # Setup-lane signal filter (setup path only; strict path keeps EARLY_BAD_SIGNALS). Dropping 'watch' lets WATCH-labelled
+          # SETUP/approach coins raise an ALERT; they are not bought unless EARLY_SETUP_WATCH_MODE=live. Set to
+          # 'falling knife,weak,avoid,watch' to restore the old behaviour.
+          EARLY_SETUP_BAD_SIGNALS:        ${{ vars.EARLY_SETUP_BAD_SIGNALS || 'falling knife,weak,avoid' }}
+          EARLY_SETUP_WATCH_MODE:         ${{ vars.EARLY_SETUP_WATCH_MODE || 'alert' }}
           EARLY_SETUP_SIZE_MULT:          ${{ vars.EARLY_SETUP_SIZE_MULT || '0.5' }}
           EARLY_SETUP_MAX_OPEN:           ${{ vars.EARLY_SETUP_MAX_OPEN || '1' }}
           # ENABLE/MIN_BULLCONF/MIN_WHALE were never wired at all (found
