@@ -42,7 +42,7 @@ import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelati
 import { checkEntryQuality } from './entry-quality-check.js';
 import { evaluateSTTiming } from './st-timing-engine.js';
 
-import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, formatEarlyBuyLine, getEarlyBuyLastScan, earlyCooldownKey, EARLY_MODE, EARLY_SETUP_MODE, EARLY_ALERT_RESPECT_GUARD } from './early-buy.js';
+import { collectEarlyBuyCandidates, collectEarlyBuyAlerts, formatEarlyBuyLine, getEarlyBuyLastScan, earlyCooldownKey, EARLY_MODE, EARLY_SETUP_MODE, EARLY_SETUP_WATCH_MODE, EARLY_ALERT_RESPECT_GUARD } from './early-buy.js';
 // ── Scout entry (reduced-size buy at TRIGGERING, before full BREAKOUT
 // confirmation) — see the trigger-gate block below for the full rationale.
 // Off by default; each threshold is independently overridable via repo
@@ -562,14 +562,16 @@ async function main() {
       logEarlyScan();
       // Setup-path candidates (SETUP trigger, pre-confirmation) only execute when EARLY_SETUP_MODE=live;
       // otherwise they are Telegram-alert only, so the setup relaxations can be observed before they trade.
-      const setupAlerts = EARLY_SETUP_MODE === 'live' ? [] : allCands.filter(c => c.result.setupPath);
-      const cands = EARLY_SETUP_MODE === 'live' ? allCands : allCands.filter(c => !c.result.setupPath);
+      // WATCH-lane candidates (setup lane that passed only because WATCH was allowed) are alert-only unless EARLY_SETUP_WATCH_MODE=live.
+      const alertOnly = c => c.result.setupPath && (EARLY_SETUP_MODE !== 'live' || (c.result.watchLane && EARLY_SETUP_WATCH_MODE !== 'live'));
+      const setupAlerts = allCands.filter(alertOnly);
+      const cands = allCands.filter(c => !alertOnly(c));
       if (setupAlerts.length) {
         const nowTs = Date.now();
         for (const c of setupAlerts) earlyCooldowns[earlyCooldownKey(c.pair)] = nowTs;
         await sendTelegram([
           `\ud83d\udfe1 *Alpha Terminal \u2014 EARLY BUY (P0 setup, alert only)*`,
-          `Pre-confirmation SETUP: approaching the 5m Supertrend with CVD up and whales buying. Not auto-bought (EARLY_SETUP_MODE=${EARLY_SETUP_MODE}).`,
+          `Pre-confirmation SETUP: approaching the 5m Supertrend with CVD up and whales buying. Not auto-bought (EARLY_SETUP_MODE=${EARLY_SETUP_MODE}, EARLY_SETUP_WATCH_MODE=${EARLY_SETUP_WATCH_MODE}).`,
           '', setupAlerts.map(formatEarlyBuyLine).join('\n\n'),
         ].join('\n'));
       }

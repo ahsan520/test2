@@ -53,6 +53,14 @@ const LOG_MAX_FAILED = num('EARLY_LOG_MAX_FAILED', '3');   // audit-log strict p
 // 2026-10-24/25 replay of skipped events agreed: WATCH n=22 avg -0.71% / 18% win (15 stopped), the worst label by far.
 // Override with EARLY_BAD_SIGNALS (comma list, lowercase substrings) to retest.
 const BAD_SIGNAL  = (process.env.EARLY_BAD_SIGNALS || 'falling knife,weak,avoid,watch').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+// Setup-lane signal filter. 2026-11-04 audit: 54 of 55 SETUP/approach candidates failed ONLY-or-also on signalSafe (35 of them
+// labelled WATCH), so the lane that replays best (SETUP/approach, de-duplicated: n=32, 62% win, +1.10% avg) could never fire.
+// EARLY_SETUP_BAD_SIGNALS applies to the setup lane only (default = same list as EARLY_BAD_SIGNALS, i.e. no change); the strict
+// path always uses EARLY_BAD_SIGNALS. A candidate that passes ONLY because WATCH was allowed here is tagged watchLane:true and
+// is alert-only unless EARLY_SETUP_WATCH_MODE=live (see leaderboard-decider.js). WATCH overall is still stop-heavy
+// (n=94: 15 T1 / 29 stop), so this lane stays in shadow until it has its own replay sample.
+const SETUP_BAD_SIGNAL = (process.env.EARLY_SETUP_BAD_SIGNALS ?? (process.env.EARLY_BAD_SIGNALS || 'falling knife,weak,avoid,watch')).split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+export const EARLY_SETUP_WATCH_MODE = (process.env.EARLY_SETUP_WATCH_MODE || 'alert').toLowerCase();   // alert | live
 // Alert-mode controls. The live path already respects the market guard (BTC 4H regime etc.); the alert path did not, so
 // shadow alerts fired on days the bot itself would refuse to buy. EARLY_ALERT_RESPECT_GUARD=true (default) suppresses the
 // Telegram message when the guard blocks buys (audit + shadow scoring continue). EARLY_MAX_ALERTS_PER_CYCLE caps one message
@@ -110,7 +118,7 @@ function buildClauses(entry, symbolState, relaxed) {
     oiMomentumOk: !OI_MOM_REQUIRE || oiMomTrend == null || !OI_MOM_BLOCK.includes(oiMomTrend),
     buyIntel:     (entry?.buyIntelPenalty ?? 0) <= (setupLane ? Math.max(MAX_PENALTY, SETUP_MAX_PENALTY) : MAX_PENALTY),
     whale:        (entry?.whale?.score ?? 0) >= WHALE_MIN,
-    signalSafe:   !BAD_SIGNAL.some(w => sig.includes(w)),
+    signalSafe:   !(setupLane ? SETUP_BAD_SIGNAL : BAD_SIGNAL).some(w => sig.includes(w)),
     trigger:      trigConfirmed || setupTrigOk,
     setupNoKnife,
     preCross:     stage !== null,
@@ -124,6 +132,7 @@ function buildClauses(entry, symbolState, relaxed) {
   const failed = Object.keys(clauses).filter(k => !clauses[k]);
   return {
     pass: failed.length === 0, failed, clauses, stage,
+    watchLane: setupLane && BAD_SIGNAL.some(w => sig.includes(w)) && !SETUP_BAD_SIGNAL.some(w => sig.includes(w)),
     snap: {
       price: entry?.price ?? null, conv: entry?.conv ?? null, bullConf: entry?.bullConf ?? null,
       shock: d.shock ?? null, cvd: d.cvdTrend ?? null, oiDiv: d.oiDiv ?? null,
@@ -141,10 +150,10 @@ function buildClauses(entry, symbolState, relaxed) {
 // STRICT failure list plus setupFailed (what is still failing on the relaxed pass) for tuning.
 export function evaluateEarlyBuy(entry, symbolState = null) {
   const strict = buildClauses(entry, symbolState, false);
-  if (strict.pass || EARLY_SETUP_MODE === 'off') return { ...strict, setupPath: false, setupFailed: null, strictFailed: null };
+  if (strict.pass || EARLY_SETUP_MODE === 'off') return { ...strict, watchLane: false, setupPath: false, setupFailed: null, strictFailed: null };
   const relaxed = buildClauses(entry, symbolState, true);
   if (relaxed.pass) return { ...relaxed, setupPath: true, setupFailed: [], strictFailed: strict.failed };
-  return { ...strict, setupPath: false, setupFailed: relaxed.failed, strictFailed: null };
+  return { ...strict, watchLane: false, setupPath: false, setupFailed: relaxed.failed, strictFailed: null };
 }
 
 // Last scan summary (for the per-cycle console line in leaderboard-decider.js): how many crypto symbols were
@@ -174,7 +183,7 @@ export function collectEarlyBuyCandidates({ entries, cooldowns, positions = {}, 
     if (r.pass || r.failed.length <= LOG_MAX_FAILED || (r.setupFailed && r.setupFailed.length <= LOG_MAX_FAILED)) {
       const lk = `lb_early_log_${pair}`;
       if (now - (cooldowns[lk] || 0) >= 60 * 60000) {
-        logAudit('early_buy_candidate', { pair, priority: 'P0', type: 'EARLY_BUY', strict: r.pass && !r.setupPath, setupPath: r.setupPath, failed: r.setupPath ? r.strictFailed : r.failed, setupFailed: r.setupFailed, stage: r.stage, ...r.snap });
+        logAudit('early_buy_candidate', { pair, priority: 'P0', type: 'EARLY_BUY', strict: r.pass && !r.setupPath, setupPath: r.setupPath, watchLane: !!r.watchLane, failed: r.setupPath ? r.strictFailed : r.failed, setupFailed: r.setupFailed, stage: r.stage, ...r.snap });
         cooldowns[lk] = now;
       }
     }
