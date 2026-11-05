@@ -451,6 +451,9 @@
         <div>&nbsp;&nbsp;• Check the regime banner above (<b>Regime / Breadth / Risk score</b>). A RISK_OFF regime with breadth/risk failing the bot's own BUY_MIN_BREADTH / BUY_BTC_RISK_MAX gates means even a clean-looking row is fighting a market-wide headwind the bot itself would likely block or discount right now.</div>
       </div>
     </details>
+    <!-- Top-3 manual candidates (computed client-side from the same rows as the table below; see
+         renderMarketDataTopCandidates in app.js). A manual-buy aid, NOT a bot signal. -->
+    <div id="market-data-top3" style="border-bottom:1px solid var(--text-dim);font-family:var(--mono);padding:8px 10px;"></div>
     <div class="api-trades-header">
       <span class="api-trades-title">📊 MARKET DATA</span>
       <div id="market-data-asset-filter" style="display:flex;gap:4px;"></div>
