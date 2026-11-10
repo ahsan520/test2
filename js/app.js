@@ -1379,6 +1379,7 @@ const _MD_SORT_ACCESSORS = {
   hist:     e => e.hist?.winRate,
   position: e => _marketDataState.positions[e.base] ? (_marketDataState.positions[e.base].highestPnLSeen ?? 0) : -Infinity,
   buyIntel: e => e.d?.buyIntel?.penalty ?? -1,
+  botGate:  e => _mdBotGate(e).blockers.length,
   // Server-computed short-timeframe trigger (calcSpikeTrigger, buy-intelligence.js
   // → persisted top-level as e.triggerStatus/e.triggerScore by market-fetcher.js).
   // Rank so BREAKOUT sorts above TRIGGERING above SETUP, FAILED sinks lowest;
@@ -1423,7 +1424,7 @@ const _MD_COLUMNS = [
   ['CONV', 'conv'], ['BULLCONF', 'bullConf'], ['WHALE', 'whale'], ['SHOCK', 'shock'],
   ['RSI15', 'rsi15'], ['4H BIAS', 'bias4h'], ['DAILY BIAS', 'biasDay'], ['OI DIV', 'oiDiv'],
   ['CVD', 'cvd'], ['OI MOM', 'oiMom'], ['HIST (30D)', 'hist'], ['POSITION', 'position'],
-  ['BUY INTEL', 'buyIntel'],
+  ['BUY INTEL', 'buyIntel'], ['BOT GATE', 'botGate'],
 ];
 
 // dir: -1 = descending (default on first click of a new column — "biggest/
@@ -1482,9 +1483,11 @@ function _renderMarketDataHeader() {
 // A ranked shortlist of coins that are still PRE-spike, for buying BY HAND when the bot's gates stay quiet.
 // It deliberately never pads the list with coins that have already moved: if fewer than 3 coins are still approaching
 // their 5m Supertrend line, fewer are shown. Screening aid only, not a bot signal and not advice.
-// Evidence (scripts/missed_signal_check.py replay, 2026-11-04, stop 1.0% / T1 3.0% / 3h): SETUP while approaching the 5m
-// line was the best bucket (de-duplicated n=32, 62% win, +1.10% avg); a TRIGGERING/RETEST coin that has already left the
-// line was the worst (n=24, 17% win, -0.45% avg). So only the approach stage qualifies here.
+// Evidence (scripts/missed_signal_check.py, stop 1.0% / T1 3.0% / 3h): 2026-11-04 replay had SETUP while approaching the 5m
+// line as the best bucket (de-duplicated n=32, 62% win, +1.10% avg). The 2026-11-10 replay did NOT confirm it (n=27, 22% win,
+// -0.38% avg, RISK_OFF tape, 262/266 events guard-blocked), so treat every candidate here as unproven. Strict tier = approach
+// stage only. Loose tier (2026-11-10, _MD_LOOSE_ABOVE_ATR) also lists coins up to 2 ATR ABOVE the line, ranked after strict ones,
+// never READY, because the star tag in the Signal column flags such coins while this panel used to show 0.
 // Not visible here: the bot's Entry Quality "TRIGGER_STALE" check (breakout age).
 const _MD_TOP_N = 3;
 const _MD_MANUAL_STOP_PCT = 1.0;      // replay exit grid: stop 1.0 / T1 3.0 was the best combination (+0.40% avg)
@@ -1492,6 +1495,7 @@ const _MD_MANUAL_T1_PCT   = 3.0;
 const _MD_APPROACH_ATR    = 1.5;      // = EARLY_APPROACH_ATR: ST5 BEAR and no more than this many ATR below the line
 const _MD_EARLY_MAX_CHG24 = 10;       // "already spiked" cut-off for the panel (bot's own EARLY_MAX_CHG24 is 12)
 const _MD_EARLY_MAX_RSI15 = 65;       // panel is stricter than the bot's EARLY_MAX_RSI15 (68): early means room left
+const _MD_LOOSE_ABOVE_ATR = 2.0;      // loose tier: ST5 BULL but no more than this many ATR ABOVE the line (just left it). 0 disables the tier.
 const _MD_BOT_BULLCONF_MAX = 8;       // set to your EARLY_BULLCONF_MAX; above it the bot skips the coin (the panel flags it)
 
 function _mdCandidateEval(e) {
@@ -1502,6 +1506,9 @@ function _mdCandidateEval(e) {
   const dir = String(st5?.direction || '').toUpperCase();
   const dist = st5?.distanceATR;
   const approach = dir === 'BEAR' && dist != null && dist < 0 && dist >= -_MD_APPROACH_ATR;
+  // Loose tier: the coin has already crossed above the 5m line but is still close to it (a retest / just-crossed bounce).
+  // Not early in the strict sense (replay: coins past the line did worse), so it is ranked below strict candidates and never READY.
+  const nearLine = !approach && _MD_LOOSE_ABOVE_ATR > 0 && dir === 'BULL' && dist != null && dist >= 0 && dist <= _MD_LOOSE_ABOVE_ATR;
   const bothBear = approach && String(st15?.direction || '').toUpperCase() === 'BEAR' && (st15?.distanceATR ?? 0) < 0;
   const shock = parseFloat(d.shock);
   const whale = e.whale?.score ?? 0;
@@ -1515,7 +1522,7 @@ function _mdCandidateEval(e) {
   // Exclusions. The first group is "not early any more" (shown in the skipped line); the rest are the bot's no-go filters.
   const out = [];
   if (_marketDataState.positions?.[e.base]) out.push('held');
-  if (!approach) out.push(dir === 'BULL' ? 'already above the 5m line' : dir === 'BEAR' ? 'too far below the 5m line' : 'no 5m data');
+  if (!approach && !nearLine) out.push(dir === 'BULL' ? 'already above the 5m line' : dir === 'BEAR' ? 'too far below the 5m line' : 'no 5m data');
   if (chg != null && chg >= _MD_EARLY_MAX_CHG24) out.push('already +' + chg.toFixed(0) + '% today');
   if (r15 != null && r15 >= _MD_EARLY_MAX_RSI15) out.push('RSI15 ' + r15);
   if (bothBear) out.push('ST5+ST15 both bear (knife risk)');
@@ -1539,6 +1546,7 @@ function _mdCandidateEval(e) {
   score -= pen * 4;
   score -= dist != null ? Math.max(0, (Math.abs(dist) - 1) * 4) : 0;  // deeper below the line = further from a turn
   if (entryState === 'CHASING') score -= 6;
+  if (nearLine) score -= 12;                                           // always rank strict (below-the-line) candidates first
   if (e.hist?.sample >= 5 && e.hist.winRate != null && e.hist.winRate < 0.2) score -= 5;
 
   const need = [];
@@ -1547,10 +1555,41 @@ function _mdCandidateEval(e) {
   if (!(e.bullConf >= 5)) need.push('BullConf ' + (e.bullConf ?? '—') + '/10');
   if (pen > 2) need.push('penalty ' + pen);
   const warn = [];
+  if (nearLine) warn.push('already above the 5m line (' + dist.toFixed(2) + ' ATR) - not a pre-cross entry');
   if (entryState === 'CHASING') warn.push('labelled CHASING');
   if (e.bullConf > _MD_BOT_BULLCONF_MAX) warn.push('bot skips it: BullConf ' + e.bullConf + ' > ' + _MD_BOT_BULLCONF_MAX);
   if (!/WATCH|BUY/.test(sig)) warn.push('signal ' + (e.signal || '—'));
-  return { e, excluded: out, score: Math.round(score), ready: need.length === 0, need, warn, approach, dist };
+  return { e, excluded: out, score: Math.round(score), ready: need.length === 0 && !nearLine, need, warn, approach, nearLine, dist };
+}
+
+// ── BOT GATE column: why the bot's EARLY-BUY path is not buying this coin (crypto only) ──────────────────────────
+// APPROXIMATE client-side mirror of scripts/early-buy.js clauses + the BTC 4H regime gate, for a quick read only. The
+// server (audit.json: early_buy_candidate / market_guard / entry_quality_blocked) is authoritative; thresholds below
+// follow alerts.yml (EARLY_SHOCK_MIN .8, EARLY_WHALE_MIN 60, EARLY_BULLCONF 3..8, EARLY_MAX_BUYINTEL_PENALTY 1).
+// Later server layers (ST5/ST15 exhausted-zone, TRIGGER_STALE, IMPULSE_EXHAUSTED) are NOT visible here.
+function _mdBotGate(e) {
+  if (e.assetType !== 'crypto') return { blockers: [], text: '—', title: 'stocks use a different path' };
+  const d = e.d || {};
+  const sig = String(e.signal || '').toLowerCase();
+  const st5 = e.supertrend5m || d.supertrend5m || null;
+  const dir = String(st5?.direction || '').toUpperCase();
+  const dist = st5?.distanceATR;
+  const stage = (dir === 'BEAR' && dist != null && dist < 0 && dist >= -_MD_APPROACH_ATR) || (dir === 'BULL' && st5?.retest === true && dist != null && dist <= _MD_APPROACH_ATR);
+  const btc = (_marketDataState.symbols || []).find(x => x.pair === 'BTCUSDT');
+  const btcBear = ['BEAR 4H', 'LEAN BEAR'].includes(String(btc?.d?.bias4h || '').toUpperCase());
+  const b = [];
+  if (/falling knife|weak|avoid|watch/.test(sig)) b.push(['signal ' + (e.signal || ''), 'signalSafe: WATCH/WEAK/AVOID/FALLING KNIFE never qualify for early-buy']);
+  if (!stage) b.push([dir === 'BULL' ? 'past 5m line' : 'not pre-cross', 'preCross: must be ST5 BEAR within ' + _MD_APPROACH_ATR + ' ATR below the line, or a BULL retest']);
+  if (!(parseFloat(d.shock) > 0.8)) b.push(['shock ' + (isNaN(parseFloat(d.shock)) ? '—' : parseFloat(d.shock).toFixed(2)), 'volume shock must be > 0.8x']);
+  if ((e.whale?.score ?? 0) < 60) b.push(['whale ' + (e.whale?.score ?? '—'), 'whale score must be >= 60']);
+  if (!(e.bullConf >= 3 && e.bullConf <= _MD_BOT_BULLCONF_MAX)) b.push(['BullConf ' + (e.bullConf ?? '—'), 'BullConf must be 3..' + _MD_BOT_BULLCONF_MAX]);
+  if ((e.buyIntelPenalty ?? 0) > 1) b.push(['intel -' + e.buyIntelPenalty, 'buy-intel penalty must be <= 1']);
+  // BTC gate is market-wide (already in the top bar), so coin-specific reasons lead and it trails as a short suffix.
+  const btcNote = 'BTC 4H bias is bearish: the bot pauses new buys (a strong coin may still pass the alpha exception)';
+  const shown = b.slice(0, 2).map(x => x[0]).join(' · ') + (b.length > 2 ? ' +' + (b.length - 2) : '');
+  const text = (b.length ? shown : 'coin clear') + (btcBear ? ' · BTC gate' : '');
+  const all = b.map(x => x[1]).concat(btcBear ? [btcNote] : []);
+  return { blockers: btcBear ? b.concat([['BTC gate', btcNote]]) : b, text, title: all.length ? all.join(' | ') : 'passes the approximate early-buy checks (server has more gates)' };
 }
 
 function renderMarketDataTopCandidates() {
@@ -1560,32 +1599,35 @@ function renderMarketDataTopCandidates() {
   const eligible = all.filter(x => !x.excluded.length).sort((a, b) => b.score - a.score);
   const picks = eligible.slice(0, _MD_TOP_N);
   const approaching = all.filter(x => x.approach && !_marketDataState.positions?.[x.e.base]).length;
+  const nearCount = eligible.filter(x => x.nearLine).length;
   const ms = _marketDataState.regime || {};
   const bs = ms.buyStatus?.status;
   const regimeWarn = (ms.marketRegime === 'RISK_OFF' || (bs && bs !== 'OPEN'))
     ? `<div style="color:var(--bear);margin-bottom:6px;">⚠ Market ${ms.marketRegime || ''} / buy status ${bs || '—'} — the bot's guard would block buys right now.</div>` : '';
   const head = `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;font-size:9px;letter-spacing:1px;">
-    <span style="color:var(--text-bright);">🌱 TOP ${_MD_TOP_N} EARLY-BUY CANDIDATES <span style="color:var(--text-dim);">(still below the 5m line · not already spiked · not held)</span></span>
-    <span style="color:var(--text-dim);">${approaching} approaching the 5m line · ${eligible.length} pass the filters</span></div>`;
+    <span style="color:var(--text-bright);">🌱 TOP ${_MD_TOP_N} EARLY-BUY CANDIDATES <span style="color:var(--text-dim);">(below or just above the 5m line · not already spiked · not held)</span></span>
+    <span style="color:var(--text-dim);">${approaching} approaching the 5m line · ${nearCount} just above it · ${eligible.length} pass the filters</span></div>`;
   // Coins that look strong but have already moved - listed so it is clear they were considered and left out.
   const moved = all.filter(x => x.excluded.some(r => /above the 5m line|already \+|RSI15/.test(r)) && (x.e.conv ?? 0) >= 5 && !x.excluded.includes('held'))
     .sort((a, b) => (b.e.conv ?? 0) - (a.e.conv ?? 0)).slice(0, 8).map(x => x.e.base);
   const skipped = moved.length ? `<div style="font-size:8px;color:var(--text-dim);margin-top:4px;">Left out as already moved: ${moved.join(', ')}</div>` : '';
   if (!picks.length) {
-    el.innerHTML = head + regimeWarn + `<div style="font-size:9px;color:var(--text-dim);">Nothing is in a pre-spike approach with clean flow right now. Better to wait than buy after the move.</div>` + skipped;
+    el.innerHTML = head + regimeWarn + `<div style="font-size:9px;color:var(--text-dim);">Nothing is at or near the 5m line with clean flow right now. Better to wait than buy after the move.</div>` + skipped;
     return;
   }
   const cards = picks.map((x, i) => {
     const e = x.e, d = e.d || {}, px = parseFloat(e.price);
     const stop = px * (1 - _MD_MANUAL_STOP_PCT / 100), t1 = px * (1 + _MD_MANUAL_T1_PCT / 100);
     const fmt = v => v >= 100 ? v.toFixed(2) : v >= 1 ? v.toFixed(3) : v.toPrecision(4);
-    const tag = x.ready
+    const tag = x.nearLine
+      ? `<span style=\"color:#6ea8fe;border:1px solid #6ea8fe;border-radius:3px;padding:0 5px;\">NEAR LINE · WATCH</span>`
+      : x.ready
       ? `<span style="color:var(--bull);border:1px solid var(--bull);border-radius:3px;padding:0 5px;">EARLY · READY</span>`
       : `<span style="color:#ff8c00;border:1px solid #ff8c00;border-radius:3px;padding:0 5px;">EARLY · WATCH</span>`;
     return `<div style="flex:1;min-width:230px;border:1px solid var(--text-dim);border-radius:4px;padding:7px 9px;font-size:9px;line-height:1.6;">
       <div style="display:flex;justify-content:space-between;align-items:center;"><b style="font-size:11px;color:var(--text-bright);">#${i + 1} ${e.base}</b>${tag}</div>
       <div style="color:var(--text-dim);">$${e.price} · ${e.signal || '—'} · conv ${e.conv ?? '—'} · score ${x.score}</div>
-      <div>5m line ${x.dist != null ? x.dist.toFixed(2) + ' ATR below' : '—'} · ${e.triggerStatus || '—'} · BullConf ${e.bullConf ?? '—'}/10 · whale ${e.whale?.score ?? '—'}</div>
+      <div>5m line ${x.dist != null ? x.dist.toFixed(2) + (x.nearLine ? ' ATR above' : ' ATR below') : '—'} · ${e.triggerStatus || '—'} · BullConf ${e.bullConf ?? '—'}/10 · whale ${e.whale?.score ?? '—'}</div>
       <div>shock <span style="color:${_mdColorShock(parseFloat(d.shock))}">${d.shock != null ? parseFloat(d.shock).toFixed(2) + 'x' : '—'}</span> · RSI15 ${d.r15 ?? '—'} · 24h ${e.chg != null ? (e.chg > 0 ? '+' : '') + parseFloat(e.chg).toFixed(1) + '%' : '—'}</div>
       <div style="color:var(--text-dim);">Levels (replay best): stop $${fmt(stop)} (−${_MD_MANUAL_STOP_PCT}%) · T1 $${fmt(t1)} (+${_MD_MANUAL_T1_PCT}%) · ~3h hold</div>
       ${x.need.length ? `<div style="color:#ff8c00;">Missing: ${x.need.join(' · ')}</div>` : `<div style="color:var(--bull);">Setup-lane checks pass</div>`}
@@ -1593,7 +1635,7 @@ function renderMarketDataTopCandidates() {
     </div>`;
   }).join('');
   el.innerHTML = head + regimeWarn + `<div style="display:flex;gap:8px;flex-wrap:wrap;">${cards}</div>` + skipped + `
-    <div style="font-size:8px;color:var(--text-dim);margin-top:6px;">Manual-buy aid, not a bot signal or advice. Replay (2026-11-04): SETUP while approaching the 5m line did best (n=32, 62% win, +1.10% avg); small sample, one market move. A coin still below its line can keep falling: use the stop. Breakout age (TRIGGER_STALE) is not shown here.</div>`;
+    <div style="font-size:8px;color:var(--text-dim);margin-top:6px;">Manual-buy aid, not a bot signal or advice. Replays disagree: 11-04 SETUP/approach n=32, 62% win; 11-10 n=27, 22% win, -0.38% avg (bear tape). Small samples, one market move; buying any near-miss lost on average in the latest replay. A coin still below its line can keep falling: use the stop. Breakout age (TRIGGER_STALE) is not shown here.</div>`;
 }
 
 function renderMarketData() {
@@ -1640,7 +1682,7 @@ function renderMarketData() {
   }
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="20" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="21" style="text-align:center;color:var(--text-dim);padding:20px;">No market data on record yet.</td></tr>';
     return;
   }
 
@@ -1667,6 +1709,7 @@ function renderMarketData() {
       : '<span style="color:var(--text-dim)">no data</span>';
 
     const pos = _marketDataState.positions[e.base];
+    const _gate = _mdBotGate(e);
     const posText = pos
       ? `<span style="color:${pos.liveOrder?.mode === 'live' ? 'var(--accent)' : 'var(--text-bright)'}" title="Entry $${pos.entryPrice} · Stop $${pos.stop}">${pos.liveOrder?.mode === 'live' ? '🔴 LIVE' : '👁 watch'} ${pos.highestPnLSeen != null ? (pos.highestPnLSeen >= 0 ? '+' : '') + pos.highestPnLSeen + '%' : ''}</span>`
       : '<span style="color:var(--text-dim)">—</span>';
@@ -1692,6 +1735,7 @@ function renderMarketData() {
       <td style="font-size:9px">${histText}</td>
       <td style="font-size:9px">${posText}</td>
       <td style="font-size:9px">${biText}</td>
+      <td style="font-size:9px;color:${_gate.blockers.length ? 'var(--text-dim)' : 'var(--bull)'}" title="${_gate.title.replace(/"/g, '&quot;')}">${_gate.text}</td>
     </tr>`;
   }).join('');
 }
