@@ -15,9 +15,9 @@
     "t2": 1.1142,
     "score": -10,
     "spikeScore": 1.0186216584334469,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1794362170296,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -29,34 +29,40 @@
       "fillPrice": 1.0511004311432939,
       "buyOrderId": "MANUAL_ADOPTED_1794359491919",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__749018537414070272036",
+      "exitFillPrice": 1.0542081207163387,
+      "closedAt": 1794362171964,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
-      "reason": "no entry snapshot — falling-knife-only score 25 below 75 threshold",
-      "fallingKnifeScore": 25,
-      "exitProbability": 25,
-      "dynamicPositionRisk": 25,
+      "reason": "no entry snapshot — falling-knife-only score 70 below 75 threshold",
+      "fallingKnifeScore": 70,
+      "exitProbability": 70,
+      "dynamicPositionRisk": 70,
       "recovery": {
         "recovering": false,
         "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1794361873499
+      "evaluatedAt": 1794362170296
     },
     "highestPnLSeen": 0.98,
     "lowestPnLSeen": -0.08,
-    "lastR15": 49.2,
+    "lastR15": 44.2,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.39% ≥ 0.35% but confirmed momentum weakness not met (0/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +0.98% fell 0.76% to +0.22% (≥ 0.50% trail)",
       "highestPnLSeen": 0.98,
-      "drawdownFromPeak": 0.39,
-      "tier": "B",
-      "giveBack": 0.35,
-      "evaluatedAt": 1794361873499
+      "drawdownFromPeak": 0.76,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1794362170296
     },
-    "prevPnLPct": 0.59
+    "prevPnLPct": 0.22,
+    "exitPrice": 1.0534,
+    "statusChangedAt": 1794362170296
   }
 }
