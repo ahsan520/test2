@@ -15,9 +15,9 @@
     "t2": 1.1179,
     "score": -4,
     "spikeScore": 0.2481961606436405,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1794415599646,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "peak",
     "recommended": false,
@@ -29,7 +29,11 @@
       "fillPrice": 1.054588834610242,
       "buyOrderId": "MANUAL_ADOPTED_1794400576111",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__749242634282684416036",
+      "exitFillPrice": 1.0683344667264172,
+      "closedAt": 1794415600828,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -43,21 +47,23 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1794415275388
+      "evaluatedAt": 1794415599646
     },
     "highestPnLSeen": 2.06,
     "lowestPnLSeen": 0.02,
-    "lastR15": 58.6,
+    "lastR15": 56.9,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.65% below tier A+ give-back 0.75%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +2.06% fell 0.75% to +1.31% (≥ 0.72% trail)",
       "highestPnLSeen": 2.06,
-      "drawdownFromPeak": 0.6500000000000001,
-      "tier": "A+",
-      "giveBack": 0.75,
-      "evaluatedAt": 1794415275388
+      "drawdownFromPeak": 0.75,
+      "tier": "TRAIL",
+      "giveBack": 0.721,
+      "evaluatedAt": 1794415599646
     },
-    "prevPnLPct": 1.41
+    "prevPnLPct": 1.31,
+    "exitPrice": 1.0684,
+    "statusChangedAt": 1794415599646
   },
   "NASDAQ:AAPL": {
     "sym": "NASDAQ:AAPL",
@@ -95,7 +101,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1794415275388
+      "evaluatedAt": 1794415599646
     }
   },
   "NYSE:GE": {
@@ -126,17 +132,17 @@
     "caution": false,
     "highestPnLSeen": 1.45,
     "lowestPnLSeen": 0.19,
-    "lastR15": 62,
+    "lastR15": 62.2,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "drawdown 0.35% below tier A give-back 0.50%",
+      "reason": "drawdown 0.24% below tier A give-back 0.50%",
       "highestPnLSeen": 1.45,
-      "drawdownFromPeak": 0.34999999999999987,
+      "drawdownFromPeak": 0.24,
       "tier": "A",
       "giveBack": 0.5,
-      "evaluatedAt": 1794415275388
+      "evaluatedAt": 1794415599646
     },
-    "prevPnLPct": 1.1
+    "prevPnLPct": 1.21
   },
   "NASDAQ:GOOG": {
     "sym": "NASDAQ:GOOG",
@@ -164,17 +170,17 @@
     "histWinRate": 0,
     "histSample": 4,
     "caution": true,
-    "highestPnLSeen": 0.54,
+    "highestPnLSeen": 0.65,
     "lowestPnLSeen": -0.28,
-    "lastR15": 27.5,
+    "lastR15": 27.9,
     "lastProfitIntel": {
       "action": "HOLD",
-      "reason": "peak 0.54% below 0.8% floor — not evaluated yet",
-      "highestPnLSeen": 0.54,
+      "reason": "peak 0.65% below 0.8% floor — not evaluated yet",
+      "highestPnLSeen": 0.65,
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1794415275388
+      "evaluatedAt": 1794415599646
     }
   }
 }
