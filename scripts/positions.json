@@ -81,7 +81,7 @@
     "caution": false,
     "highestPnLSeen": 0.05,
     "lowestPnLSeen": -0.74,
-    "lastR15": 59.7,
+    "lastR15": 60,
     "lastProfitIntel": {
       "action": "HOLD",
       "reason": "peak 0.05% below 0.8% floor — not evaluated yet",
@@ -89,7 +89,7 @@
       "drawdownFromPeak": 0,
       "tier": null,
       "giveBack": null,
-      "evaluatedAt": 1794500159801
+      "evaluatedAt": 1794500456582
     }
   },
   "BINANCE:XRPUSDT": {
@@ -108,9 +108,9 @@
     "t2": 1.0871,
     "score": -12,
     "spikeScore": 0.49003830768763446,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1794500456582,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "latest",
     "recommended": false,
@@ -122,7 +122,11 @@
       "fillPrice": 1.0255386585127404,
       "buyOrderId": "MANUAL_ADOPTED_1794495360198",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__749598549703888896036",
+      "exitFillPrice": 1.0279405017128964,
+      "closedAt": 1794500457635,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -136,20 +140,22 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1794500159801
+      "evaluatedAt": 1794500456582
     },
     "highestPnLSeen": 0.8,
     "lowestPnLSeen": -0.76,
-    "lastR15": 45.5,
+    "lastR15": 43.2,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.39% ≥ 0.35% but confirmed momentum weakness not met (0/2) — holding, letting it run",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +0.80% fell 0.57% to +0.23% (≥ 0.50% trail)",
       "highestPnLSeen": 0.8,
-      "drawdownFromPeak": 0.39000000000000007,
-      "tier": "B",
-      "giveBack": 0.35,
-      "evaluatedAt": 1794500159801
+      "drawdownFromPeak": 0.5700000000000001,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1794500456582
     },
-    "prevPnLPct": 0.41
+    "prevPnLPct": 0.23,
+    "exitPrice": 1.0279,
+    "statusChangedAt": 1794500456582
   }
 }
