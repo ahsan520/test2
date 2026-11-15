@@ -15,9 +15,9 @@
     "t2": 1.0268,
     "score": -4,
     "spikeScore": 0.9640337429312857,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1794750078990,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "peak",
     "recommended": false,
@@ -29,7 +29,11 @@
       "fillPrice": 0.9686791275975636,
       "buyOrderId": "MANUAL_ADOPTED_1794742875757",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "sellOrderId": "C02__750645541662056448036",
+      "exitFillPrice": 0.9715704165813716,
+      "closedAt": 1794750079947,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -38,25 +42,27 @@
       "exitProbability": 24,
       "dynamicPositionRisk": 24,
       "recovery": {
-        "recovering": true,
-        "sustainedMin": 6
+        "recovering": false,
+        "sustainedMin": 0
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1794749851303
+      "evaluatedAt": 1794750078990
     },
     "highestPnLSeen": 0.86,
     "lowestPnLSeen": -0.69,
-    "lastR15": 61.1,
+    "lastR15": 57.6,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.24% below tier B give-back 0.35%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +0.86% fell 0.54% to +0.32% (≥ 0.50% trail)",
       "highestPnLSeen": 0.86,
-      "drawdownFromPeak": 0.24,
-      "tier": "B",
-      "giveBack": 0.35,
-      "evaluatedAt": 1794749851303
+      "drawdownFromPeak": 0.54,
+      "tier": "TRAIL",
+      "giveBack": 0.5,
+      "evaluatedAt": 1794750078990
     },
-    "prevPnLPct": 0.62
+    "prevPnLPct": 0.32,
+    "exitPrice": 0.9718,
+    "statusChangedAt": 1794750078990
   }
 }
