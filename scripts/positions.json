@@ -15,9 +15,9 @@
     "t2": 1.07415,
     "score": 6,
     "spikeScore": 2.7207421105091134,
-    "exitAlertedAt": null,
+    "exitAlertedAt": 1795444567529,
     "tier1AlertedAt": null,
-    "status": "watching",
+    "status": "exiting",
     "source": "manual_adopted",
     "scoreSource": "peak",
     "recommended": false,
@@ -29,7 +29,11 @@
       "fillPrice": 0.9930879186600783,
       "buyOrderId": "MANUAL_ADOPTED_1795443369766",
       "adopted": true,
-      "priceSource": "trade_history"
+      "priceSource": "trade_history",
+      "closedAt": 1795444567772,
+      "exitFillPrice": 1.0001,
+      "dustIgnored": true,
+      "staleZeroBalanceStrikes": 0
     },
     "lastPI": {
       "action": "HOLD",
@@ -43,21 +47,23 @@
       },
       "breakoutFailed": false,
       "noSnapshotFallback": true,
-      "evaluatedAt": 1795444356043
+      "evaluatedAt": 1795444567529
     },
     "highestPnLSeen": 1.83,
-    "lowestPnLSeen": 1.79,
-    "lastR15": 84.4,
-    "prevPnLPct": 1.83,
+    "lowestPnLSeen": 0.71,
+    "lastR15": 74.9,
+    "prevPnLPct": 0.71,
     "lastProfitIntel": {
-      "action": "HOLD",
-      "reason": "drawdown 0.00% below tier A+ give-back 0.75%",
+      "action": "EXIT",
+      "reason": "Profit Protection Triggered: trailing stop — peak +1.83% fell 1.12% to +0.71% (≥ 0.64% trail)",
       "highestPnLSeen": 1.83,
-      "drawdownFromPeak": 0,
-      "tier": "A+",
-      "giveBack": 0.75,
-      "evaluatedAt": 1795444356043
-    }
+      "drawdownFromPeak": 1.12,
+      "tier": "TRAIL",
+      "giveBack": 0.6405,
+      "evaluatedAt": 1795444567529
+    },
+    "exitPrice": 1.0001,
+    "statusChangedAt": 1795444567529
   },
   "NASDAQ:AMZN": {
     "sym": "NASDAQ:AMZN",
