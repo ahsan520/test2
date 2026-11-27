@@ -184,6 +184,22 @@ jobs:
           LB_MOM_WATCH_ENABLE:        ${{ vars.LB_MOM_WATCH_ENABLE || 'true' }}
           LB_MOM_MIN_SCORE:           ${{ vars.LB_MOM_MIN_SCORE || '0' }}
           LB_MOM_WATCH_COOLDOWN_MIN:  ${{ vars.LB_MOM_WATCH_COOLDOWN_MIN || '20' }}
+          # ── XRP-only 5m momentum BUY/SELL alert (scripts/xrp-momentum.js).
+          # XRP is fee-free so the streak bar is low. Alert only, no execution.
+          XRP_MOM_ENABLE:         ${{ vars.XRP_MOM_ENABLE || 'true' }}
+          XRP_MOM_SELL_ENABLE:    ${{ vars.XRP_MOM_SELL_ENABLE || 'true' }}
+          XRP_MOM_STREAK_MIN:     ${{ vars.XRP_MOM_STREAK_MIN || '3' }}
+          XRP_MOM_MIN_MOVE_PCT:   ${{ vars.XRP_MOM_MIN_MOVE_PCT || '0.15' }}
+          XRP_MOM_COOLDOWN_MIN:   ${{ vars.XRP_MOM_COOLDOWN_MIN || '10' }}
+          XRP_MOM_REQUIRE_HL_LH:      ${{ vars.XRP_MOM_REQUIRE_HL_LH || 'true' }}
+          XRP_MOM_MIN_DROP_PCT:       ${{ vars.XRP_MOM_MIN_DROP_PCT || '0.4' }}
+          XRP_MOM_MIN_RECOVERY_PCT:   ${{ vars.XRP_MOM_MIN_RECOVERY_PCT || '50' }}
+          XRP_MOM_MAX_PULLBACK_PCT:   ${{ vars.XRP_MOM_MAX_PULLBACK_PCT || '0.5' }}
+          XRP_MOM_REQUIRE_DIP:        ${{ vars.XRP_MOM_REQUIRE_DIP || 'true' }}
+          XRP_MOM_DIP_ZONE_PCT:       ${{ vars.XRP_MOM_DIP_ZONE_PCT || '0.5' }}
+          XRP_MOM_MAX_MOVE_PCT:       ${{ vars.XRP_MOM_MAX_MOVE_PCT || '0.9' }}
+          XRP_MOM_MAX_EXT_PCT:        ${{ vars.XRP_MOM_MAX_EXT_PCT || '0.4' }}
+          XRP_MOM_MAX_CANDLE_X:       ${{ vars.XRP_MOM_MAX_CANDLE_X || '3' }}
           LB_HOLD_LOCK:       ${{ vars.LB_HOLD_LOCK || '20' }}
           LB_EXIT_CVD_CYCLES: ${{ vars.LB_EXIT_CVD_CYCLES || vars.LB_CVD_CYCLES || '3' }}
           LB_EXIT_SCORE_MIN:  ${{ vars.LB_EXIT_SCORE_MIN || '3' }}
