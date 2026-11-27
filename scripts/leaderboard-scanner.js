@@ -10,6 +10,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import fs   from 'fs';
+import { calcXrpStreak } from './xrp-momentum.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { resolveExchange, toStooqSymbol, toYahooSymbol, buildSymKey } from './exchange-registry.js';
@@ -1242,6 +1243,7 @@ export async function scoreSymbol(pair, prevFr = null, btcTriggerOk = null) {
       bullConf: bullConf.count, bullChecks: bullConf.checks,
       flow, grade: gradeInfo.grade, successProb: gradeInfo.successProb, archetype,
       trigger,
+      xrpStreak: pair === (process.env.XRP_MOM_PAIR || 'XRPUSDT') ? calcXrpStreak(k5) : undefined,
     };
   } catch (e) {
     console.log(`  ⚠  ${pair} crypto score failed: ${e.message}`);

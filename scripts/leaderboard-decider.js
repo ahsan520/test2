@@ -36,6 +36,7 @@ import {
 import { mexcGetAllBalances } from './mexc-client.js';
 
 import { sendTelegram, pollTelegramCommands } from './telegram-commands.js';
+import { collectXrpMomentumAlerts } from './xrp-momentum.js';
 import { monitorPositions, reconcileTrackedLiveBalances } from './position-monitor.js';
 import { executeTradeCycle, adoptManualHoldings, executeSTPriorityRotation, executeST5PriorityRotation, executeEarlyBuyP0 } from './mexc-trader.js';
 import { runAllBuyGuards, isDivergingFromBtc, checkBtcAlphaException, calcRelativeStrength, checkBull4hPersistence, checkMarketIntelligenceGate } from './market-guard.js';
@@ -722,6 +723,18 @@ async function main() {
   // see below — has cooldown state available on the early no-candidate
   // return path too, not just the normal buy path.
   const cooldowns = loadCooldowns();
+
+  // XRP-only 5m momentum BUY/SELL alert (xrp-momentum.js) — runs before the
+  // pre-screen so it's never swallowed by the no-candidate early returns.
+  // Informational only; no execution.
+  {
+    const xrpLines = collectXrpMomentumAlerts(entries, cooldowns, loadPositions());
+    if (xrpLines.length) {
+      await sendTelegram([`📈 *Alpha Terminal — XRP 5m momentum*`, `_alert only — no order placed_`, '', xrpLines.join('\n\n')].join('\n'));
+      saveCooldowns(cooldowns);
+      logAudit('xrp_momentum_alert', { count: xrpLines.length });
+    }
+  }
 
   // Pre-screen — bail early if nothing clears min score
   const anyCandidate = entries.some(([, entry]) => {
